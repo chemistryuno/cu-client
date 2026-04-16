@@ -1,7 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import { buildApiURL } from './utils/runtimeConfig'
+import { buildApiURL, OFFLINE_MODE } from './utils/runtimeConfig'
+import { installOfflineFetchInterceptor } from './utils/offlineBackend'
 import './index.css'
 
 const syncViewportHeight = () => {
@@ -105,6 +106,9 @@ const scheduleNonCriticalTask = (task: () => void, timeout = 1000) => {
 }
 
 async function bootstrap() {
+  if (OFFLINE_MODE) {
+    installOfflineFetchInterceptor()
+  }
   scheduleViewportSync()
   window.addEventListener('resize', scheduleViewportSync, { passive: true })
   window.addEventListener('orientationchange', scheduleViewportSync, { passive: true })

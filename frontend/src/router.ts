@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
-import { buildApiURL } from './utils/runtimeConfig'
+import { createRouter, createWebHashHistory, createWebHistory, type RouteLocationNormalized } from 'vue-router'
+import { OFFLINE_MODE, buildApiURL } from './utils/runtimeConfig'
 
 const Login = () => import('./pages/Login.vue')
 const Register = () => import('./pages/Register.vue')
@@ -155,7 +155,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: OFFLINE_MODE ? createWebHashHistory() : createWebHistory(),
   routes
 })
 

@@ -1,4 +1,5 @@
-import { WS_URL } from './runtimeConfig'
+﻿import { OFFLINE_MODE, WS_URL } from './runtimeConfig'
+import { offlineSocket } from './offlineBackend'
 
 interface WebSocketMessage {
   type: string
@@ -8,11 +9,13 @@ interface WebSocketMessage {
 class WebSocketService {
   private ws: WebSocket | null = null
   private listeners: { [key: string]: Array<(message: WebSocketMessage) => void> } = {}
-  private reconnectAttempts: number = 0
-  private readonly maxReconnectAttempts: number = 5
+  private offlineUnsubscribers: { [key: string]: (() => void) | undefined } = {}
+  private reconnectAttempts = 0
+  private readonly maxReconnectAttempts = 5
   private pendingMessages: WebSocketMessage[] = []
-  private isConnecting: boolean = false
-  private networkEventsBound: boolean = false
+  private isConnecting = false
+  private networkEventsBound = false
+  private currentRoomId: string | null = null
 
   private bindNetworkEvents(): void {
     if (this.networkEventsBound) return
@@ -31,38 +34,39 @@ class WebSocketService {
   }
 
   connect(): void {
+    if (OFFLINE_MODE) {
+      this.bindNetworkEvents()
+      this.isConnecting = false
+      this.reconnectAttempts = 0
+      return
+    }
+
     if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
       return
     }
 
     this.bindNetworkEvents()
     this.isConnecting = true
-    const wsUrl = WS_URL
-
-    this.ws = new WebSocket(wsUrl)
+    this.ws = new WebSocket(WS_URL)
 
     this.ws.onopen = () => {
-      console.log('[WebSocket] connected')
       this.reconnectAttempts = 0
       this.isConnecting = false
-
       while (this.pendingMessages.length > 0) {
-        const msg = this.pendingMessages.shift()
-        if (msg) this.send(msg)
+        const message = this.pendingMessages.shift()
+        if (message) this.send(message)
       }
     }
 
     this.ws.onmessage = (event: MessageEvent) => {
       try {
-        const message: WebSocketMessage = JSON.parse(event.data)
-        this.handleMessage(message)
+        this.handleMessage(JSON.parse(event.data))
       } catch (error) {
         console.error('[WebSocket] failed to parse message:', error)
       }
     }
 
     this.ws.onclose = () => {
-      console.log('[WebSocket] disconnected')
       this.isConnecting = false
       this.attemptReconnect()
     }
@@ -75,13 +79,17 @@ class WebSocketService {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++
-      console.log(`[WebSocket] reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`)
+      this.reconnectAttempts += 1
       setTimeout(() => this.connect(), 3000)
     }
   }
 
   disconnect(): void {
+    if (OFFLINE_MODE) {
+      this.isConnecting = false
+      return
+    }
+
     this.reconnectAttempts = this.maxReconnectAttempts
     if (this.ws) {
       this.ws.close()
@@ -91,14 +99,33 @@ class WebSocketService {
   }
 
   send(message: WebSocketMessage): void {
+    if (OFFLINE_MODE) {
+      if (message.type === 'chat' && this.currentRoomId) {
+        offlineSocket.sendRoomChat(this.currentRoomId, String(message.message || ''))
+      } else if (message.type === 'private_chat') {
+        this.handleMessage({
+          type: 'chat',
+          data: {
+            uid: 0,
+            username: 'system',
+            nickname: '离线系统',
+            avatar: '???',
+            message: '纯离线模式下未启用跨用户私聊。',
+            created_at: new Date().toISOString()
+          }
+        })
+      }
+      return
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
-    } else {
-      console.log('[WebSocket] queueing message until the connection is ready')
-      this.pendingMessages.push(message)
-      if (!this.isConnecting) {
-        this.connect()
-      }
+      return
+    }
+
+    this.pendingMessages.push(message)
+    if (!this.isConnecting) {
+      this.connect()
     }
   }
 
@@ -107,34 +134,39 @@ class WebSocketService {
       this.listeners[event] = []
     }
     this.listeners[event].push(callback)
+
+    if (OFFLINE_MODE && !this.offlineUnsubscribers[event]) {
+      this.offlineUnsubscribers[event] = offlineSocket.on(event, (message) => this.handleMessage(message))
+    }
   }
 
   off(event: string, callback: (message: WebSocketMessage) => void): void {
-    if (this.listeners[event]) {
-      this.listeners[event] = this.listeners[event].filter(cb => cb !== callback)
+    if (!this.listeners[event]) return
+    this.listeners[event] = this.listeners[event].filter((item) => item !== callback)
+    if (OFFLINE_MODE && this.listeners[event].length === 0 && this.offlineUnsubscribers[event]) {
+      this.offlineUnsubscribers[event]?.()
+      delete this.offlineUnsubscribers[event]
     }
   }
 
   private handleMessage(message: WebSocketMessage): void {
-    const { type } = message
-    if (this.listeners[type]) {
-      this.listeners[type].forEach(callback => {
-        try {
-          callback(message)
-        } catch (e) {
-          console.error(`WebSocket handler error for "${type}":`, e)
-        }
-      })
-    }
+    const handlers = this.listeners[message.type] || []
+    handlers.forEach((handler) => {
+      try {
+        handler(message)
+      } catch (error) {
+        console.error(`[WebSocket] handler error for ${message.type}:`, error)
+      }
+    })
   }
 
   joinRoom(roomId: string): void {
-    console.log('[WebSocket] Joining room:', roomId)
+    this.currentRoomId = roomId
     this.send({ type: 'join_room', room_id: roomId })
   }
 
   leaveRoom(): void {
-    console.log('[WebSocket] Leaving room')
+    this.currentRoomId = null
     this.send({ type: 'leave_room' })
   }
 
@@ -143,8 +175,10 @@ class WebSocketService {
   }
 
   isConnected(): boolean {
+    if (OFFLINE_MODE) return true
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN
   }
 }
 
 export default new WebSocketService()
+
