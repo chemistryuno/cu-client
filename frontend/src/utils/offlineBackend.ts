@@ -470,3 +470,722 @@ const drawCardsForPlayer = (game: GameState, index: number, count: number) => {
   }
   refreshCardCounts(game)
 }
+
+const nextActivePlayerIndex = (game: GameState) => {
+  if (game.players.length <= 1) return 0
+  let next = game.current_player
+  for (let i = 0; i < game.players.length; i += 1) {
+    next = (next + game.direction + game.players.length) % game.players.length
+    const uid = game.players[next]?.uid
+    if (!game.finished_players.includes(uid)) return next
+  }
+  return next
+}
+
+const getPlayerSummary = (state: State, room: Room) => room.players.map((uid) => serializeUser(getPlayerInfo(state, uid) || {
+  uid,
+  username: `player-${uid}`,
+  password: '',
+  nickname: `Player ${uid}`,
+  avatar: '🧪',
+  role: 'user',
+  is_admin: false,
+  points: 1000,
+  exp: 0,
+  level: 1,
+  created_at: nowISO()
+}))
+
+const roomSnapshot = (state: State, room: Room) => ({
+  ...clone(room),
+  players_info: getPlayerSummary(state, room)
+})
+
+const emitRoomsUpdate = (state: State) => {
+  emit('rooms_update', { type: 'rooms_update', data: clone(state.rooms) })
+  emit('online_count', { type: 'online_count', data: Math.max(1, state.users.length) })
+}
+
+const emitGameUpdate = (room: Room) => {
+  if (room.game_state) {
+    emit('game_update', { type: 'game_update', data: clone(room.game_state) })
+  }
+}
+
+const pushGlobalChat = (state: State, message: ChatMessage) => {
+  state.global_messages.push(message)
+  state.global_messages = state.global_messages.slice(-100)
+}
+
+const createHistory = (state: State, room: Room) => {
+  const game = room.game_state
+  if (!game) return
+  const winnerUid = game.finished_players[0] ?? null
+  const winner = winnerUid ? getPlayerInfo(state, winnerUid) : null
+  state.histories.unshift({
+    id: state.next_history_id++,
+    room_id: room.id,
+    winner_uid: winnerUid,
+    winner_name: winner?.nickname || winner?.username || 'Unknown',
+    is_invalid: false,
+    invalid_reason: '',
+    has_replay: true,
+    replay_events: clone(game.discard_pile),
+    replay_permanent: true,
+    replay_expires_at: null,
+    replay_cleared_at: null,
+    cheat_detected: false,
+    cheat_uids: [],
+    players: clone(room.players),
+    original_player_count: game.original_player_count,
+    quitted_count: game.quitted_count,
+    finished_players: clone(game.finished_players),
+    started_at: room.created_at,
+    finished_at: nowISO(),
+    created_at: nowISO()
+  })
+}
+
+const finishGameIfNeeded = (state: State, room: Room) => {
+  const game = room.game_state
+  if (!game || game.status === 'finished') return
+  const alive = game.players.filter((player) => !game.finished_players.includes(player.uid))
+  if (alive.length <= 1) {
+    if (alive.length === 1 && !game.finished_players.includes(alive[0].uid)) {
+      game.finished_players.unshift(alive[0].uid)
+    }
+    game.status = 'finished'
+    room.status = 'finished'
+    const winnerUid = game.finished_players[0]
+    game.points_changes = {}
+    game.xp_changes = {}
+    game.players.forEach((player, index) => {
+      const won = player.uid === winnerUid || (index === 0 && !winnerUid)
+      game.points_changes[player.uid] = won ? 30 : 10
+      game.xp_changes[player.uid] = won ? 20 : 8
+      const user = getPlayerInfo(state, player.uid)
+      if (user) {
+        user.points += game.points_changes[player.uid]
+        user.exp += game.xp_changes[player.uid]
+        user.level = Math.max(1, Math.floor(user.exp / 100) + 1)
+      }
+    })
+    clearTimer(turnTimers, room.id)
+    clearTimer(aiTimers, room.id)
+    createHistory(state, room)
+    emit('action_toast', { type: 'action_toast', data: 'Game finished in offline mode.' })
+    emitGameUpdate(room)
+    emitRoomsUpdate(state)
+  }
+}
+
+const runAiTurn = (state: State, room: Room) => {
+  const game = ensureGame(room)
+  const player = game.players[game.current_player]
+  if (!player?.is_ai) return
+  const available = getAvailableSubstances(player.hand_cards)
+  const playable = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula))
+  if (playable.length > 0) {
+    applyPlay(state, room, game.current_player, playable[0], game.last_card ? [game.last_card.substance, playable[0]] : [playable[0]])
+    emit('action_toast', { type: 'action_toast', data: `${player.nickname} played ${playable[0]}.` })
+  } else {
+    const drawCount = Math.max(1, game.pending_draw_count || 1)
+    drawCardsForPlayer(game, game.current_player, drawCount)
+    game.pending_draw_count = 0
+    game.pending_draw_types = []
+    emit('action_toast', { type: 'action_toast', data: `${player.nickname} drew cards.` })
+  }
+  advanceTurn(state, room)
+}
+
+const maybeScheduleAiTurn = (_state: State, room: Room) => {
+  clearTimer(aiTimers, room.id)
+  const game = room.game_state
+  if (!game || game.status !== 'playing') return
+  const current = game.players[game.current_player]
+  if (!current?.is_ai) return
+  const timer = window.setTimeout(() => {
+    const latest = readState()
+    const targetRoom = latest.rooms.find((item) => item.id === room.id)
+    if (!targetRoom?.game_state || targetRoom.game_state.status !== 'playing') return
+    runAiTurn(latest, targetRoom)
+    writeState(latest)
+    emitGameUpdate(targetRoom)
+    emitRoomsUpdate(latest)
+  }, 900)
+  aiTimers.set(room.id, timer)
+}
+
+const scheduleTurnTimer = (_state: State, room: Room) => {
+  clearTimer(turnTimers, room.id)
+  const game = room.game_state
+  if (!game || game.status !== 'playing') return
+  game.turn_end_time = nowMs() + TURN_TIMEOUT_MS
+  const current = game.players[game.current_player]
+  const timer = window.setTimeout(() => {
+    const latest = readState()
+    const targetRoom = latest.rooms.find((item) => item.id === room.id)
+    if (!targetRoom?.game_state || targetRoom.game_state.status !== 'playing') return
+    const player = targetRoom.game_state.players[targetRoom.game_state.current_player]
+    if (!player || player.uid !== current.uid) return
+    drawCardsForPlayer(targetRoom.game_state, targetRoom.game_state.current_player, Math.max(1, targetRoom.game_state.pending_draw_count || 1))
+    targetRoom.game_state.pending_draw_count = 0
+    targetRoom.game_state.pending_draw_types = []
+    targetRoom.game_state.current_player = nextActivePlayerIndex(targetRoom.game_state)
+    writeState(latest)
+    emit('action_toast', { type: 'action_toast', data: `${player.nickname} auto-drew due to timeout.` })
+    emitGameUpdate(targetRoom)
+    emitRoomsUpdate(latest)
+    scheduleTurnTimer(latest, targetRoom)
+    maybeScheduleAiTurn(latest, targetRoom)
+  }, TURN_TIMEOUT_MS)
+  turnTimers.set(room.id, timer)
+}
+
+const appendFinishedPlayer = (game: GameState, uid: number) => {
+  if (!game.finished_players.includes(uid)) {
+    game.finished_players.push(uid)
+  }
+}
+
+const applyPlay = (_state: State, room: Room, playerIndex: number, substance: string, reactants?: string[]) => {
+  const game = ensureGame(room)
+  const player = game.players[playerIndex]
+  const normalized = normalizeFormula(substance)
+  if (!normalized) throw { status: 400, data: { error: 'Substance is required' } }
+  if (!canFormSubstance(player.hand_cards, normalized)) {
+    throw { status: 400, data: { error: 'Required cards are not available locally' } }
+  }
+  if (game.last_card && !isReactionPair(game.last_card.substance, normalized)) {
+    throw { status: 400, data: { error: 'These substances cannot react' } }
+  }
+
+  player.hand_cards = removeFormulaCards(player.hand_cards, normalized)
+  player.card_count = player.hand_cards.length
+  player.action_progress = Math.min(2, player.action_progress + 1)
+  if (player.action_progress >= 2) {
+    player.double_action_available = true
+  }
+
+  const playedCard: PlayedCard = {
+    card: { type: normalized, count: 1, effect: specialCards.has(normalized) ? normalized : undefined },
+    substance: normalized,
+    player_uid: player.uid,
+    reactants
+  }
+
+  game.last_card = playedCard
+  game.discard_pile.push(playedCard)
+  game.current_reaction = reactants?.length ? reactants.join(' + ') : normalized
+
+  if (normalized === '+2') {
+    game.pending_draw_count += 2
+    game.pending_draw_types.push('+2')
+  }
+  if (normalized === '+4') {
+    game.pending_draw_count += 4
+    game.pending_draw_types.push('+4')
+  }
+
+  if (player.hand_cards.length === 0) {
+    appendFinishedPlayer(game, player.uid)
+  }
+}
+
+const advanceTurn = (state: State, room: Room) => {
+  const game = ensureGame(room)
+  refreshCardCounts(game)
+  finishGameIfNeeded(state, room)
+  if (game.status === 'finished') return
+  game.current_player = nextActivePlayerIndex(game)
+  scheduleTurnTimer(state, room)
+  maybeScheduleAiTurn(state, room)
+}
+
+const buildGameState = (state: State, room: Room) => {
+  const players = room.players.map((uid) => {
+    const user = getPlayerInfo(state, uid)
+    if (!user) throw { status: 400, data: { error: 'User not found in room' } }
+    return toPlayerState(user, room.ready_uids.includes(uid))
+  })
+
+  for (let i = 0; i < room.ai_count; i += 1) {
+    const uid = -1 - i
+    players.push(toPlayerState({
+      uid,
+      username: `ai-${Math.abs(uid)}`,
+      nickname: aiNames[i % aiNames.length],
+      avatar: '🤖'
+    }, true, true))
+  }
+
+  const deck = buildDrawPile(room.deck_config)
+  const initialCards = room.deck_config.initial_cards || 10
+  const game: GameState = {
+    room_id: room.id,
+    players,
+    spectators: clone(room.spectators),
+    finished_players: [],
+    current_player: 0,
+    direction: 1,
+    last_card: null,
+    discard_pile: [],
+    original_player_count: players.length,
+    quitted_count: 0,
+    status: 'playing',
+    is_points_mode: room.is_points_mode,
+    turn_end_time: 0,
+    pending_draw_count: 0,
+    pending_draw_types: [],
+    allowed_any_player: -1,
+    points_changes: {},
+    xp_changes: {},
+    current_reaction: '',
+    tutorial_script_mode: room.tutorial_script,
+    tutorial_current_step: room.tutorial_script ? 1 : 0,
+    pending_forced_plays: 0,
+    draw_pile: deck
+  }
+
+  game.players.forEach((_player, index) => drawCardsForPlayer(game, index, initialCards))
+  room.status = 'playing'
+  room.game_state = game
+  scheduleTurnTimer(state, room)
+  maybeScheduleAiTurn(state, room)
+}
+
+const getQueryParams = (url: URL) => Object.fromEntries(url.searchParams.entries())
+
+const parseData = (config: AxiosRequestConfig) => {
+  if (!config.data) return {}
+  if (typeof config.data === 'string') {
+    try {
+      return JSON.parse(config.data)
+    } catch {
+      return {}
+    }
+  }
+  return config.data as Record<string, any>
+}
+
+const success = (config: AxiosRequestConfig, data: any, status = 200): AxiosResponse => ({
+  data,
+  status,
+  statusText: 'OK',
+  headers: {},
+  config: config as any
+})
+
+const failure = (config: AxiosRequestConfig, status: number, data: any): never => {
+  const error: any = new Error(data?.error || 'Offline request failed')
+  error.response = success(config, data, status)
+  throw error
+}
+
+const updateStoredUser = (user: User | null) => {
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(serializeUser(user)))
+    localStorage.setItem('token', 'offline-token')
+    localStorage.setItem('access_token', 'offline-access-token')
+    localStorage.setItem('refresh_token', 'offline-refresh-token')
+  } else {
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+  }
+  window.dispatchEvent(new Event('auth-changed'))
+}
+
+const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
+  const method = String(config.method || 'get').toUpperCase()
+  const url = new URL(config.url || '/', 'http://offline.local')
+  const path = url.pathname.replace(/^\/api/, '') || '/'
+  const body = parseData(config)
+  const query = getQueryParams(url)
+  const state = readState()
+
+  const authed = () => requireAuth(state)
+  const authedAdmin = () => {
+    const user = requireAuth(state)
+    if (!user.is_admin) throw { status: 403, data: { error: 'Admin only in offline mode' } }
+    return user
+  }
+
+  try {
+    if (method === 'GET' && path === '/auth/config') {
+      return { status: 200, data: { enable_email: false, enable_oauth: false, enable_webauthn: false, offline_mode: true } }
+    }
+    if (method === 'POST' && path === '/auth/register') {
+      const username = String(body.username || '').trim()
+      const password = String(body.password || '').trim()
+      if (!username || !password) throw { status: 400, data: { error: 'Username and password are required' } }
+      if (state.users.some((user) => user.username === username)) throw { status: 400, data: { error: 'Username already exists locally' } }
+      const user: User = {
+        uid: state.next_uid++, username, password, nickname: String(body.nickname || username), avatar: body.avatar || '🧪', role: 'user', is_admin: false,
+        points: 1000, exp: 0, level: 1, created_at: nowISO(), bio: '', custom_contact: 'offline://peer'
+      }
+      state.users.push(user)
+      state.session_uid = user.uid
+      writeState(state)
+      updateStoredUser(user)
+      return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
+    }
+    if (method === 'POST' && path === '/auth/login') {
+      const identifier = String(body.username || body.identifier || '').trim()
+      const password = String(body.password || '').trim()
+      const user = state.users.find((item) => item.username === identifier)
+      if (!user || user.password !== password) throw { status: 401, data: { error: 'Invalid offline credentials' } }
+      state.session_uid = user.uid
+      writeState(state)
+      updateStoredUser(user)
+      return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
+    }
+    if (method === 'POST' && path === '/auth/refresh') {
+      const user = currentUser(state)
+      if (!user) throw { status: 401, data: { error: 'Not logged in' } }
+      return { status: 200, data: { access_token: 'offline-access-token', refresh_token: 'offline-refresh-token', user: serializeUser(user) } }
+    }
+    if (method === 'GET' && path === '/user/info') return { status: 200, data: serializeUser(authed()) }
+    if (method === 'PUT' && path === '/user/profile') {
+      const user = authed()
+      Object.assign(user, body)
+      writeState(state)
+      updateStoredUser(user)
+      return { status: 200, data: serializeUser(user) }
+    }
+    if (method === 'PUT' && path === '/user/avatar') {
+      const user = authed()
+      user.avatar = body.avatar || user.avatar
+      writeState(state)
+      updateStoredUser(user)
+      return { status: 200, data: serializeUser(user) }
+    }
+    if (method === 'GET' && path.startsWith('/user/profile/')) {
+      const uid = Number(path.split('/').pop())
+      const user = state.users.find((item) => item.uid === uid)
+      if (!user) throw { status: 404, data: { error: 'User not found' } }
+      return { status: 200, data: serializeUser(user) }
+    }
+    if (method === 'GET' && path === '/version') return { status: 200, data: { version: 'offline', fullVersion: 'Chemistry UNO Offline Local Build' } }
+    if (method === 'GET' && path === '/announcements') return { status: 200, data: announcements }
+    if (method === 'GET' && path === '/hints') return { status: 200, data: hints }
+    if (method === 'GET' && path === '/feedbacks/my') {
+      const user = authed()
+      return { status: 200, data: state.feedbacks.filter((item) => item.uid === user.uid) }
+    }
+    if (method === 'POST' && path === '/feedback') {
+      const user = authed()
+      const item: FeedbackItem = { id: state.next_feedback_id++, uid: user.uid, content: String(body.content || ''), type: String(body.type || 'general'), status: 'unread', created_at: nowISO() }
+      state.feedbacks.unshift(item)
+      writeState(state)
+      return { status: 200, data: { ok: true, id: item.id } }
+    }
+    if (method === 'GET' && path === '/friends') {
+      const user = authed()
+      const friends = state.friends.filter((item) => item.uid === user.uid).map((item) => {
+        const target = getPlayerInfo(state, item.friend_uid)
+        return target ? { ...serializeUser(target), remark: item.remark, is_online: true } : null
+      }).filter(Boolean)
+      return { status: 200, data: friends }
+    }
+    if (method === 'POST' && path === '/friends/request') {
+      const user = authed()
+      const friendUid = Number(body.friend_uid)
+      if (!friendUid || friendUid === user.uid) throw { status: 400, data: { error: 'Invalid friend uid' } }
+      if (!state.users.some((item) => item.uid === friendUid)) throw { status: 404, data: { error: 'User not found' } }
+      if (!state.friends.some((item) => item.uid === user.uid && item.friend_uid === friendUid)) state.friends.push({ uid: user.uid, friend_uid: friendUid })
+      if (!state.friends.some((item) => item.uid === friendUid && item.friend_uid === user.uid)) state.friends.push({ uid: friendUid, friend_uid: user.uid })
+      writeState(state)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'GET' && path === '/my-decks') {
+      const user = authed()
+      return { status: 200, data: state.decks.filter((deck) => deck.is_global || deck.created_by === user.uid) }
+    }
+    if (method === 'POST' && path === '/my-decks') {
+      const user = authed()
+      const deck: Deck = { id: state.next_deck_id++, name: String(body.name || 'Offline Deck'), is_global: false, cards: clone(body.cards || builtinDeck), initial_cards: Number(body.initial_cards || 10), created_by: user.uid, created_at: nowISO() }
+      state.decks.push(deck)
+      writeState(state)
+      return { status: 200, data: deck }
+    }
+    if ((method === 'PUT' || method === 'DELETE') && path.startsWith('/my-decks/')) {
+      const user = authed()
+      const deckId = Number(path.split('/').pop())
+      const deck = state.decks.find((item) => item.id === deckId && !item.is_global && item.created_by === user.uid)
+      if (!deck) throw { status: 404, data: { error: 'Deck not found' } }
+      if (method === 'PUT') {
+        deck.name = body.name || deck.name
+        deck.cards = clone(body.cards || deck.cards)
+        deck.initial_cards = Number(body.initial_cards || deck.initial_cards)
+        writeState(state)
+        return { status: 200, data: deck }
+      }
+      state.decks = state.decks.filter((item) => item.id !== deckId)
+      writeState(state)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'GET' && path === '/rooms') {
+      authed()
+      return { status: 200, data: state.rooms.filter((room) => !room.is_private || room.players.includes(state.session_uid || -1)) }
+    }
+    if (method === 'POST' && path === '/rooms') {
+      const user = authed()
+      const deck = state.decks.find((item) => item.id === Number(body.deck_id)) || state.decks[0]
+      const room: Room = {
+        id: randomId('room'), name: String(body.name || 'Offline Room'), players: [user.uid], ready_uids: [], countdown: 0, spectators: [], max_players: Number(body.max_players || 4),
+        deck_config: clone(deck), status: 'waiting', is_points_mode: Boolean(body.is_points_mode), is_private: Boolean(body.is_private), access_key: body.access_key || '', created_at: nowISO(),
+        is_pve: Boolean(body.is_pve), pve_difficulty: Number(body.pve_difficulty || 0), ai_count: Number(body.ai_count || 0), enable_ai_backfill: Boolean(body.enable_ai_backfill),
+        ai_backfill_difficulty: Number(body.ai_backfill_difficulty || 0), is_ranked: Boolean(body.is_ranked), level_range: Number(body.level_range || 5), created_by_uid: user.uid,
+        tutorial_script: Boolean(body.tutorial_script), room_messages: []
+      }
+      state.rooms.unshift(room)
+      writeState(state)
+      emitRoomsUpdate(state)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'GET' && /^\/rooms\/[^/]+$/.test(path)) {
+      authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'GET' && /^\/rooms\/[^/]+\/status$/.test(path)) {
+      const roomId = path.split('/')[2]
+      const room = state.rooms.find((item) => item.id === roomId)
+      return { status: 200, data: room ? { exists: true, status: room.status } : { exists: false, status: 'closed' } }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/join$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const asSpectator = query.spectator === 'true'
+      if (room.is_private && room.access_key && room.access_key !== query.key && room.created_by_uid !== user.uid) throw { status: 403, data: { error: 'Invalid room key' } }
+      if (asSpectator) {
+        if (!room.spectators.includes(user.uid)) room.spectators.push(user.uid)
+      } else if (!room.players.includes(user.uid)) {
+        if (room.players.length >= room.max_players) throw { status: 400, data: { error: 'Room is full' } }
+        room.players.push(user.uid)
+        emit('player_joined', { type: 'player_joined', data: room.id })
+      }
+      writeState(state)
+      emitRoomsUpdate(state)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/leave$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      room.players = room.players.filter((uid) => uid !== user.uid)
+      room.ready_uids = room.ready_uids.filter((uid) => uid !== user.uid)
+      room.spectators = room.spectators.filter((uid) => uid !== user.uid)
+      if (room.game_state) {
+        const index = findPlayerIndexByUid(room.game_state, user.uid)
+        if (index >= 0) {
+          room.game_state.quitted_count += 1
+          appendFinishedPlayer(room.game_state, user.uid)
+          finishGameIfNeeded(state, room)
+        }
+      }
+      if (room.players.length === 0 && (!room.game_state || room.game_state.status !== 'playing')) state.rooms = state.rooms.filter((item) => item.id !== room.id)
+      writeState(state)
+      emit('player_left', { type: 'player_left', data: room.id })
+      emitRoomsUpdate(state)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/ready$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      if (room.ready_uids.includes(user.uid)) room.ready_uids = room.ready_uids.filter((uid) => uid !== user.uid)
+      else room.ready_uids.push(user.uid)
+      writeState(state)
+      emitRoomsUpdate(state)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/start$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      if (room.created_by_uid !== user.uid) throw { status: 403, data: { error: 'Only the host can start offline games' } }
+      if (!room.is_pve && room.players.length < 2) throw { status: 400, data: { error: 'At least two local players are required' } }
+      buildGameState(state, room)
+      writeState(state)
+      emitGameUpdate(room)
+      emitRoomsUpdate(state)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/play$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const game = ensureGame(room)
+      const index = findPlayerIndexByUid(game, user.uid)
+      if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
+      applyPlay(state, room, index, String(body.substance || body.card?.type || ''))
+      advanceTurn(state, room)
+      writeState(state)
+      emitGameUpdate(room)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/play-double$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const game = ensureGame(room)
+      const index = findPlayerIndexByUid(game, user.uid)
+      if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
+      const player = game.players[index]
+      const sub1 = String(body.sub1 || '')
+      const sub2 = String(body.sub2 || '')
+      if (!player.double_action_available && player.action_progress < 2) throw { status: 400, data: { error: 'Double action is not ready' } }
+      applyPlay(state, room, index, sub1)
+      player.double_action_available = false
+      player.action_progress = 0
+      if (sub2) applyPlay(state, room, index, sub2, [sub1, sub2])
+      advanceTurn(state, room)
+      writeState(state)
+      emitGameUpdate(room)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'POST' && /^\/rooms\/[^/]+\/draw$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const game = ensureGame(room)
+      const index = findPlayerIndexByUid(game, user.uid)
+      if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
+      const drawCount = Math.max(1, game.pending_draw_count || 1)
+      drawCardsForPlayer(game, index, drawCount)
+      game.pending_draw_count = 0
+      game.pending_draw_types = []
+      advanceTurn(state, room)
+      writeState(state)
+      emitGameUpdate(room)
+      return { status: 200, data: roomSnapshot(state, room) }
+    }
+    if (method === 'GET' && /^\/rooms\/[^/]+\/substances$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const game = ensureGame(room)
+      const index = findPlayerIndexByUid(game, user.uid)
+      if (index < 0) throw { status: 403, data: { error: 'You are not in this room' } }
+      return { status: 200, data: getAvailableSubstances(game.players[index].hand_cards) }
+    }
+    if (method === 'GET' && /^\/rooms\/[^/]+\/reaction-hints$/.test(path)) {
+      const user = authed()
+      const room = ensureRoom(state, path.split('/')[2])
+      const game = ensureGame(room)
+      const index = findPlayerIndexByUid(game, user.uid)
+      const available = index >= 0 ? getAvailableSubstances(game.players[index].hand_cards) : []
+      const hintsData = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula)).slice(0, 12).map((formula, idx) => ({ id: idx + 1, formula, name: substanceNames[formula] || formula }))
+      return { status: 200, data: hintsData }
+    }
+    if (method === 'POST' && path === '/game/check-reaction') {
+      const valid = isReactionPair(String(body.r1 || ''), String(body.r2 || ''))
+      return { status: 200, data: { can_react: valid, valid } }
+    }
+    if (method === 'GET' && path === '/points/leaderboard') return { status: 200, data: clone(state.users).sort((a, b) => b.points - a.points).map(serializeUser) }
+    if (method === 'GET' && path === '/level/leaderboard') return { status: 200, data: clone(state.users).sort((a, b) => b.level - a.level || b.exp - a.exp).map(serializeUser) }
+    if (method === 'GET' && path === '/level/info') {
+      const user = authed()
+      return { status: 200, data: { level: user.level, exp: user.exp, next_level_exp: user.level * 100 } }
+    }
+    if (method === 'GET' && path === '/data/substances') {
+      return { status: 200, data: Object.keys(substanceNames).map((formula, index) => ({ id: index + 1, formula, name: substanceNames[formula], status: 'approved', creator_name: 'offline', created_at: nowISO() })) }
+    }
+    if (method === 'GET' && path === '/substances/names') return { status: 200, data: substanceNames }
+    if (method === 'GET' && (path === '/reactions' || path === '/reactions/all' || path === '/reactions/my')) {
+      return { status: 200, data: reactionPairs.map(([r1, r2], index) => ({ id: index + 1, r1, r2, display: `${r1} + ${r2}`, status: 'approved' })) }
+    }
+    if (method === 'GET' && path === '/user/game-history') {
+      const user = authed()
+      return { status: 200, data: state.histories.filter((item) => item.players.includes(user.uid)) }
+    }
+    if (method === 'GET' && /^\/user\/game-history\/\d+\/replay$/.test(path)) {
+      const historyId = Number(path.split('/')[3])
+      const history = state.histories.find((item) => item.id === historyId)
+      if (!history) throw { status: 404, data: { error: 'Replay not found' } }
+      return { status: 200, data: history }
+    }
+    if (method === 'GET' && path === '/user/sessions') {
+      const user = authed()
+      return { status: 200, data: [{ id: 'offline-session', created_at: user.created_at, current: true, mode: 'offline' }] }
+    }
+    if (method === 'GET' && (path === '/surveys/active' || path === '/surveys/all')) return { status: 200, data: [] }
+    if (method === 'GET' && path === '/plugins') return { status: 200, data: [] }
+    if (method === 'GET' && path === '/plugin-cards') return { status: 200, data: [] }
+    if (method === 'GET' && path === '/chat/global/history') return { status: 200, data: state.global_messages.slice(-Number(query.limit || 50)) }
+    if (method === 'GET' && path.startsWith('/chat/private/history/')) return { status: 200, data: [] }
+    if (method === 'GET' && path === '/admin/rooms/active') {
+      authedAdmin()
+      return { status: 200, data: state.rooms }
+    }
+    if (method === 'POST' && path === '/admin/users/kick') {
+      authedAdmin()
+      return { status: 200, data: { ok: true } }
+    }
+    if (path.startsWith('/admin/')) {
+      authedAdmin()
+      return { status: 200, data: [] }
+    }
+    return { status: 200, data: [] }
+  } catch (error: any) {
+    if (error?.status) return error
+    return { status: 500, data: { error: error?.message || 'Offline backend error' } }
+  } finally {
+    writeState(state)
+  }
+}
+
+export const offlineAxiosAdapter: AxiosAdapter = async (config) => {
+  await sleep(30)
+  const result = dispatchRequest(config)
+  if (result.status >= 400) failure(config, result.status, result.data)
+  return success(config, result.data, result.status)
+}
+
+export const installOfflineFetchInterceptor = () => {
+  const g = window as Window & typeof globalThis & { __offlineFetchInstalled?: boolean; __offlineOriginalFetch?: typeof fetch }
+  if (g.__offlineFetchInstalled) return
+  g.__offlineFetchInstalled = true
+  g.__offlineOriginalFetch = window.fetch.bind(window)
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    const url = new URL(requestUrl, window.location.origin)
+    if (!url.pathname.startsWith('/api/')) return g.__offlineOriginalFetch!(input as any, init)
+
+    const result = dispatchRequest({ url: url.pathname + url.search, method: init?.method || 'GET', data: init?.body })
+    return new Response(JSON.stringify(result.data), { status: result.status, headers: { 'Content-Type': 'application/json' } })
+  }
+}
+
+const sendOfflineChat = (payload: { uid: number; nickname: string; username: string; avatar: string; message: string; target_uid?: number }) => {
+  if (payload.target_uid) {
+    emit('private_chat', { type: 'private_chat', uid: payload.uid, target_uid: payload.target_uid, message: payload.message, data: { nickname: payload.nickname, username: payload.username, avatar: payload.avatar } })
+    return
+  }
+  emit('chat', { type: 'chat', uid: payload.uid, message: payload.message, data: { nickname: payload.nickname, username: payload.username, avatar: payload.avatar } })
+}
+
+export const offlineSocket = {
+  on(event: string, handler: (message: any) => void) {
+    const listener = (e: Event) => handler((e as CustomEvent).detail)
+    eventBus.addEventListener(event, listener)
+    return () => eventBus.removeEventListener(event, listener)
+  },
+  sendRoomChat(roomId: string, message: string) {
+    const state = readState()
+    const user = currentUser(state)
+    if (!user) return
+    if (roomId === 'lobby') {
+      const entry: ChatMessage = { user_uid: user.uid, username: user.username, nickname: user.nickname, avatar: user.avatar, message, created_at: nowISO() }
+      pushGlobalChat(state, entry)
+      writeState(state)
+      sendOfflineChat({ uid: user.uid, username: user.username, nickname: user.nickname, avatar: user.avatar, message })
+      emit('chat_unread_count', { type: 'chat_unread_count', count: 0 })
+      return
+    }
+    const room = state.rooms.find((item) => item.id === roomId)
+    if (!room) return
+    const entry: RoomMessage = { uid: user.uid, username: user.username, nickname: user.nickname, avatar: user.avatar, message, created_at: nowISO() }
+    room.room_messages.push(entry)
+    room.room_messages = room.room_messages.slice(-100)
+    writeState(state)
+    sendOfflineChat({ uid: user.uid, username: user.username, nickname: user.nickname, avatar: user.avatar, message })
+  }
+}
