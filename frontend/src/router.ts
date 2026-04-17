@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory, createWebHistory, type RouteLocationNormalized } from 'vue-router'
-import { OFFLINE_MODE, buildApiURL } from './utils/runtimeConfig'
+import { OFFLINE_MODE } from './utils/runtimeConfig'
 import { ensureAuthReady, getSafeInternalRedirect, getStoredUser, rememberPendingAuthRedirect } from './utils/authSession'
 
 const Login = () => import('./pages/Login.vue')
@@ -160,31 +160,6 @@ const router = createRouter({
   routes
 })
 
-const isDataRoute = (path: string): boolean => path === '/data' || path.startsWith('/data/')
-
-const findActiveRoomId = async (_token: string | null, uid: number): Promise<string | null> => {
-  try {
-    const res = await fetch(buildApiURL('/rooms'), {
-      credentials: 'include', // 自动发送cookie中的token
-    })
-    if (!res.ok) return null
-
-    const payload = await res.json()
-    const rooms = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : [])
-    const activeRoom = rooms.find((room: any) => {
-      const roomStatus = room?.status
-      const players = Array.isArray(room?.players) ? room.players : []
-      return (roomStatus === 'waiting' || roomStatus === 'playing') &&
-        players.some((playerUID: any) => Number(playerUID) === uid)
-    })
-
-    return activeRoom?.id ? String(activeRoom.id) : null
-  } catch (error) {
-    console.error('Failed to check active room before entering data routes', error)
-    return null
-  }
-}
-
 router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormalized) => {
   await ensureAuthReady()
   const user = getStoredUser()
@@ -201,13 +176,6 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
     return '/'
   } else if (to.meta.coWorkerOnly && (!user || (user.role !== 'admin' && user.role !== 'co-worker'))) {
     return '/'
-  }
-
-  if (user?.uid && isDataRoute(to.path)) {
-    const activeRoomID = await findActiveRoomId(null, Number(user.uid))
-    if (activeRoomID) {
-      return `/room/${activeRoomID}`
-    }
   }
 
   return true

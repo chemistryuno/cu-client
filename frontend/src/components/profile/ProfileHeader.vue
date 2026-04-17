@@ -56,7 +56,7 @@ onMounted(() => {
       <div class="text-center space-y-1 w-full relative">
         <div class="flex items-center justify-center gap-1.5 mb-0.5">
           <UserIcon class="w-3 h-3 text-blue-500 opacity-50" />
-          <span class="text-[8px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">UID: {{ user.uid }} | {{ user.nickname || user.username }}</span>
+          <span class="text-[8px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">{{ user.nickname || user.username }} | LOCAL PLAYER</span>
         </div>
         <div class="flex items-center justify-center gap-2 group/nick">
           <h2 class="text-xl font-black tracking-tight text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors uppercase italic truncate px-2 leading-none">
@@ -71,11 +71,8 @@ onMounted(() => {
           </button>
         </div>
         <div class="flex items-center justify-center gap-2 pt-1">
-          <span v-if="user.is_admin" class="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-blue-500/20 flex items-center gap-1 uppercase tracking-widest">
-            <Shield class="w-2 h-2" /> CORE ADMIN 
-          </span>
-          <span v-else class="bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-slate-500/20 flex items-center gap-1 uppercase tracking-widest">
-            <Fingerprint class="w-2 h-2" /> RESEARCHER
+          <span class="bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-slate-500/20 flex items-center gap-1 uppercase tracking-widest">
+            <Fingerprint class="w-2 h-2" /> LOCAL PLAYER
           </span>
         </div>
       </div>

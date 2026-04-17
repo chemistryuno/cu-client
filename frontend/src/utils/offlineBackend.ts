@@ -215,25 +215,27 @@ const nowISO = () => new Date().toISOString()
 const nowMs = () => Date.now()
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+const makeLocalPlayer = (nickname = '本地玩家', avatar = 'flask'): User => ({
+  uid: 1,
+  username: 'local-player',
+  password: '',
+  nickname,
+  avatar,
+  role: 'user',
+  is_admin: false,
+  points: 0,
+  exp: 0,
+  level: 1,
+  created_at: nowISO(),
+  sound_volume: 0.8,
+  vibration_enabled: true,
+  enable_element_input: false,
+  custom_contact: 'offline://local',
+  bio: 'Local single-player profile'
+})
+
 const makeInitialState = (): State => ({
-  users: [{
-    uid: 1,
-    username: 'offline-admin',
-    password: 'offline-admin',
-    nickname: 'Local Admin',
-    avatar: '🧪',
-    role: 'admin',
-    is_admin: true,
-    points: 1200,
-    exp: 120,
-    level: 3,
-    created_at: nowISO(),
-    sound_volume: 0.8,
-    vibration_enabled: true,
-    enable_element_input: false,
-    custom_contact: 'offline://local',
-    bio: 'Offline profile'
-  }],
+  users: [makeLocalPlayer()],
   session_uid: null,
   next_uid: 2,
   next_deck_id: 2,
@@ -784,7 +786,10 @@ const failure = (config: AxiosRequestConfig, status: number, data: any): never =
 
 const updateStoredUser = (user: User | null) => {
   if (user) {
-    localStorage.setItem('user', JSON.stringify(serializeUser(user)))
+    const serialized = serializeUser(user)
+    delete (serialized as Record<string, any>).password
+    delete (serialized as Record<string, any>).username
+    localStorage.setItem('user', JSON.stringify(serialized))
     localStorage.setItem('token', 'offline-token')
     localStorage.setItem('access_token', 'offline-access-token')
     localStorage.setItem('refresh_token', 'offline-refresh-token')
@@ -816,30 +821,51 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
     if (method === 'GET' && path === '/auth/config') {
       return { status: 200, data: { enable_email: false, enable_oauth: false, enable_webauthn: false, offline_mode: true } }
     }
-    if (method === 'POST' && path === '/auth/register') {
-      const username = String(body.username || '').trim()
-      const password = String(body.password || '').trim()
-      if (!username || !password) throw { status: 400, data: { error: 'Username and password are required' } }
-      if (state.users.some((user) => user.username === username)) throw { status: 400, data: { error: 'Username already exists locally' } }
-      const user: User = {
-        uid: state.next_uid++, username, password, nickname: String(body.nickname || username), avatar: body.avatar || '🧪', role: 'user', is_admin: false,
-        points: 1000, exp: 0, level: 1, created_at: nowISO(), bio: '', custom_contact: 'offline://peer'
+    if (method === 'POST' && path === '/auth/offline-profile') {
+      const nickname = String(body.nickname || '').trim()
+      const avatar = String(body.avatar || 'flask').trim() || 'flask'
+      if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
+      const user = state.users[0] || makeLocalPlayer()
+      user.nickname = nickname
+      user.avatar = avatar
+      user.username = 'local-player'
+      user.password = ''
+      user.role = 'user'
+      user.is_admin = false
+      if (!state.users.length) {
+        state.users.push(user)
+      } else {
+        state.users[0] = user
       }
-      state.users.push(user)
       state.session_uid = user.uid
       writeState(state)
       updateStoredUser(user)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
+    if (method === 'POST' && path === '/auth/register') {
+      return dispatchRequest({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
+    }
     if (method === 'POST' && path === '/auth/login') {
-      const identifier = String(body.username || body.identifier || '').trim()
-      const password = String(body.password || '').trim()
-      const user = state.users.find((item) => item.username === identifier)
-      if (!user || user.password !== password) throw { status: 401, data: { error: 'Invalid offline credentials' } }
+      const nickname = String(body.nickname || body.identifier || body.username || '').trim()
+      if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
+      const user = state.users[0] || makeLocalPlayer()
+      user.nickname = nickname
+      user.avatar = user.avatar || 'flask'
+      if (!state.users.length) {
+        state.users.push(user)
+      } else {
+        state.users[0] = user
+      }
       state.session_uid = user.uid
       writeState(state)
       updateStoredUser(user)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
+    }
+    if (method === 'POST' && path === '/auth/logout') {
+      state.session_uid = null
+      writeState(state)
+      updateStoredUser(null)
+      return { status: 200, data: { ok: true } }
     }
     if (method === 'POST' && path === '/auth/refresh') {
       const user = currentUser(state)

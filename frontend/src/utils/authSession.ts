@@ -36,7 +36,7 @@ const fetchWithTimeout = async (url: string, init: RequestInit = {}, timeoutMs =
 
 const normalizeUser = (payload: any): StoredUser => {
   const user = payload?.user ?? payload
-  return user && user.uid ? user : null
+  return user && (user.nickname || user.uid || user.id) ? user : null
 }
 
 export const getSafeInternalRedirect = (value: unknown, fallback = '/'): string => {

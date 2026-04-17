@@ -62,8 +62,10 @@ api.interceptors.response.use(
 const createCacheKey = (url: string, params?: Record<string, any>) => url + (params ? JSON.stringify(params) : '')
 
 export const authAPI = {
+  initializeOfflineProfile: (data: { nickname: string; avatar: string }) => api.post('/auth/offline-profile', data),
   register: (data: any) => api.post('/auth/register', data),
   login: (data: any) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   getAuthConfig: () => api.get('/auth/config'),
   unbindOAuth: (provider: string) => api.post(`/auth/oauth/unbind?provider=${provider}`),
   sendCode: (email: string, type = 'register', recaptcha_token?: string) => api.post('/auth/send-code', { email, type, recaptcha_token }),

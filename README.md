@@ -20,6 +20,7 @@
 - [技术栈](#-技术栈)
 - [快速开始（开发）](#-快速开始开发)
 - [常用脚本](#-常用脚本)
+- [Electron 客户端构建](#-electron-客户端构建)
 - [环境变量（核心项）](#️-环境变量核心项)
 - [API 与路由分组（摘要）](#-api-与路由分组摘要)
 - [项目结构](#-项目结构)
@@ -259,6 +260,7 @@ pnpm start
 - `pnpm build`：一体化构建
 - `pnpm build:frontend`：仅构建前端
 - `pnpm build:backend`：仅构建后端
+- `pnpm electron:ensure`：补装/修复 Electron 本地二进制
 - `pnpm electron:dev`：启动 Electron 客户端（开发模式）
 - `pnpm electron:run`：构建前端后启动 Electron 客户端（生产渲染资源）
 - `pnpm electron:pack:win`：构建并打包 Windows 客户端安装包（输出到 `frontend/release`）
@@ -274,6 +276,50 @@ pnpm start
 - `pnpm -C frontend dev`
 - `pnpm -C frontend build`
 - `pnpm -C frontend type-check`
+
+---
+
+## 🖥️ Electron 客户端构建
+
+### 开发模式
+
+首次运行或遇到 `Electron failed to install correctly` 时，先执行：
+
+```bash
+pnpm electron:ensure
+```
+
+然后执行：
+
+```bash
+pnpm electron:dev
+```
+
+该命令会启动前端开发服务器，并用 Electron 桌面窗口加载本地页面。
+
+### 生产模式运行
+
+```bash
+pnpm electron:run
+```
+
+该命令会先构建前端资源，再启动 Electron 客户端进行本地运行验证。
+
+### 构建 Windows 安装包
+
+在打包前，请先在 `.env` 中配置桌面端连接的后端地址：
+
+```env
+CHEM_SERVER_ORIGIN=http://127.0.0.1:8080
+```
+
+然后执行：
+
+```bash
+pnpm electron:pack:win
+```
+
+构建完成后，Windows 安装包会输出到 `frontend/release/` 目录。
 
 ---
 
