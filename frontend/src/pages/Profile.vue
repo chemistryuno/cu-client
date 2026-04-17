@@ -7,11 +7,9 @@ import ProfileHeader from '../components/profile/ProfileHeader.vue'
 import StatsGrid from '../components/profile/StatsGrid.vue'
 import SettingsPanel from '../components/profile/SettingsPanel.vue'
 import CustomDecks from '../components/profile/CustomDecks.vue'
-import PersonalSpacePanel from '../components/profile/PersonalSpacePanel.vue'
 import MatchHistory from '../components/profile/MatchHistory.vue'
 import ChangeAvatarModal from '../components/profile/ChangeAvatarModal.vue'
-import LevelProgress from '../components/LevelProgress.vue'
-import { ArrowLeft, Award, FlaskConical, History, LayoutDashboard, LogOut, Menu, Sliders, User as UserIcon, X as CloseIcon } from 'lucide-vue-next'
+import { ArrowLeft, FlaskConical, History, LogOut, Menu, Sliders, X as CloseIcon } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -28,7 +26,7 @@ try {
 }
 
 const user = ref<any>(initialUser)
-const currentCategory = ref('overview')
+const currentCategory = ref('research')
 const isSidebarOpen = ref(false)
 const showChangeAvatar = ref(false)
 const loading = ref(false)

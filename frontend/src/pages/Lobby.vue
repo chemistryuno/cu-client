@@ -147,6 +147,7 @@ const createTutorialMatch = async () => {
       true,
     )
     localStorage.setItem('chemistry-uno-tutorial-mode', 'true')
+    await gameAPI.startGame(response.data.id)
     router.push(`/room/${response.data.id}`)
   } catch (error: any) {
     showAlert(error.response?.data?.error || '创建教学关卡失败', '系统异常')
@@ -174,6 +175,7 @@ const handleCreateAIRoom = async () => {
       0,
       false,
     )
+    await gameAPI.startGame(response.data.id)
     showAIArenaModal.value = false
     router.push(`/room/${response.data.id}`)
   } catch (error: any) {

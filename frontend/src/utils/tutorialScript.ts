@@ -84,8 +84,8 @@ export interface TutorialInitialState {
 }
 
 export const TUTORIAL_INITIAL_STATE: TutorialInitialState = {
-  humanHand: ['Na', 'Mg', 'O', 'H', 'Au', 'Ar', 'K'],
-  aiHand: ['H', 'Cl', 'Br', 'Mn', 'Fe', 'Zn', 'Ca'],
+  humanHand: ['Mg', 'Na', 'O', 'H', 'Ar', 'Au', '+2'],
+  aiHand: ['H', 'Cl', 'Br', 'Br', 'Mn', 'Fe', 'Zn'],
   discardTop: 'Cl2'
 }
 

@@ -1,4 +1,5 @@
 ﻿import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
+import { TUTORIAL_INITIAL_STATE } from './tutorialScript'
 
 type User = {
   uid: number
@@ -440,11 +441,13 @@ const toPlayerState = (user: User | { uid: number; username: string; nickname: s
   is_ai: isAi
 })
 
+const createCard = (type: string): Card => ({ type, count: 1, effect: specialCards.has(type) ? type : undefined })
+
 const buildDrawPile = (deck: Deck) => {
   const pile: Card[] = []
   Object.entries(deck.cards).forEach(([type, count]) => {
     for (let i = 0; i < count; i += 1) {
-      pile.push({ type, count: 1, effect: specialCards.has(type) ? type : undefined })
+      pile.push(createCard(type))
     }
   })
   for (let i = pile.length - 1; i > 0; i -= 1) {
@@ -749,7 +752,36 @@ const buildGameState = (state: State, room: Room) => {
     draw_pile: deck
   }
 
-  game.players.forEach((_player, index) => drawCardsForPlayer(game, index, initialCards))
+  if (room.tutorial_script && game.players.length >= 2) {
+    game.players[0].hand_cards = TUTORIAL_INITIAL_STATE.humanHand.map(createCard)
+    game.players[1].hand_cards = TUTORIAL_INITIAL_STATE.aiHand.map(createCard)
+    game.last_card = {
+      card: createCard(TUTORIAL_INITIAL_STATE.discardTop),
+      substance: TUTORIAL_INITIAL_STATE.discardTop,
+      player_uid: 0,
+      reactants: [TUTORIAL_INITIAL_STATE.discardTop]
+    }
+    game.discard_pile = [game.last_card]
+    game.current_reaction = TUTORIAL_INITIAL_STATE.discardTop
+
+    const reservedCards = [...TUTORIAL_INITIAL_STATE.humanHand, ...TUTORIAL_INITIAL_STATE.aiHand]
+      .reduce<Record<string, number>>((acc, type) => {
+        acc[type] = (acc[type] || 0) + 1
+        return acc
+      }, {})
+
+    game.draw_pile = game.draw_pile.filter((card) => {
+      const remaining = reservedCards[card.type] || 0
+      if (remaining <= 0) return true
+      reservedCards[card.type] = remaining - 1
+      return false
+    })
+
+    refreshCardCounts(game)
+  } else {
+    game.players.forEach((_player, index) => drawCardsForPlayer(game, index, initialCards))
+  }
+
   room.status = 'playing'
   room.game_state = game
   scheduleTurnTimer(state, room)
@@ -1031,6 +1063,9 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
       const room = ensureRoom(state, path.split('/')[2])
       if (room.created_by_uid !== user.uid) throw { status: 403, data: { error: 'Only the host can start offline games' } }
       if (!room.is_pve && room.players.length < 2) throw { status: 400, data: { error: 'At least two local players are required' } }
+      if (room.status === 'playing' && room.game_state) {
+        return { status: 200, data: roomSnapshot(state, room) }
+      }
       buildGameState(state, room)
       writeState(state)
       emitGameUpdate(room)
