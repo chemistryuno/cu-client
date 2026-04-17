@@ -542,21 +542,20 @@ const handleCreateAIRoom = async () => {
   }
 }
 
-const handleJoinRoom = async (roomId: string, asSpectator: boolean = false) => {
+const handleJoinRoom = async (roomId: string, asSpectator: boolean = false, accessKey?: string) => {
   try {
-    await gameAPI.joinRoom(roomId, undefined, asSpectator)
-    const url = asSpectator ? `/room/${roomId}?spectator=true` : `/room/${roomId}`
-    router.push(url)
-  } catch (error: any) {
-    if (error.response?.data?.error === '房间不存在') {
-      const index = rooms.value.findIndex(r => r.id === roomId)
-      if (index !== -1) {
-        rooms.value.splice(index, 1)
-      }
-      showAlert('该房间已失效并自动清理', '提示')
-    } else {
-      showAlert(error.response?.data?.error || '加入房间失败', '连接错误')
+    const params = new URLSearchParams()
+    if (asSpectator) {
+      params.set('spectator', 'true')
     }
+    if (accessKey) {
+      params.set('key', accessKey)
+    }
+    const query = params.toString()
+    const url = query ? `/room/${roomId}?${query}` : `/room/${roomId}`
+    await router.push(url)
+  } catch (error: any) {
+    showAlert(error?.message || '加入房间失败', '连接错误')
   }
 }
 
@@ -1667,7 +1666,7 @@ const copyToClipboard = (text: string) => {
               </div>
             </div>
             <button
-              @click="showAccessKeyModal = false; router.push(`/room/${createdRoomInfo.id}`)"
+              @click="showAccessKeyModal = false; handleJoinRoom(createdRoomInfo.id, false, createdRoomInfo.access_key)"
               class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white"
             >
               <X class="w-5 h-5" />
@@ -1732,7 +1731,7 @@ const copyToClipboard = (text: string) => {
               稍后进入
             </button>
             <button
-              @click="showAccessKeyModal = false; router.push(`/room/${createdRoomInfo.id}`)"
+              @click="showAccessKeyModal = false; handleJoinRoom(createdRoomInfo.id, false, createdRoomInfo.access_key)"
               class="flex-1 px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl transition-all shadow-lg shadow-green-500/20 active:scale-95 uppercase tracking-widest text-[10px]"
             >
               立即进入房间

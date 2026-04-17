@@ -1,44 +1,50 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import websocket from '../utils/websocket'
+import { useRoute, useRouter } from 'vue-router'
 import { buildApiURL } from '../utils/runtimeConfig'
+import { completeAuthSuccess, getSafeInternalRedirect } from '../utils/authSession'
 
 const router = useRouter()
+const route = useRoute()
+const OAUTH_CALLBACK_TIMEOUT_MS = 10000
 
 onMounted(async () => {
-  // Token已由后端通过HttpOnly Cookie设置，直接调用API获取用户信息
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), OAUTH_CALLBACK_TIMEOUT_MS)
+
   try {
-    // 调用 /api/user/info 获取用户信息，cookie会自动被发送
     const res = await fetch(buildApiURL('/user/info'), {
-      credentials: 'include', // 确保cookie被发送
+      credentials: 'include',
+      signal: controller.signal,
     })
-    
+
     if (!res.ok) {
       console.error('[OAuthCallback] 获取用户信息失败:', res.status)
-      router.replace('/login')
+      router.replace({ path: '/login', query: { redirect: getSafeInternalRedirect(route.query.redirect, '/') } })
       return
     }
 
     const data = await res.json()
     const user = data.user ?? data
-    
+
     if (!user || !user.uid) {
       console.error('[OAuthCallback] 无效的用户信息')
-      router.replace('/login')
+      router.replace({ path: '/login', query: { redirect: getSafeInternalRedirect(route.query.redirect, '/') } })
       return
     }
 
-    // 存储用户信息
-    localStorage.setItem('user', JSON.stringify(user))
-    websocket.connect()
-    window.dispatchEvent(new Event('auth-changed'))
-
     console.log('[OAuthCallback] OAuth登录成功，跳转主页')
-    router.replace('/')
+    await completeAuthSuccess({
+      user,
+      router,
+      redirect: route.query.redirect,
+      replace: true,
+    })
   } catch (e) {
     console.error('[OAuthCallback] 处理OAuth回调失败:', e)
-    router.replace('/login')
+    router.replace({ path: '/login', query: { redirect: getSafeInternalRedirect(route.query.redirect, '/') } })
+  } finally {
+    window.clearTimeout(timer)
   }
 })
 </script>

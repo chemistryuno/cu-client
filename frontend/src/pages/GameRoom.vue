@@ -22,7 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const { showAlert, showConfirm, showPrompt, showToast } = useDialog()
 const gameToastRef = ref()
-const id = route.params.id as string
+const roomId = computed(() => String(route.params.id || ''))
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
 const replayStartIndexQuery = computed(() => {
   const raw = Number(route.query.replay_start_index || 0)
@@ -32,7 +32,7 @@ const replayStartIndexQuery = computed(() => {
   return Math.floor(raw)
 })
 const isReplayBridgeMode = computed(() => Number.isFinite(replayHistoryQueryID.value) && replayHistoryQueryID.value > 0)
-const isReplayRoomPath = computed(() => String(id) === 'replay')
+const isReplayRoomPath = computed(() => roomId.value === 'replay')
 const replayScopeAdmin = computed(() => String(route.query.scope || '') === 'admin')
 const replayReturnPath = computed(() => {
   const raw = String(route.query.from || '').trim()
@@ -44,6 +44,8 @@ const replayReturnPath = computed(() => {
   }
   return replayScopeAdmin.value ? '/admin/users' : '/profile/history'
 })
+const roomRouteSignature = computed(() => `${roomId.value}|${String(route.query.key || '')}|${String(route.query.spectator || '')}`)
+let activeRoomLoadToken = 0
 
 let pageScrollLockSnapshot: {
   htmlOverflow: string
@@ -242,7 +244,7 @@ const fetchRandomHints = async () => {
 
 const fetchReactionHints = async () => {
   try {
-    const res = await gameAPI.getReactionHints(id)
+    const res = await gameAPI.getReactionHints(roomId.value)
     reactionHints.value = res.data || []
   } catch (error) {
     console.error('Failed to fetch reaction hints:', error)
@@ -281,7 +283,7 @@ const handleToggleReady = async () => {
   }
 
   try {
-    await gameAPI.ready(id)
+    await gameAPI.ready(roomId.value)
     // 状态也会通过 WebSocket 更新，但手动标记一下提高体验
     await loadGameState(true)
     feedback.success()
@@ -394,7 +396,7 @@ const addPvEToast = (text: string) => {
 const sendGameInvite = async (friend: any) => {
   const inviteData = {
     type: 'game_invite',
-    room_id: id,
+    room_id: roomId.value,
     room_name: roomInfo.value?.name || '实验室',
     player_count: allPlayers.value.length,
     max_players: roomInfo.value?.max_players || 0,
@@ -952,7 +954,7 @@ const fetchTurnSubstances = async () => {
     return
   }
   try {
-    const response = await gameAPI.getAvailableSubstances(id)
+    const response = await gameAPI.getAvailableSubstances(roomId.value)
     turnReadySubstances.value = response.data || []
   } catch (error) {
     console.error('获取回合可用物质失败:', error)
@@ -1079,11 +1081,11 @@ const handleChatNotify = () => {
 
 // 为 WebSocket 事件创建包装函数，确保类型匹配
 const handlePlayerJoined = () => {
-  loadGameState(true)
+  void loadGameState(true)
 }
 
 const handlePlayerLeft = () => {
-  loadGameState(true)
+  void loadGameState(true)
 }
 
 const syncTutorialStateFromGameState = () => {
@@ -1803,20 +1805,30 @@ const loadGameState = async (silent = false) => {
     loading.value = false
     return
   }
+
+  const targetRoomId = roomId.value
+  const loadToken = ++activeRoomLoadToken
+
   try {
     if (!silent && !roomInfo.value) {
       loading.value = true
       // 首次加载时加载物质名称映射
       await loadSubstanceNames()
     }
+
+    if (!targetRoomId) {
+      throw new Error('缺少房间编号')
+    }
+
     // 只在首次加载时尝试加入房间
     if (!silent) {
       try {
         // 从 URL 查询参数中获取访问密钥和观战模式
         const accessKey = route.query.key as string | undefined
         const asSpectator = route.query.spectator === 'true' || route.query.spectator === '1'
-        await gameAPI.joinRoom(id, accessKey, asSpectator)
+        await gameAPI.joinRoom(targetRoomId, accessKey, asSpectator)
       } catch (joinError: any) {
+        if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
         // 如果加入失败（例如房间已满、被封禁等），显示错误并返回
         console.error('[GameRoom] Failed to join room:', joinError)
         const errorMsg = joinError.response?.data?.error || '无法加入该房间'
@@ -1828,7 +1840,9 @@ const loadGameState = async (silent = false) => {
       }
     }
 
-    const response = await gameAPI.getRoomState(id)
+    const response = await gameAPI.getRoomState(targetRoomId)
+    if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
+
     const data = response.data
 
     roomInfo.value = {
@@ -1843,7 +1857,8 @@ const loadGameState = async (silent = false) => {
       deck_config: data.deck_config,
       is_private: data.is_private,
       access_key: data.access_key,
-      is_pve: data.is_pve
+      is_pve: data.is_pve,
+      spectators: data.spectators || []
     }
 
     playersInfo.value = data.players_info || []
@@ -1856,12 +1871,13 @@ const loadGameState = async (silent = false) => {
       if (isTutorialMode.value && isMyTurn.value) {
         generateTutorialHint()
       }
-    } else {
-      // no game_state yet, room is in waiting status
     }
-    
+
+    loadError.value = null
     loading.value = false
   } catch (error: any) {
+    if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
+
     console.error('加载游戏状态失败:', error)
     loading.value = false
 
@@ -1891,30 +1907,47 @@ const loadGameState = async (silent = false) => {
   }
 }
 
-onMounted(() => {
-  lockPageScroll()
-  exposeForceAutoDrawConsoleAPI()
+let roomInitSafetyTimeout: number | null = null
+let roomRealtimeBound = false
 
-  // 检测教学模式
-  const tutorialMode = localStorage.getItem('chemistry-uno-tutorial-mode')
-  if (tutorialMode === 'true') {
-    isTutorialMode.value = true
-    tutorialScriptMode.value = true  // 启用脚本化教学
+const bindRoomRealtimeEvents = () => {
+  if (roomRealtimeBound) return
+  roomRealtimeBound = true
+  websocket.on('game_update', handleGameUpdate)
+  websocket.on('player_joined', handlePlayerJoined)
+  websocket.on('player_left', handlePlayerLeft)
+  websocket.on('action_toast', handleActionToast)
+  websocket.on('room_terminated', handleRoomTerminated)
+  websocket.on('player_kicked', handlePlayerKicked)
+  websocket.on('chat', handleChatNotify)
+  websocket.on('private_chat', handleChatNotify)
+  websocket.on('level_up', handleLevelUp)
+}
+
+const unbindRoomRealtimeEvents = () => {
+  if (!roomRealtimeBound) return
+  roomRealtimeBound = false
+  websocket.off('game_update', handleGameUpdate)
+  websocket.off('player_joined', handlePlayerJoined)
+  websocket.off('player_left', handlePlayerLeft)
+  websocket.off('action_toast', handleActionToast)
+  websocket.off('room_terminated', handleRoomTerminated)
+  websocket.off('player_kicked', handlePlayerKicked)
+  websocket.off('chat', handleChatNotify)
+  websocket.off('private_chat', handleChatNotify)
+  websocket.off('level_up', handleLevelUp)
+}
+
+const clearRoomInitSafetyTimeout = () => {
+  if (roomInitSafetyTimeout != null) {
+    window.clearTimeout(roomInitSafetyTimeout)
+    roomInitSafetyTimeout = null
   }
+}
 
-  // 设置浮窗提示组件引用
-  setToastRef(gameToastRef)
-
-  // 重置状态，防止之前的错误状态影响
-  isRedirecting.value = false
-
-  if (isReplayBridgeMode.value) {
-    loadReplaySimulationState()
-    return
-  }
-
-  // 设置一个安全超时，如果15秒后还在loading状态，强制重置
-  const safetyTimeout = setTimeout(() => {
+const scheduleRoomInitSafetyTimeout = () => {
+  clearRoomInitSafetyTimeout()
+  roomInitSafetyTimeout = window.setTimeout(() => {
     if (loading.value) {
       console.error('Loading timeout - forcing reset')
       loading.value = false
@@ -1923,82 +1956,117 @@ onMounted(() => {
       router.push('/')
     }
   }, 15000)
+}
 
-  // 加载好友列表，添加错误处理
+const initializeRoomSession = async (options: { resetState?: boolean } = {}) => {
+  const { resetState = false } = options
+
+  if (resetState) {
+    activeRoomLoadToken += 1
+    roomInfo.value = null
+    gameState.value = null
+    playersInfo.value = []
+    loadError.value = null
+    isRedirecting.value = false
+    selectedCard.value = null
+    selectedSubstance.value = null
+    turnReadySubstances.value = []
+    doubleMode.value = false
+    firstDoubleSubstance.value = null
+    secondDoubleSubstance.value = null
+    substanceInput.value = ''
+    websocket.leaveRoom()
+  }
+
+  if (isReplayBridgeMode.value) {
+    clearRoomInitSafetyTimeout()
+    loadReplaySimulationState()
+    return
+  }
+
+  scheduleRoomInitSafetyTimeout()
+
+  try {
+    await loadGameState()
+    clearRoomInitSafetyTimeout()
+
+    if (showHints.value && randomHints.value.length === 0) {
+      fetchRandomHints()
+    }
+
+    if (!websocket.isConnected()) {
+      websocket.connect()
+    }
+
+    websocket.joinRoom(roomId.value)
+    bindRoomRealtimeEvents()
+
+    if (isTutorialMode.value) {
+      const tutorialWelcomeShown = localStorage.getItem('chemistry-uno-tutorial-welcome-shown')
+      if (!tutorialWelcomeShown) {
+        setTimeout(() => {
+          if (tutorialScriptMode.value) {
+            showToast(
+              '🎓 欢迎来到脚本化教学关卡！你将跟随系统指引，按照固定步骤学习游戏机制。请严格按照提示的顺序出牌。',
+              '📖 教学脚本已加载',
+              'success',
+              9000
+            )
+          } else {
+            showToast(
+              '💡 欢迎来到教学关卡！这是一场低难度的AI对战，在你的回合时会出现实时提示帮助你学习游戏。祝你玩得开心！',
+              '🎯 教学模式已开启',
+              'success',
+              8000
+            )
+          }
+          localStorage.setItem('chemistry-uno-tutorial-welcome-shown', 'true')
+        }, 1500)
+      }
+    }
+  } catch (err) {
+    clearRoomInitSafetyTimeout()
+    console.error('Failed to initialize game room:', err)
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  lockPageScroll()
+  exposeForceAutoDrawConsoleAPI()
+
+  const tutorialMode = localStorage.getItem('chemistry-uno-tutorial-mode')
+  if (tutorialMode === 'true') {
+    isTutorialMode.value = true
+    tutorialScriptMode.value = true
+  }
+
+  setToastRef(gameToastRef)
+  isRedirecting.value = false
+
   friendAPI.getFriends()
     .then(res => {
       friendsList.value = res.data || []
     })
     .catch(err => {
       console.error('Failed to load friends list:', err)
-      friendsList.value = [] // 确保失败时也初始化为空数组
-      // 继续加载游戏状态，即使好友列表加载失败
+      friendsList.value = []
     })
 
-  loadGameState()
-    .then(() => {
-      clearTimeout(safetyTimeout) // 成功加载后清除超时
+  void initializeRoomSession()
+})
 
-      // 游戏状态加载成功后，获取提示信息（避免 setup 阶段的 API 调用失败导致提示为空）
-      if (showHints.value && randomHints.value.length === 0) {
-        fetchRandomHints()
-      }
-
-      // 确保WebSocket已连接
-      if (!websocket.isConnected()) {
-        websocket.connect()
-      }
-
-      websocket.joinRoom(id)
-      websocket.on('game_update', handleGameUpdate)
-      websocket.on('player_joined', handlePlayerJoined)
-      websocket.on('player_left', handlePlayerLeft)
-      websocket.on('action_toast', handleActionToast)
-      websocket.on('room_terminated', handleRoomTerminated)
-      websocket.on('player_kicked', handlePlayerKicked)
-      websocket.on('chat', handleChatNotify)
-      websocket.on('private_chat', handleChatNotify)
-      websocket.on('level_up', handleLevelUp)
-
-      // 教学模式欢迎提示
-      if (isTutorialMode.value) {
-        const tutorialWelcomeShown = localStorage.getItem('chemistry-uno-tutorial-welcome-shown')
-        if (!tutorialWelcomeShown) {
-          setTimeout(() => {
-            if (tutorialScriptMode.value) {
-              showToast(
-                '🎓 欢迎来到脚本化教学关卡！你将跟随系统指引，按照固定步骤学习游戏机制。请严格按照提示的顺序出牌。',
-                '📖 教学脚本已加载',
-                'success',
-                9000
-              )
-            } else {
-              showToast(
-                '💡 欢迎来到教学关卡！这是一场低难度的AI对战，在你的回合时会出现实时提示帮助你学习游戏。祝你玩得开心！',
-                '🎯 教学模式已开启',
-                'success',
-                8000
-              )
-            }
-            localStorage.setItem('chemistry-uno-tutorial-welcome-shown', 'true')
-          }, 1500)
-        }
-      }
-    })
-    .catch(err => {
-      clearTimeout(safetyTimeout) // 捕获错误后也清除超时
-      // loadGameState 内部已经处理了错误，这里只是确保不会有未处理的promise rejection
-      console.error('Failed to initialize game room:', err)
-      loading.value = false
-    })
+watch(roomRouteSignature, (_next, prev) => {
+  if (!prev) return
+  void initializeRoomSession({ resetState: true })
 })
 
 onUnmounted(() => {
   unlockPageScroll()
   cleanupForceAutoDrawConsoleAPI()
   clearReplayTimer()
+  clearRoomInitSafetyTimeout()
 
-  // 清除教学模式标记，并记录已完成
   if (isTutorialMode.value) {
     localStorage.removeItem('chemistry-uno-tutorial-mode')
     localStorage.removeItem('chemistry-uno-tutorial-welcome-shown')
@@ -2009,14 +2077,7 @@ onUnmounted(() => {
 
   if (timerRaf) cancelAnimationFrame(timerRaf)
   websocket.leaveRoom()
-  websocket.off('game_update', handleGameUpdate)
-  websocket.off('player_joined', handlePlayerJoined)
-  websocket.off('player_left', handlePlayerLeft)
-  websocket.off('action_toast', handleActionToast)
-  websocket.off('room_terminated', handleRoomTerminated)
-  websocket.off('player_kicked', handlePlayerKicked)
-  websocket.off('chat', handleChatNotify)
-  websocket.off('private_chat', handleChatNotify)
+  unbindRoomRealtimeEvents()
 })
 
 const canRunTutorialAction = (action: 'play' | 'draw' | 'double') => {
@@ -2048,7 +2109,7 @@ const handleCardClick = async (card: any) => {
   const specialTypes = ['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr']
   if (specialTypes.includes(card.type) || card.effect) {
     try {
-      await gameAPI.playCard(id, card, card.type)
+      await gameAPI.playCard(roomId.value, card, card.type)
       feedback.playCard()
       selectedCard.value = null
       selectedSubstance.value = null
@@ -2065,7 +2126,7 @@ const handleCardClick = async (card: any) => {
   // 例如：点击 H 手牌 → 出牌物质为 H（不管单质是 H 还是 H₂）
   // 后端会进行物质合法性检测（substances表）和反应检查（reactions表）
   try {
-    await gameAPI.playCard(id, card, card.type)
+    await gameAPI.playCard(roomId.value, card, card.type)
     feedback.playCard()
     selectedCard.value = null
     selectedSubstance.value = null
@@ -2117,7 +2178,7 @@ const handlePlayCard = async () => {
   try {
     // 如果没有选中的卡片，则传递一个带类型的占位符，后端会根据物质消耗手牌
     const cardToPlay = selectedCard.value || { type: selectedSubstance.value, count: 1, effect: '' }
-    await gameAPI.playCard(id, cardToPlay, selectedSubstance.value)
+    await gameAPI.playCard(roomId.value, cardToPlay, selectedSubstance.value)
 
     // 播放打牌反馈
     feedback.playCard()
@@ -2143,7 +2204,7 @@ const handleDoublePlay = async () => {
   }
 
   try {
-    await gameAPI.playDouble(id, firstDoubleSubstance.value, secondDoubleSubstance.value)
+    await gameAPI.playDouble(roomId.value, firstDoubleSubstance.value, secondDoubleSubstance.value)
 
     feedback.playCard()
 
@@ -2204,7 +2265,7 @@ const handleInputPlay = async () => {
 
   try {
     // 为兼容原API，传一个空Card对象
-    await gameAPI.playCard(id, { type: '', count: 0, effect: '' }, substanceInput.value)
+    await gameAPI.playCard(roomId.value, { type: '', count: 0, effect: '' }, substanceInput.value)
 
     feedback.playCard()
 
@@ -2225,7 +2286,7 @@ const handleInputPlay = async () => {
 const handleDrawCard = async () => {
   if (!canRunTutorialAction('draw')) return
   try {
-    await gameAPI.drawCard(id)
+    await gameAPI.drawCard(roomId.value)
     feedback.drawCard()
   } catch (error: any) {
     showToast(error.response?.data?.error || '摸牌失败', '系统异常', 'error')
@@ -2245,7 +2306,7 @@ const getForceAutoDrawStatus = () => {
     enabled: forceAutoDrawEnabled,
     interval_ms: forceAutoDrawIntervalMs,
     silent: forceAutoDrawSilent,
-    room_id: id,
+    room_id: roomId.value,
     in_flight: forceAutoDrawInFlight,
     success_count: forceAutoDrawSuccessCount,
     replay_mode: isReplayBridgeMode.value || isReplayRoomPath.value
@@ -2253,10 +2314,10 @@ const getForceAutoDrawStatus = () => {
 }
 
 const tryForceAutoDraw = async () => {
-  if (forceAutoDrawInFlight || !id) return
+  if (forceAutoDrawInFlight || !roomId.value) return
   forceAutoDrawInFlight = true
   try {
-    await gameAPI.drawCard(id)
+    await gameAPI.drawCard(roomId.value)
     forceAutoDrawSuccessCount += 1
   } catch (error: any) {
     if (!forceAutoDrawSilent) {
@@ -2339,7 +2400,7 @@ const handleLeaveRoom = async () => {
   if (roomInfo.value?.is_pve && isSpectator.value) {
     try {
       // 调用API通知服务器玩家离开房间
-      await gameAPI.leaveRoom(id)
+      await gameAPI.leaveRoom(roomId.value)
     } catch (error) {
       console.error('离开房间API调用失败:', error)
     }
@@ -2430,7 +2491,7 @@ const handleLeaveRoom = async () => {
       // 注意：即便是正在游戏中，用户点击“退出”也应该执行 leaveRoom 逻辑
       // 以释放该用户的“同时只能进行一次游戏”锁定
       try {
-        await gameAPI.leaveRoom(id)
+        await gameAPI.leaveRoom(roomId.value)
       } catch (error) {
         console.error('离开房间API调用失败:', error)
       }
@@ -2678,7 +2739,7 @@ watch(() => gameState.value?.current_player, () => {
             <span class="text-[10px] font-black uppercase tracking-widest">{{ isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '') }}</span>
           </button>
           <div class="hidden xs:block">
-            <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
+            <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || roomId.substring(0, 6) }}</h2>
             <div class="flex items-center gap-1.5">
               <PingDisplay />
             </div>
@@ -3909,7 +3970,7 @@ watch(() => gameState.value?.current_player, () => {
       class="fixed right-0 top-0 bottom-0 w-full lg:w-80 z-[100] lg:top-6 lg:bottom-52 lg:right-6 flex flex-col"
     >
       <ChatBox
-        :roomId="id"
+        :roomId="roomId"
         title="实验内通信线程"
         maxHeight="100%"
         class="h-full !bg-white/95 dark:!bg-slate-900/60 backdrop-blur-3xl shadow-3xl lg:rounded-[40px] border-l lg:border border-slate-200 dark:border-white/10"

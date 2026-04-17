@@ -7,8 +7,8 @@ import feedback from '../utils/feedback'
 import { Beaker, Lock, Loader2, Fingerprint, Shield, Cpu, Mail, Eye, EyeOff } from 'lucide-vue-next'
 import ResetPassword2FAModal from '../components/ResetPassword2FAModal.vue'
 import OAuthLogos from '../components/icons/OAuthLogos.vue'
-import websocket from '../utils/websocket'
 import { API_BASE_URL } from '../utils/runtimeConfig'
+import { completeAuthSuccess, getSafeInternalRedirect, rememberPendingAuthRedirect } from '../utils/authSession'
 import { get } from '@github/webauthn-json'
 
 const identifier = ref(localStorage.getItem('last_email') || '')
@@ -119,11 +119,6 @@ const handle2FAVerify = async () => {
 }
 
 const handleLoginSuccess = (token: string | null, user: any, announcements: any[] = [], isReturningPlayer: boolean = false, daysSinceLastLogin: number = 0, accessToken?: string, refreshToken?: string) => {
-  // Token已由后端通过HttpOnly Cookie设置，前端不需要存储
-  localStorage.setItem('user', JSON.stringify(user))
-  websocket.connect()
-  window.dispatchEvent(new Event('auth-changed'))
-
   // 处理回归玩家
   if (isReturningPlayer) {
     const hasSkippedLobbyTutorial = localStorage.getItem('chemistry-uno-lobby-tutorial-skipped') === 'true'
@@ -161,14 +156,11 @@ const handleLoginSuccess = (token: string | null, user: any, announcements: any[
     })
   }
 
-  // 检查是否有重定向参数
-  const redirect = router.currentRoute.value.query.redirect as string
-  if (redirect) {
-    // 跳转到原始访问的页面（包括查询参数）
-    router.push(redirect)
-  } else {
-    router.push('/')
-  }
+  completeAuthSuccess({
+    user,
+    router,
+    redirect: router.currentRoute.value.query.redirect,
+  })
 }
 
 const handleWebAuthnLogin = async () => {
@@ -231,7 +223,8 @@ const handleWebAuthnLogin = async () => {
 const handleOAuthLogin = (provider: 'github' | 'ms' | 'google' | 'apple') => {
   loading.value = true
   error.value = ''
-  
+  rememberPendingAuthRedirect(router.currentRoute.value.query.redirect)
+
   const width = 600
   const height = 700
   const left = window.screen.width / 2 - width / 2
@@ -254,6 +247,8 @@ const handleOAuthLogin = (provider: 'github' | 'ms' | 'google' | 'apple') => {
   }
 
   const messageHandler = (event: MessageEvent) => {
+    if (event.source !== popup) return
+    if (event.origin !== window.location.origin) return
     if (!event.data || typeof event.data !== 'object') return
 
     if (event.data.type === 'oauth-success') {

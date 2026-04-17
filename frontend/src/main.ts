@@ -1,8 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import { buildApiURL, OFFLINE_MODE } from './utils/runtimeConfig'
+import { OFFLINE_MODE } from './utils/runtimeConfig'
 import { installOfflineFetchInterceptor } from './utils/offlineBackend'
+import { ensureAuthReady } from './utils/authSession'
 import './index.css'
 
 const syncViewportHeight = () => {
@@ -19,63 +20,6 @@ const scheduleViewportSync = () => {
     viewportSyncRaf = 0
     syncViewportHeight()
   })
-}
-
-const clearStaleAuthState = () => {
-  localStorage.removeItem('user')
-  localStorage.removeItem('token')
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-}
-
-const ensureStartupSession = async () => {
-  const rawUser = localStorage.getItem('user')
-  if (!rawUser) {
-    return
-  }
-
-  try {
-    JSON.parse(rawUser)
-  } catch {
-    clearStaleAuthState()
-    return
-  }
-
-  try {
-    const userInfoResp = await fetch(buildApiURL('/user/info'), {
-      method: 'GET',
-      credentials: 'include'
-    })
-
-    if (userInfoResp.ok) {
-      return
-    }
-
-    if (userInfoResp.status !== 401) {
-      return
-    }
-
-    const refreshResp = await fetch(buildApiURL('/auth/refresh'), {
-      method: 'POST',
-      credentials: 'include'
-    })
-
-    if (!refreshResp.ok) {
-      clearStaleAuthState()
-      return
-    }
-
-    const verifyResp = await fetch(buildApiURL('/user/info'), {
-      method: 'GET',
-      credentials: 'include'
-    })
-
-    if (!verifyResp.ok) {
-      clearStaleAuthState()
-    }
-  } catch (error) {
-    console.warn('[Auth] startup session check failed', error)
-  }
 }
 
 const markBootSplashReady = () => {
@@ -114,7 +58,7 @@ async function bootstrap() {
   window.addEventListener('orientationchange', scheduleViewportSync, { passive: true })
   window.visualViewport?.addEventListener('resize', scheduleViewportSync)
 
-  await ensureStartupSession()
+  await ensureAuthReady()
 
   const app = createApp(App)
   app.use(router)

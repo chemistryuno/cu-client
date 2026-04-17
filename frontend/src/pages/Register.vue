@@ -5,8 +5,8 @@ import { authAPI } from '../utils/api'
 import { useDialog } from '../utils/dialog'
 import { Lock, FlaskConical, ShieldCheck, Loader2, Mail, User, HelpCircle, AtSign, FileText } from 'lucide-vue-next'
 import OAuthLogos from '../components/icons/OAuthLogos.vue'
-import websocket from '../utils/websocket'
 import { API_BASE_URL } from '../utils/runtimeConfig'
+import { completeAuthSuccess, rememberPendingAuthRedirect } from '../utils/authSession'
 
 // 注册模式: 'username' | 'email'
 const registerMode = ref<'username' | 'email'>('username')
@@ -67,16 +67,13 @@ onMounted(async () => {
 })
 
 const handleLoginSuccess = (token: string, user: any) => {
-  // Token已由后端通过HttpOnly Cookie设置，前端不需要存储
-  localStorage.setItem('user', JSON.stringify(user))
-  websocket.connect()
-  window.dispatchEvent(new Event('auth-changed'))
-  router.push('/')
+  completeAuthSuccess({ user, router })
 }
 
 const handleOAuthLogin = (provider: 'github' | 'ms' | 'google' | 'apple') => {
   loading.value = true
   error.value = ''
+  rememberPendingAuthRedirect(router.currentRoute.value.query.redirect)
 
   const width = 600
   const height = 700
@@ -100,6 +97,8 @@ const handleOAuthLogin = (provider: 'github' | 'ms' | 'google' | 'apple') => {
   }
 
   const messageHandler = (event: MessageEvent) => {
+    if (event.source !== popup) return
+    if (event.origin !== window.location.origin) return
     if (!event.data || typeof event.data !== 'object') return
 
     if (event.data.type === 'oauth-success') {

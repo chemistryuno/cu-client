@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 import { OFFLINE_MODE, buildApiURL } from './utils/runtimeConfig'
+import { ensureAuthReady, getSafeInternalRedirect, getStoredUser, rememberPendingAuthRedirect } from './utils/authSession'
 
 const Login = () => import('./pages/Login.vue')
 const Register = () => import('./pages/Register.vue')
@@ -185,26 +186,17 @@ const findActiveRoomId = async (_token: string | null, uid: number): Promise<str
 }
 
 router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormalized) => {
-  // Token存储在HttpOnly Cookie中，检查user信息判断是否已登录
-  let user = null
-  try {
-    user = JSON.parse(localStorage.getItem('user') || 'null')
-  } catch (e) {
-    console.error('Failed to parse user from localStorage', e)
-    localStorage.removeItem('user')
-  }
+  await ensureAuthReady()
+  const user = getStoredUser()
 
   if (to.meta.requiresAuth && !user) {
+    rememberPendingAuthRedirect(to.fullPath)
     return {
       path: '/login',
       query: { redirect: to.fullPath }
     }
   } else if (to.meta.guestOnly && user) {
-    const redirect = to.query.redirect as string
-    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
-      return redirect
-    }
-    return '/'
+    return getSafeInternalRedirect(to.query.redirect, '/')
   } else if (to.meta.adminOnly && (!user || !user.is_admin)) {
     return '/'
   } else if (to.meta.coWorkerOnly && (!user || (user.role !== 'admin' && user.role !== 'co-worker'))) {

@@ -2,6 +2,7 @@
 import router from '../router'
 import { API_BASE_URL, OFFLINE_MODE } from './runtimeConfig'
 import { offlineAxiosAdapter } from './offlineBackend'
+import { clearClientAuthState } from './authSession'
 
 interface CacheEntry {
   data: any
@@ -26,11 +27,8 @@ const setCached = (key: string, data: any, ttl = 5 * 60 * 1000) => {
 }
 
 const clearAuthState = () => {
-  localStorage.removeItem('user')
-  localStorage.removeItem('token')
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
   apiCache.delete('user_info')
+  clearClientAuthState()
 }
 
 let isRedirectingToLogin = false
@@ -327,6 +325,10 @@ export const pluginAPI = {
   reloadPlugins: () => api.post('/admin/plugins/reload'),
   scheduleRestart: (delaySeconds: number, reason?: string) => api.post('/admin/server/restart', { delay_seconds: delaySeconds, reason }),
   cancelRestart: () => api.post('/admin/server/restart/cancel')
+}
+
+export const invalidateApiCache = (...keys: string[]) => {
+  keys.forEach((key) => apiCache.delete(key))
 }
 
 export default api

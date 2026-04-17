@@ -87,8 +87,7 @@ onMounted(() => {
   // 只有非房间内聊天才加载全服历史并加入大厅频道
   if (!props.roomId) {
     loadHistory()
-    // 确保连接建立后立即尝试加入
-    websocket.send({ type: 'join_room', room_id: 'lobby' })
+    websocket.joinRoom('lobby')
   }
 
   const handleChatMessage = (msg: any) => {
@@ -156,6 +155,9 @@ onMounted(() => {
   window.addEventListener('start-private-chat', handleStartPrivateChat as any)
 
   onUnmounted(() => {
+    if (!props.roomId) {
+      websocket.leaveRoom()
+    }
     websocket.off('chat', handleChatMessage)
     websocket.off('private_chat', handlePrivateMessage)
     window.removeEventListener('start-private-chat', handleStartPrivateChat as any)

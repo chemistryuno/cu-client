@@ -85,6 +85,8 @@ class WebSocketService {
   }
 
   disconnect(): void {
+    this.currentRoomId = null
+
     if (OFFLINE_MODE) {
       this.isConnecting = false
       return
@@ -100,7 +102,11 @@ class WebSocketService {
 
   send(message: WebSocketMessage): void {
     if (OFFLINE_MODE) {
-      if (message.type === 'chat' && this.currentRoomId) {
+      if (message.type === 'join_room') {
+        this.currentRoomId = typeof message.room_id === 'string' ? message.room_id : null
+      } else if (message.type === 'leave_room') {
+        this.currentRoomId = null
+      } else if (message.type === 'chat' && this.currentRoomId) {
         offlineSocket.sendRoomChat(this.currentRoomId, String(message.message || ''))
       } else if (message.type === 'private_chat') {
         this.handleMessage({
