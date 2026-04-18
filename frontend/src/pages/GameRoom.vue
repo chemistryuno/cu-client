@@ -22,89 +22,10 @@ const route = useRoute()
 const router = useRouter()
 const { showAlert, showConfirm, showPrompt, showToast } = useDialog()
 const gameToastRef = ref()
-const roomId = computed(() => String(route.params.id || ''))
+const id = route.params.id as string
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
-const replayStartIndexQuery = computed(() => {
-  const raw = Number(route.query.replay_start_index || 0)
-  if (!Number.isFinite(raw) || raw < 0) {
-    return 0
-  }
-  return Math.floor(raw)
-})
 const isReplayBridgeMode = computed(() => Number.isFinite(replayHistoryQueryID.value) && replayHistoryQueryID.value > 0)
-const isReplayRoomPath = computed(() => roomId.value === 'replay')
 const replayScopeAdmin = computed(() => String(route.query.scope || '') === 'admin')
-const replayReturnPath = computed(() => {
-  const raw = String(route.query.from || '').trim()
-  if (/^\/admin(?:\/[a-zA-Z0-9_-]+)?$/.test(raw)) {
-    return raw
-  }
-  if (/^\/profile(?:\/[a-zA-Z0-9_-]+)?$/.test(raw)) {
-    return raw
-  }
-  return replayScopeAdmin.value ? '/admin/users' : '/profile/history'
-})
-const roomRouteSignature = computed(() => `${roomId.value}|${String(route.query.key || '')}|${String(route.query.spectator || '')}`)
-let activeRoomLoadToken = 0
-
-let pageScrollLockSnapshot: {
-  htmlOverflow: string
-  bodyOverflow: string
-  bodyWidth: string
-  appOverflow: string
-} | null = null
-
-const lockPageScroll = () => {
-  if (pageScrollLockSnapshot) return
-
-  const appRoot = document.getElementById('app')
-  pageScrollLockSnapshot = {
-    htmlOverflow: document.documentElement.style.overflow,
-    bodyOverflow: document.body.style.overflow,
-    bodyWidth: document.body.style.width,
-    appOverflow: appRoot?.style.overflow || ''
-  }
-
-  document.documentElement.style.overflow = 'hidden'
-  document.body.style.overflow = 'hidden'
-  document.body.style.width = '100%'
-  if (appRoot) {
-    appRoot.style.overflow = 'hidden'
-  }
-}
-
-const unlockPageScroll = () => {
-  if (!pageScrollLockSnapshot) return
-
-  const appRoot = document.getElementById('app')
-  document.documentElement.style.overflow = pageScrollLockSnapshot.htmlOverflow
-  document.body.style.overflow = pageScrollLockSnapshot.bodyOverflow
-  document.body.style.width = pageScrollLockSnapshot.bodyWidth
-  if (appRoot) {
-    appRoot.style.overflow = pageScrollLockSnapshot.appOverflow
-  }
-
-  pageScrollLockSnapshot = null
-}
-
-const buildReplayTimelineURL = () => {
-  if (!(Number.isFinite(replayHistoryQueryID.value) && replayHistoryQueryID.value > 0)) {
-    return replayReturnPath.value
-  }
-  const query = new URLSearchParams()
-  if (replayScopeAdmin.value) {
-    query.set('scope', 'admin')
-  }
-  query.set('from', replayReturnPath.value)
-  const queryStr = query.toString()
-  return queryStr
-    ? `/replay/${replayHistoryQueryID.value}?${queryStr}`
-    : `/replay/${replayHistoryQueryID.value}`
-}
-
-const navigateBackFromReplay = () => {
-  router.push(buildReplayTimelineURL())
-}
 
 const user = ref<any>({})
 try {
@@ -121,7 +42,7 @@ try {
 const gameState = ref<any>(null)
 const roomInfo = ref<any>(null)
 const playersInfo = ref<any[]>([])
-const friendsList = ref<any[]>([]); // Friends disabled in offline mode
+const friendsList = ref<any[]>([])
 const availableSubstances = ref<string[]>([])
 
 // 教学模式检测
@@ -159,12 +80,6 @@ const replayInitialHands = ref<Record<number, any[]>>({})
 const replaySpeedOptions = [0.5, 1, 1.5, 2, 3, 4]
 let replayTimer: number | null = null
 const replayActionEventTypes = new Set(['play_card', 'double_play', 'draw_card', 'timeout_auto_draw'])
-let forceAutoDrawEnabled = false
-let forceAutoDrawIntervalMs = 260
-let forceAutoDrawSilent = true
-let forceAutoDrawInFlight = false
-let forceAutoDrawSuccessCount = 0
-let forceAutoDrawTimer: number | null = null
 
 // UI State
 const isMobile = ref(false)
@@ -244,7 +159,7 @@ const fetchRandomHints = async () => {
 
 const fetchReactionHints = async () => {
   try {
-    const res = await gameAPI.getReactionHints(roomId.value)
+    const res = await gameAPI.getReactionHints(id)
     reactionHints.value = res.data || []
   } catch (error) {
     console.error('Failed to fetch reaction hints:', error)
@@ -283,7 +198,7 @@ const handleToggleReady = async () => {
   }
 
   try {
-    await gameAPI.ready(roomId.value)
+    await gameAPI.ready(id)
     // 状态也会通过 WebSocket 更新，但手动标记一下提高体验
     await loadGameState(true)
     feedback.success()
@@ -332,7 +247,11 @@ const shouldShowInBlue = (player: any) => {
   return !!(friend?.remark)
 }
 
- 发送同步请求，等待量子握手。`, '请求已发送', 'success')
+const handleAddFriend = async (player: any) => {
+  try {
+    const displayName = player.nickname || player.username
+    await friendAPI.sendRequest(player.uid)
+  showToast(`已向研究员 ${displayName} 发送同步请求，等待量子握手。`, '请求已发送', 'success')
   } catch (error: any) {
     showToast(error.response?.data?.error || '请求发送失败', '链路故障', 'error')
   }
@@ -359,7 +278,7 @@ const playersCardState = computed(() => {
 })
 
 // 改为监听简化版本而不是deep watch
-watch(playersCardState, (_newState) => {
+watch(playersCardState, (newState) => {
   if (!gameState.value?.players) return
   gameState.value.players.forEach((p: any) => {
     const oldVal = playerCardCounts.value[p.uid]
@@ -389,7 +308,17 @@ const addPvEToast = (text: string) => {
 // startPrivateChat 已被弃用，实验室内禁止私聊
 
 
-
+const sendGameInvite = async (friend: any) => {
+  const inviteData = {
+    type: 'game_invite',
+    room_id: id,
+    room_name: roomInfo.value?.name || '实验室',
+    player_count: allPlayers.value.length,
+    max_players: roomInfo.value?.max_players || 0,
+    is_points_mode: roomInfo.value?.is_points_mode || false,
+    is_private: roomInfo.value?.is_private || false,
+    access_key: roomInfo.value?.access_key || ''
+  }
 
   websocket.send({
     type: 'private_chat',
@@ -404,8 +333,8 @@ const addPvEToast = (text: string) => {
 }
 
 // Admin management state
-
-
+const showAdminModal = ref(false)
+const adminTargetUser = ref<any>(null)
 const adminActionType = ref<'kick' | 'ban'>('kick')
 const banUntil = ref('')
 const banReason = ref('你由于违规游戏而被踢出')
@@ -497,9 +426,19 @@ watch(() => gameState.value?.status, (newStatus, oldStatus) => {
   }
 })
 
+const openAdminAction = (player: any) => {
+  if (!user.value.is_admin || player.uid === user.value.uid) return
+  adminTargetUser.value = player
+  adminActionType.value = 'kick'
+  banReason.value = '你由于违规游戏而被踢出'
+  selectedBanPreset.value = 24
+  banUntil.value = getDefaultBanUntil()
+  showAdminModal.value = true
+}
 
-
- (UID: ${player.uid})`, '请输入举报原因', '违规行为举报')
+const handleReportPlayer = async (player: any) => {
+  const displayName = player.nickname || player.username
+  const reason = await showPrompt(`举报研究员 ${displayName} (UID: ${player.uid})`, '请输入举报原因', '违规行为举报')
   if (!reason) return
   
   try {
@@ -510,7 +449,14 @@ watch(() => gameState.value?.status, (newStatus, oldStatus) => {
   }
 }
 
- else {
+const handleAdminAction = async () => {
+  if (!adminTargetUser.value) return
+  try {
+    if (adminActionType.value === 'kick') {
+      await adminAPI.kickPlayer(adminTargetUser.value.uid, banReason.value)
+      feedback.success()
+      showToast('该玩家已被强制下线并清除登录状态', '成功', 'success')
+    } else {
       if (!banUntil.value) {
         showToast('请选择封禁截止时间', '参数缺失', 'warning')
         feedback.error()
@@ -638,16 +584,6 @@ const winner = computed(() => {
      return gameState.value.players.find((p: any) => p.uid === winnerUid)
   }
   return gameState.value.players?.find((p: any) => p.card_count === 0)
-})
-
-const showSettlementPanel = computed(() => {
-  if (isReplayBridgeMode.value) return false
-  const status = String(gameState.value?.status || '')
-  return status === 'finished' || status === 'terminated'
-})
-
-const isTerminatedSettlement = computed(() => {
-  return String(gameState.value?.status || '') === 'terminated'
 })
 
 const isManualSettlement = ref(false)
@@ -923,7 +859,7 @@ const fetchTurnSubstances = async () => {
     return
   }
   try {
-    const response = await gameAPI.getAvailableSubstances(roomId.value)
+    const response = await gameAPI.getAvailableSubstances(id)
     turnReadySubstances.value = response.data || []
   } catch (error) {
     console.error('获取回合可用物质失败:', error)
@@ -1015,23 +951,8 @@ const handleActionToast = (msg: any) => {
 }
 
 const handleRoomTerminated = async (msg: any) => {
-  const reason = msg.message || '由于连接中断，实验室已关闭'
-
-  const hasSettlementData = Boolean(
-    (gameState.value?.finished_players && gameState.value.finished_players.length > 0) ||
-    (gameState.value?.points_changes && Object.keys(gameState.value.points_changes).length > 0) ||
-    (gameState.value?.xp_changes && Object.keys(gameState.value.xp_changes).length > 0)
-  )
-
-  if (hasSettlementData && !isReplayBridgeMode.value) {
-    if (gameState.value?.status !== 'finished') {
-      gameState.value.status = 'terminated'
-    }
-    showToast(reason, '实验结束', 'warning')
-    return
-  }
-
   isRedirecting.value = true
+  const reason = msg.message || '由于连接中断，实验室已关闭'
   await showAlert(reason, '实验结束')
   router.push('/')
 }
@@ -1050,11 +971,11 @@ const handleChatNotify = () => {
 
 // 为 WebSocket 事件创建包装函数，确保类型匹配
 const handlePlayerJoined = () => {
-  void loadGameState(true)
+  loadGameState(true)
 }
 
 const handlePlayerLeft = () => {
-  void loadGameState(true)
+  loadGameState(true)
 }
 
 const syncTutorialStateFromGameState = () => {
@@ -1139,20 +1060,13 @@ const normalizeReplayEvents = (events: any[]) => {
     })
 }
 
-const resolveReplayCardKeyFromObject = (card: any) => {
-  return String(card?.card_symbol || card?.card_type || card?.type || '?')
-}
-
 const resolveReplayCardKeyForPlay = (payload: any) => {
-  if (Array.isArray(payload?.cards) && payload.cards.length) {
-    return resolveReplayCardKeyFromObject(payload.cards[0])
-  }
   return payload?.card_symbol || payload?.card_type || '未知卡'
 }
 
 const resolveReplayCardKeysForDouble = (payload: any) => {
   if (Array.isArray(payload?.cards) && payload.cards.length) {
-    return payload.cards.map((card: any) => resolveReplayCardKeyFromObject(card))
+    return payload.cards.map((card: any) => card?.card_symbol || card?.card_type || card?.type || '未知卡')
   }
   const symbol = payload?.card_symbol || payload?.card_type
   if (symbol) return [symbol, symbol]
@@ -1221,38 +1135,7 @@ const addReplayHandCards = (player: any, cardKeys: string[]) => {
   player.card_count = player.hand_cards.length
 }
 
-const parseReplayInitialHandsFromEvents = (events: any[]) => {
-  const gameStartEvent = events.find((event: any) => event?.__type === 'game_start' && event?.__payload?.initial_hands)
-  const initialHandsPayload = gameStartEvent?.__payload?.initial_hands
-  if (!initialHandsPayload || typeof initialHandsPayload !== 'object') {
-    return null
-  }
-
-  const result: Record<number, string[]> = {}
-  Object.entries(initialHandsPayload).forEach(([uidKey, cards]) => {
-    const uid = Number(uidKey)
-    if (!Number.isFinite(uid)) return
-    if (!Array.isArray(cards)) {
-      result[uid] = []
-      return
-    }
-    result[uid] = cards.map((card: any) => resolveReplayCardKeyFromObject(card))
-  })
-  return result
-}
-
 const buildReplayInitialHands = (players: any[], events: any[]) => {
-  const explicitInitialHands = parseReplayInitialHandsFromEvents(events)
-  if (explicitInitialHands) {
-    players.forEach((player: any) => {
-      const uid = Number(player.uid)
-      if (!Array.isArray(explicitInitialHands[uid])) {
-        explicitInitialHands[uid] = []
-      }
-    })
-    return explicitInitialHands
-  }
-
   const handsByUID: Record<number, string[]> = {}
   const cardBalanceByUID: Record<number, number> = {}
 
@@ -1308,26 +1191,24 @@ const buildReplayLastCardFromEvent = (event: any) => {
   const payload = event?.__payload || event?.payload || {}
 
   if (eventType === 'double_play') {
-    const doubleKeys = resolveReplayCardKeysForDouble(payload)
     const reactants = [payload.sub1 || payload.substance_1, payload.sub2 || payload.substance_2].filter(Boolean)
     const result = payload.substance || payload.result_substance || reactants.join(' + ')
     return {
       substance: result,
       reactants,
       card: {
-        type: doubleKeys[0] || reactants[0] || 'R',
+        type: payload.card_symbol || payload.card_type || reactants[0] || 'R',
         effect: payload.card_effect || ''
       }
     }
   }
 
   if (eventType === 'play_card') {
-    const playedKey = resolveReplayCardKeyForPlay(payload)
     const substance = payload.substance || payload.result_substance || payload.card_symbol || payload.card_type || 'R'
     return {
       substance,
       card: {
-        type: playedKey || substance,
+        type: payload.card_symbol || payload.card_type || substance,
         effect: payload.card_effect || ''
       }
     }
@@ -1361,53 +1242,6 @@ const replayProgressText = computed(() => {
   const current = Math.min(replayPlaybackIndex.value, total)
   return `${current}/${total}`
 })
-
-const normalizeReplaySeekIndex = (targetIndex: number) => {
-  if (!Number.isFinite(targetIndex)) {
-    return 0
-  }
-  return Math.max(0, Math.min(Math.floor(targetIndex), replayEvents.value.length))
-}
-
-const seekReplayToIndex = (targetIndex: number) => {
-  if (!isReplayBridgeMode.value || !gameState.value) return
-
-  clearReplayTimer()
-  replayIsPlaying.value = false
-  replayGameOver.value = false
-  replayEndType.value = ''
-
-  const clampedIndex = normalizeReplaySeekIndex(targetIndex)
-  replayPlaybackIndex.value = 0
-  resetReplaySimulationBoard()
-
-  for (let index = 0; index < clampedIndex; index += 1) {
-    const event = replayEvents.value[index]
-    applyReplayEventToBoard(event)
-    replayPlaybackIndex.value = index + 1
-
-    const eventType = event?.__type || ''
-    if (eventType === 'game_finished' || eventType === 'game_terminated_invalid') {
-      replayGameOver.value = true
-      replayEndType.value = eventType
-      return
-    }
-  }
-
-  if (clampedIndex >= replayEvents.value.length && replayEvents.value.length > 0) {
-    replayGameOver.value = true
-    replayEndType.value = replayEvents.value[replayEvents.value.length - 1]?.__type || 'game_finished'
-  }
-}
-
-const jumpReplayByStep = (delta: number) => {
-  seekReplayToIndex(replayPlaybackIndex.value + delta)
-}
-
-const handleReplaySeekInput = (event: Event) => {
-  const nextIndex = Number((event.target as HTMLInputElement | null)?.value ?? 0)
-  seekReplayToIndex(nextIndex)
-}
 
 const replaySummary = computed(() => {
   const cardCounts: Record<string, number> = {}
@@ -1578,21 +1412,19 @@ const scheduleReplayPlaybackStep = () => {
   }, delay)
 }
 
-const startReplayPlayback = (restart = false, restartIndex = 0) => {
+const startReplayPlayback = (restart = false) => {
   if (!isReplayBridgeMode.value || !gameState.value) return
 
   if (restart) {
-    seekReplayToIndex(restartIndex)
+    replayPlaybackIndex.value = 0
+    replayGameOver.value = false
+    replayEndType.value = ''
+    resetReplaySimulationBoard()
   }
 
   if (!replayEvents.value.length) {
     replayGameOver.value = true
     replayEndType.value = 'game_finished'
-    replayIsPlaying.value = false
-    return
-  }
-
-  if (replayGameOver.value || replayPlaybackIndex.value >= replayEvents.value.length) {
     replayIsPlaying.value = false
     return
   }
@@ -1629,8 +1461,8 @@ const setReplaySpeed = (speed: number) => {
   }
 }
 
-const restartReplayPlayback = (startIndex = 0) => {
-  startReplayPlayback(true, startIndex)
+const restartReplayPlayback = () => {
+  startReplayPlayback(true)
 }
 
 const loadReplaySimulationState = async () => {
@@ -1689,7 +1521,7 @@ const loadReplaySimulationState = async () => {
       card_count: 0,
       hand_cards: [],
       index,
-      is_ai: typeof p.is_ai === 'boolean' ? p.is_ai : Number(p.uid) < 0,
+      is_ai: Number(p.uid) < 0,
       is_offline: false,
       points: 0,
       exp: 0
@@ -1707,7 +1539,7 @@ const loadReplaySimulationState = async () => {
       username: p.username || p.nickname || `UID ${p.uid}`,
       nickname: p.nickname || p.username || `UID ${p.uid}`,
       avatar: p.avatar || '🧪',
-      is_ai: typeof p.is_ai === 'boolean' ? p.is_ai : Number(p.uid) < 0,
+      is_ai: Number(p.uid) < 0,
       is_offline: false
     }))
 
@@ -1760,7 +1592,7 @@ const loadReplaySimulationState = async () => {
     }
 
     replayEvents.value = normalizedReplayEvents
-    restartReplayPlayback(replayStartIndexQuery.value)
+    startReplayPlayback(true)
   } catch (error: any) {
     console.error('[GameRoom] 加载回放模拟失败:', error)
     loadError.value = error?.response?.data?.error || error?.message || '回放模拟加载失败'
@@ -1774,30 +1606,20 @@ const loadGameState = async (silent = false) => {
     loading.value = false
     return
   }
-
-  const targetRoomId = roomId.value
-  const loadToken = ++activeRoomLoadToken
-
   try {
     if (!silent && !roomInfo.value) {
       loading.value = true
       // 首次加载时加载物质名称映射
       await loadSubstanceNames()
     }
-
-    if (!targetRoomId) {
-      throw new Error('缺少房间编号')
-    }
-
     // 只在首次加载时尝试加入房间
     if (!silent) {
       try {
         // 从 URL 查询参数中获取访问密钥和观战模式
         const accessKey = route.query.key as string | undefined
         const asSpectator = route.query.spectator === 'true' || route.query.spectator === '1'
-        await gameAPI.joinRoom(targetRoomId, accessKey, asSpectator)
+        await gameAPI.joinRoom(id, accessKey, asSpectator)
       } catch (joinError: any) {
-        if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
         // 如果加入失败（例如房间已满、被封禁等），显示错误并返回
         console.error('[GameRoom] Failed to join room:', joinError)
         const errorMsg = joinError.response?.data?.error || '无法加入该房间'
@@ -1809,9 +1631,7 @@ const loadGameState = async (silent = false) => {
       }
     }
 
-    const response = await gameAPI.getRoomState(targetRoomId)
-    if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
-
+    const response = await gameAPI.getRoomState(id)
     const data = response.data
 
     roomInfo.value = {
@@ -1826,8 +1646,7 @@ const loadGameState = async (silent = false) => {
       deck_config: data.deck_config,
       is_private: data.is_private,
       access_key: data.access_key,
-      is_pve: data.is_pve,
-      spectators: data.spectators || []
+      is_pve: data.is_pve
     }
 
     playersInfo.value = data.players_info || []
@@ -1840,13 +1659,12 @@ const loadGameState = async (silent = false) => {
       if (isTutorialMode.value && isMyTurn.value) {
         generateTutorialHint()
       }
+    } else {
+      // no game_state yet, room is in waiting status
     }
-
-    loadError.value = null
+    
     loading.value = false
   } catch (error: any) {
-    if (loadToken !== activeRoomLoadToken || targetRoomId !== roomId.value) return
-
     console.error('加载游戏状态失败:', error)
     loading.value = false
 
@@ -1876,47 +1694,27 @@ const loadGameState = async (silent = false) => {
   }
 }
 
-let roomInitSafetyTimeout: number | null = null
-let roomRealtimeBound = false
-
-const bindRoomRealtimeEvents = () => {
-  if (roomRealtimeBound) return
-  roomRealtimeBound = true
-  websocket.on('game_update', handleGameUpdate)
-  websocket.on('player_joined', handlePlayerJoined)
-  websocket.on('player_left', handlePlayerLeft)
-  websocket.on('action_toast', handleActionToast)
-  websocket.on('room_terminated', handleRoomTerminated)
-  websocket.on('player_kicked', handlePlayerKicked)
-  websocket.on('chat', handleChatNotify)
-  websocket.on('private_chat', handleChatNotify)
-  websocket.on('level_up', handleLevelUp)
-}
-
-const unbindRoomRealtimeEvents = () => {
-  if (!roomRealtimeBound) return
-  roomRealtimeBound = false
-  websocket.off('game_update', handleGameUpdate)
-  websocket.off('player_joined', handlePlayerJoined)
-  websocket.off('player_left', handlePlayerLeft)
-  websocket.off('action_toast', handleActionToast)
-  websocket.off('room_terminated', handleRoomTerminated)
-  websocket.off('player_kicked', handlePlayerKicked)
-  websocket.off('chat', handleChatNotify)
-  websocket.off('private_chat', handleChatNotify)
-  websocket.off('level_up', handleLevelUp)
-}
-
-const clearRoomInitSafetyTimeout = () => {
-  if (roomInitSafetyTimeout != null) {
-    window.clearTimeout(roomInitSafetyTimeout)
-    roomInitSafetyTimeout = null
+onMounted(() => {
+  // 检测教学模式
+  const tutorialMode = localStorage.getItem('chemistry-uno-tutorial-mode')
+  if (tutorialMode === 'true') {
+    isTutorialMode.value = true
+    tutorialScriptMode.value = true  // 启用脚本化教学
   }
-}
 
-const scheduleRoomInitSafetyTimeout = () => {
-  clearRoomInitSafetyTimeout()
-  roomInitSafetyTimeout = window.setTimeout(() => {
+  // 设置浮窗提示组件引用
+  setToastRef(gameToastRef)
+
+  // 重置状态，防止之前的错误状态影响
+  isRedirecting.value = false
+
+  if (isReplayBridgeMode.value) {
+    loadReplaySimulationState()
+    return
+  }
+
+  // 设置一个安全超时，如果15秒后还在loading状态，强制重置
+  const safetyTimeout = setTimeout(() => {
     if (loading.value) {
       console.error('Loading timeout - forcing reset')
       loading.value = false
@@ -1925,117 +1723,80 @@ const scheduleRoomInitSafetyTimeout = () => {
       router.push('/')
     }
   }, 15000)
-}
 
-const initializeRoomSession = async (options: { resetState?: boolean } = {}) => {
-  const { resetState = false } = options
-
-  if (resetState) {
-    activeRoomLoadToken += 1
-    roomInfo.value = null
-    gameState.value = null
-    playersInfo.value = []
-    loadError.value = null
-    isRedirecting.value = false
-    selectedCard.value = null
-    selectedSubstance.value = null
-    turnReadySubstances.value = []
-    doubleMode.value = false
-    firstDoubleSubstance.value = null
-    secondDoubleSubstance.value = null
-    substanceInput.value = ''
-    websocket.leaveRoom()
-  }
-
-  if (isReplayBridgeMode.value) {
-    clearRoomInitSafetyTimeout()
-    loadReplaySimulationState()
-    return
-  }
-
-  scheduleRoomInitSafetyTimeout()
-
-  try {
-    await loadGameState()
-    clearRoomInitSafetyTimeout()
-
-    if (showHints.value && randomHints.value.length === 0) {
-      fetchRandomHints()
-    }
-
-    if (!websocket.isConnected()) {
-      websocket.connect()
-    }
-
-    websocket.joinRoom(roomId.value)
-    bindRoomRealtimeEvents()
-
-    if (isTutorialMode.value) {
-      const tutorialWelcomeShown = localStorage.getItem('chemistry-uno-tutorial-welcome-shown')
-      if (!tutorialWelcomeShown) {
-        setTimeout(() => {
-          if (tutorialScriptMode.value) {
-            showToast(
-              '🎓 欢迎来到脚本化教学关卡！你将跟随系统指引，按照固定步骤学习游戏机制。请严格按照提示的顺序出牌。',
-              '📖 教学脚本已加载',
-              'success',
-              9000
-            )
-          } else {
-            showToast(
-              '💡 欢迎来到教学关卡！这是一场低难度的AI对战，在你的回合时会出现实时提示帮助你学习游戏。祝你玩得开心！',
-              '🎯 教学模式已开启',
-              'success',
-              8000
-            )
-          }
-          localStorage.setItem('chemistry-uno-tutorial-welcome-shown', 'true')
-        }, 1500)
-      }
-    }
-  } catch (err) {
-    clearRoomInitSafetyTimeout()
-    console.error('Failed to initialize game room:', err)
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  lockPageScroll()
-  exposeForceAutoDrawConsoleAPI()
-
-  const tutorialMode = localStorage.getItem('chemistry-uno-tutorial-mode')
-  if (tutorialMode === 'true') {
-    isTutorialMode.value = true
-    tutorialScriptMode.value = true
-  }
-
-  setToastRef(gameToastRef)
-  isRedirecting.value = false
-
+  // 加载好友列表，添加错误处理
   friendAPI.getFriends()
     .then(res => {
       friendsList.value = res.data || []
     })
     .catch(err => {
       console.error('Failed to load friends list:', err)
-      friendsList.value = []
+      friendsList.value = [] // 确保失败时也初始化为空数组
+      // 继续加载游戏状态，即使好友列表加载失败
     })
 
-  void initializeRoomSession()
-})
+  loadGameState()
+    .then(() => {
+      clearTimeout(safetyTimeout) // 成功加载后清除超时
 
-watch(roomRouteSignature, (_next, prev) => {
-  if (!prev) return
-  void initializeRoomSession({ resetState: true })
+      // 游戏状态加载成功后，获取提示信息（避免 setup 阶段的 API 调用失败导致提示为空）
+      if (showHints.value && randomHints.value.length === 0) {
+        fetchRandomHints()
+      }
+
+      // 确保WebSocket已连接
+      if (!websocket.isConnected()) {
+        websocket.connect()
+      }
+
+      websocket.joinRoom(id)
+      websocket.on('game_update', handleGameUpdate)
+      websocket.on('player_joined', handlePlayerJoined)
+      websocket.on('player_left', handlePlayerLeft)
+      websocket.on('action_toast', handleActionToast)
+      websocket.on('room_terminated', handleRoomTerminated)
+      websocket.on('player_kicked', handlePlayerKicked)
+      websocket.on('chat', handleChatNotify)
+      websocket.on('private_chat', handleChatNotify)
+      websocket.on('level_up', handleLevelUp)
+
+      // 教学模式欢迎提示
+      if (isTutorialMode.value) {
+        const tutorialWelcomeShown = localStorage.getItem('chemistry-uno-tutorial-welcome-shown')
+        if (!tutorialWelcomeShown) {
+          setTimeout(() => {
+            if (tutorialScriptMode.value) {
+              showToast(
+                '🎓 欢迎来到脚本化教学关卡！你将跟随系统指引，按照固定步骤学习游戏机制。请严格按照提示的顺序出牌。',
+                '📖 教学脚本已加载',
+                'success',
+                9000
+              )
+            } else {
+              showToast(
+                '💡 欢迎来到教学关卡！这是一场低难度的AI对战，在你的回合时会出现实时提示帮助你学习游戏。祝你玩得开心！',
+                '🎯 教学模式已开启',
+                'success',
+                8000
+              )
+            }
+            localStorage.setItem('chemistry-uno-tutorial-welcome-shown', 'true')
+          }, 1500)
+        }
+      }
+    })
+    .catch(err => {
+      clearTimeout(safetyTimeout) // 捕获错误后也清除超时
+      // loadGameState 内部已经处理了错误，这里只是确保不会有未处理的promise rejection
+      console.error('Failed to initialize game room:', err)
+      loading.value = false
+    })
 })
 
 onUnmounted(() => {
-  unlockPageScroll()
-  cleanupForceAutoDrawConsoleAPI()
   clearReplayTimer()
-  clearRoomInitSafetyTimeout()
 
+  // 清除教学模式标记，并记录已完成
   if (isTutorialMode.value) {
     localStorage.removeItem('chemistry-uno-tutorial-mode')
     localStorage.removeItem('chemistry-uno-tutorial-welcome-shown')
@@ -2046,7 +1807,14 @@ onUnmounted(() => {
 
   if (timerRaf) cancelAnimationFrame(timerRaf)
   websocket.leaveRoom()
-  unbindRoomRealtimeEvents()
+  websocket.off('game_update', handleGameUpdate)
+  websocket.off('player_joined', handlePlayerJoined)
+  websocket.off('player_left', handlePlayerLeft)
+  websocket.off('action_toast', handleActionToast)
+  websocket.off('room_terminated', handleRoomTerminated)
+  websocket.off('player_kicked', handlePlayerKicked)
+  websocket.off('chat', handleChatNotify)
+  websocket.off('private_chat', handleChatNotify)
 })
 
 const canRunTutorialAction = (action: 'play' | 'draw' | 'double') => {
@@ -2078,7 +1846,7 @@ const handleCardClick = async (card: any) => {
   const specialTypes = ['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr']
   if (specialTypes.includes(card.type) || card.effect) {
     try {
-      await gameAPI.playCard(roomId.value, card, card.type)
+      await gameAPI.playCard(id, card, card.type)
       feedback.playCard()
       selectedCard.value = null
       selectedSubstance.value = null
@@ -2095,7 +1863,7 @@ const handleCardClick = async (card: any) => {
   // 例如：点击 H 手牌 → 出牌物质为 H（不管单质是 H 还是 H₂）
   // 后端会进行物质合法性检测（substances表）和反应检查（reactions表）
   try {
-    await gameAPI.playCard(roomId.value, card, card.type)
+    await gameAPI.playCard(id, card, card.type)
     feedback.playCard()
     selectedCard.value = null
     selectedSubstance.value = null
@@ -2147,7 +1915,7 @@ const handlePlayCard = async () => {
   try {
     // 如果没有选中的卡片，则传递一个带类型的占位符，后端会根据物质消耗手牌
     const cardToPlay = selectedCard.value || { type: selectedSubstance.value, count: 1, effect: '' }
-    await gameAPI.playCard(roomId.value, cardToPlay, selectedSubstance.value)
+    await gameAPI.playCard(id, cardToPlay, selectedSubstance.value)
 
     // 播放打牌反馈
     feedback.playCard()
@@ -2173,7 +1941,7 @@ const handleDoublePlay = async () => {
   }
 
   try {
-    await gameAPI.playDouble(roomId.value, firstDoubleSubstance.value, secondDoubleSubstance.value)
+    await gameAPI.playDouble(id, firstDoubleSubstance.value, secondDoubleSubstance.value)
 
     feedback.playCard()
 
@@ -2234,7 +2002,7 @@ const handleInputPlay = async () => {
 
   try {
     // 为兼容原API，传一个空Card对象
-    await gameAPI.playCard(roomId.value, { type: '', count: 0, effect: '' }, substanceInput.value)
+    await gameAPI.playCard(id, { type: '', count: 0, effect: '' }, substanceInput.value)
 
     feedback.playCard()
 
@@ -2255,92 +2023,11 @@ const handleInputPlay = async () => {
 const handleDrawCard = async () => {
   if (!canRunTutorialAction('draw')) return
   try {
-    await gameAPI.drawCard(roomId.value)
+    await gameAPI.drawCard(id)
     feedback.drawCard()
   } catch (error: any) {
     showToast(error.response?.data?.error || '摸牌失败', '系统异常', 'error')
     feedback.error()
-  }
-}
-
-const stopForceAutoDrawLoop = () => {
-  if (forceAutoDrawTimer != null) {
-    window.clearInterval(forceAutoDrawTimer)
-    forceAutoDrawTimer = null
-  }
-}
-
-const getForceAutoDrawStatus = () => {
-  return {
-    enabled: forceAutoDrawEnabled,
-    interval_ms: forceAutoDrawIntervalMs,
-    silent: forceAutoDrawSilent,
-    room_id: roomId.value,
-    in_flight: forceAutoDrawInFlight,
-    success_count: forceAutoDrawSuccessCount,
-    replay_mode: isReplayBridgeMode.value || isReplayRoomPath.value
-  }
-}
-
-const tryForceAutoDraw = async () => {
-  if (forceAutoDrawInFlight || !roomId.value) return
-  forceAutoDrawInFlight = true
-  try {
-    await gameAPI.drawCard(roomId.value)
-    forceAutoDrawSuccessCount += 1
-  } catch (error: any) {
-    if (!forceAutoDrawSilent) {
-      const message = error?.response?.data?.error || error?.message || 'unknown_error'
-      console.debug('[ForceAutoDraw] draw failed:', message)
-    }
-  } finally {
-    forceAutoDrawInFlight = false
-  }
-}
-
-const scheduleForceAutoDrawLoop = () => {
-  stopForceAutoDrawLoop()
-  if (!forceAutoDrawEnabled) return
-
-  forceAutoDrawTimer = window.setInterval(() => {
-    void tryForceAutoDraw()
-  }, forceAutoDrawIntervalMs)
-}
-
-) => {
-  if (typeof options?.intervalMs === 'number' && Number.isFinite(options.intervalMs)) {
-    forceAutoDrawIntervalMs = Math.max(80, Math.floor(options.intervalMs))
-  }
-  if (typeof options?.silent === 'boolean') {
-    forceAutoDrawSilent = options.silent
-  }
-
-  forceAutoDrawEnabled = true
-  scheduleForceAutoDrawLoop()
-  void tryForceAutoDraw()
-  console.info('[ForceAutoDraw] started', getForceAutoDrawStatus())
-  return getForceAutoDrawStatus()
-}
-
-
-
-
-  win.__chemForceAutoDraw = {
-    start: (options?: { intervalMs?: number, silent?: boolean }) => startForceAutoDrawFromConsole(options),
-    stop: () => stopForceAutoDrawFromConsole(),
-    once: async () => {
-      await tryForceAutoDraw()
-      return getForceAutoDrawStatus()
-    },
-    status: () => getForceAutoDrawStatus()
-  }
-
-  console.info('[ForceAutoDraw] console API ready: window.__chemForceAutoDraw.start({ intervalMs: 200, silent: true })')
-}
-
-
-  if (win.__chemForceAutoDraw) {
-    delete win.__chemForceAutoDraw
   }
 }
 
@@ -2352,8 +2039,9 @@ const handleKeyboardConfirm = async (formula: string) => {
 }
 
 const handleLeaveRoom = async () => {
-  if (isReplayBridgeMode.value || isReplayRoomPath.value) {
-    navigateBackFromReplay()
+  if (isReplayBridgeMode.value) {
+    const scopeQuery = replayScopeAdmin.value ? '?scope=admin' : ''
+    router.push(`/replay/${replayHistoryQueryID.value}${scopeQuery}`)
     return
   }
 
@@ -2361,7 +2049,7 @@ const handleLeaveRoom = async () => {
   if (roomInfo.value?.is_pve && isSpectator.value) {
     try {
       // 调用API通知服务器玩家离开房间
-      await gameAPI.leaveRoom(roomId.value)
+      await gameAPI.leaveRoom(id)
     } catch (error) {
       console.error('离开房间API调用失败:', error)
     }
@@ -2452,7 +2140,7 @@ const handleLeaveRoom = async () => {
       // 注意：即便是正在游戏中，用户点击“退出”也应该执行 leaveRoom 逻辑
       // 以释放该用户的“同时只能进行一次游戏”锁定
       try {
-        await gameAPI.leaveRoom(roomId.value)
+        await gameAPI.leaveRoom(id)
       } catch (error) {
         console.error('离开房间API调用失败:', error)
       }
@@ -2700,7 +2388,7 @@ watch(() => gameState.value?.current_player, () => {
             <span class="text-[10px] font-black uppercase tracking-widest">{{ isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '') }}</span>
           </button>
           <div class="hidden xs:block">
-            <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || roomId.substring(0, 6) }}</h2>
+            <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
             <div class="flex items-center gap-1.5">
               <PingDisplay />
             </div>
@@ -2808,38 +2496,6 @@ watch(() => gameState.value?.current_player, () => {
               </button>
             </div>
 
-            <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5">
-              <button
-                type="button"
-                @click.stop.prevent="jumpReplayByStep(-1)"
-                :disabled="replayPlaybackIndex === 0"
-                :class="cn('px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest', replayPlaybackIndex === 0 ? 'text-slate-400 cursor-not-allowed' : 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/15')"
-              >
-                上一步
-              </button>
-              <button
-                type="button"
-                @click.stop.prevent="jumpReplayByStep(1)"
-                :disabled="replayPlaybackIndex >= replayEvents.length"
-                :class="cn('px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest', replayPlaybackIndex >= replayEvents.length ? 'text-slate-400 cursor-not-allowed' : 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/15')"
-              >
-                下一步
-              </button>
-            </div>
-
-            <div class="flex items-center gap-2 px-2 py-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5">
-              <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">定位</span>
-              <input
-                type="range"
-                min="0"
-                :max="replayEvents.length"
-                :value="replayPlaybackIndex"
-                @input="handleReplaySeekInput"
-                class="w-28 accent-amber-500"
-              />
-              <span class="text-[10px] font-black text-amber-700 dark:text-amber-300">{{ replayPlaybackIndex }}</span>
-            </div>
-
             <button
               type="button"
               @click.stop.prevent="toggleReplayPlayback"
@@ -2851,7 +2507,7 @@ watch(() => gameState.value?.current_player, () => {
 
             <button
               type="button"
-              @click.stop.prevent="restartReplayPlayback()"
+              @click.stop.prevent="restartReplayPlayback"
               class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
             >
               重新播放
@@ -3416,7 +3072,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Experimental Victory / Failure Protocol -->
-      <div v-if="showSettlementPanel" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl transition-all duration-500">
+      <div v-if="gameState?.status === 'finished' && !isReplayBridgeMode" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl transition-all duration-500">
         <!-- Cool Background Effects (Minimized for focus) -->
         <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
            <div v-for="i in 8" :key="i" 
@@ -3443,15 +3099,7 @@ watch(() => gameState.value?.current_player, () => {
                 </div>
 
                 <div class="px-2">
-                  <template v-if="isTerminatedSettlement">
-                    <h2 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight mb-1">
-                      实验异常中止
-                    </h2>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      对局已结束并进入终止结算，以下为当前可用实验数据。
-                    </p>
-                  </template>
-                  <template v-else-if="winner?.uid === user.uid">
+                  <template v-if="winner?.uid === user.uid">
                     <h2 class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-slate-900 to-slate-600 dark:from-white dark:to-blue-200 tracking-tighter leading-tight mb-1">
                       实验大成功
                     </h2>
@@ -3573,13 +3221,13 @@ watch(() => gameState.value?.current_player, () => {
 
             <div class="flex items-center gap-3 pt-1">
               <button
-                @click="restartReplayPlayback()"
+                @click="restartReplayPlayback"
                 class="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-xs transition-all"
               >
                 重新播放
               </button>
               <button
-                @click="navigateBackFromReplay"
+                @click="router.push(`/replay/${replayHistoryQueryID}${replayScopeAdmin ? '?scope=admin' : ''}`)"
                 class="flex-1 h-11 rounded-xl border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-200 font-black uppercase tracking-widest text-xs hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
               >
                 返回时间线
@@ -3590,7 +3238,92 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </template>
 
-    
+    <!-- Admin Management Modal -->
+    <div v-if="showAdminModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="feedback.click(); showAdminModal = false"></div>
+      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
+              <ShieldAlert class="w-6 h-6 text-red-500" />
+              权限执行控制
+            </h3>
+            <button @click="feedback.click(); showAdminModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
+              <X class="w-6 h-6 text-slate-400" />
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">Target: {{ adminTargetUser?.nickname || adminTargetUser?.username }} (UID: {{ adminTargetUser?.uid }})</p>
+        </div>
+
+        <div class="p-8 space-y-8">
+          <div class="grid grid-cols-2 gap-4">
+            <button 
+              @click="adminActionType = 'kick'; banReason = '你由于违规游戏而被踢出'"
+              :class="cn(
+                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
+                adminActionType === 'kick' ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
+              )"
+            >
+              <UserMinus class="w-8 h-8 group-hover:scale-110 transition-transform" />
+              <span class="text-xs font-black uppercase tracking-widest">驱逐出场</span>
+            </button>
+            <button 
+              @click="adminActionType = 'ban'; banReason = '你由于违规游戏而被封禁'"
+              :class="cn(
+                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
+                adminActionType === 'ban' ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
+              )"
+            >
+              <Ban class="w-8 h-8 group-hover:scale-110 transition-transform" />
+              <span class="text-xs font-black uppercase tracking-widest">限制访问</span>
+            </button>
+          </div>
+
+          <div v-if="adminActionType === 'ban'" class="space-y-4 animate-in slide-in-from-top-4 duration-300">
+            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">封禁时长</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                v-for="preset in banPresets"
+                :key="preset.hours"
+                @click="setBanDuration(preset.hours)"
+                :class="cn(
+                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
+                  selectedBanPreset === preset.hours
+                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
+                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
+                )"
+              >
+                {{ preset.label }}
+              </button>
+              <button
+                @click="selectedBanPreset = null"
+                :class="cn(
+                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
+                  selectedBanPreset === null
+                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
+                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
+                )"
+              >
+                自定义
+              </button>
+            </div>
+            <div v-if="selectedBanPreset === null" class="animate-in slide-in-from-top-2 duration-200">
+              <input
+                v-model="banUntil"
+                type="datetime-local"
+                :min="formatDatetimeLocal(new Date())"
+                @focus="handleInputFocus"
+                @blur="handleInputBlur"
+                class="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3 text-sm font-bold text-slate-700 dark:text-white focus:outline-none focus:border-red-500/50 transition-all"
+              />
+            </div>
+            <div class="flex items-center gap-2 ml-1 mt-1">
+              <div class="w-1.5 h-1.5 rounded-full" :class="banUntil ? 'bg-red-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'"></div>
+              <span class="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
+                截止: {{ banUntil ? new Date(banUntil).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) + '（UTC+8）' : '未设置' }}
+              </span>
+            </div>
+          </div>
 
           <div class="space-y-4">
             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">操作事由</label>
@@ -3619,7 +3352,24 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </div>
 
-    
+    <!-- Invite Friends Modal -->
+    <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="showInviteFriendsModal = false"></div>
+      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
+                <UserPlus class="w-6 h-6 text-blue-500" />
+                邀请好友加入
+              </h3>
+              <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em] mt-2">选择一位好友发送游戏邀请</p>
+            </div>
+            <button @click="showInviteFriendsModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
+              <X class="w-6 h-6 text-slate-400" />
+            </button>
+          </div>
+        </div>
 
         <div class="p-8 max-h-[500px] overflow-y-auto custom-scrollbar">
           <div v-if="friendsList.length === 0" class="flex flex-col items-center justify-center py-16 opacity-20 grayscale">
@@ -3700,7 +3450,7 @@ watch(() => gameState.value?.current_player, () => {
                 : (gameState ? 'bg-slate-50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5' : 'bg-slate-50 dark:bg-white/[0.03] border-slate-200 dark:border-white/10'),
               isReplayBridgeMode && 'cursor-pointer hover:border-cyan-400/50',
               isReplayBridgeMode && replayPerspectiveUID === Number(player.uid) && 'ring-2 ring-cyan-400/70 border-cyan-400/70 bg-cyan-500/10 dark:bg-cyan-500/15',
-              drawAnimatingUIDs.has(player.uid) && 'ring-2 ring-rose-500 border-rose-500',
+              drawAnimatingUIDs.has(player.uid) && 'ring-2 ring-rose-500 animate-pulse',
               gameState?.finished_players?.includes(player.uid) && 'opacity-60 grayscale-[0.8] bg-slate-200/50 dark:bg-black/40 border-slate-300/30'
             )"
           >
@@ -3829,7 +3579,7 @@ watch(() => gameState.value?.current_player, () => {
       class="fixed right-0 top-0 bottom-0 w-full lg:w-80 z-[100] lg:top-6 lg:bottom-52 lg:right-6 flex flex-col"
     >
       <ChatBox
-        :roomId="roomId"
+        :roomId="id"
         title="实验内通信线程"
         maxHeight="100%"
         class="h-full !bg-white/95 dark:!bg-slate-900/60 backdrop-blur-3xl shadow-3xl lg:rounded-[40px] border-l lg:border border-slate-200 dark:border-white/10"
