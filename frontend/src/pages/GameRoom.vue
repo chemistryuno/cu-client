@@ -121,7 +121,7 @@ try {
 const gameState = ref<any>(null)
 const roomInfo = ref<any>(null)
 const playersInfo = ref<any[]>([])
-const friendsList = ref<any[]>([])
+const friendsList = ref<any[]>([]); // Friends disabled in offline mode
 const availableSubstances = ref<string[]>([])
 
 // 教学模式检测
@@ -332,11 +332,7 @@ const shouldShowInBlue = (player: any) => {
   return !!(friend?.remark)
 }
 
-const handleAddFriend = async (player: any) => {
-  try {
-    const displayName = player.nickname || player.username
-    await friendAPI.sendRequest(player.uid)
-  showToast(`已向研究员 ${displayName} 发送同步请求，等待量子握手。`, '请求已发送', 'success')
+ 发送同步请求，等待量子握手。`, '请求已发送', 'success')
   } catch (error: any) {
     showToast(error.response?.data?.error || '请求发送失败', '链路故障', 'error')
   }
@@ -393,17 +389,7 @@ const addPvEToast = (text: string) => {
 // startPrivateChat 已被弃用，实验室内禁止私聊
 
 
-const sendGameInvite = async (friend: any) => {
-  const inviteData = {
-    type: 'game_invite',
-    room_id: roomId.value,
-    room_name: roomInfo.value?.name || '实验室',
-    player_count: allPlayers.value.length,
-    max_players: roomInfo.value?.max_players || 0,
-    is_points_mode: roomInfo.value?.is_points_mode || false,
-    is_private: roomInfo.value?.is_private || false,
-    access_key: roomInfo.value?.access_key || ''
-  }
+
 
   websocket.send({
     type: 'private_chat',
@@ -418,8 +404,8 @@ const sendGameInvite = async (friend: any) => {
 }
 
 // Admin management state
-const showAdminModal = ref(false)
-const adminTargetUser = ref<any>(null)
+
+
 const adminActionType = ref<'kick' | 'ban'>('kick')
 const banUntil = ref('')
 const banReason = ref('你由于违规游戏而被踢出')
@@ -511,19 +497,9 @@ watch(() => gameState.value?.status, (newStatus, oldStatus) => {
   }
 })
 
-const openAdminAction = (player: any) => {
-  if (!user.value.is_admin || player.uid === user.value.uid) return
-  adminTargetUser.value = player
-  adminActionType.value = 'kick'
-  banReason.value = '你由于违规游戏而被踢出'
-  selectedBanPreset.value = 24
-  banUntil.value = getDefaultBanUntil()
-  showAdminModal.value = true
-}
 
-const handleReportPlayer = async (player: any) => {
-  const displayName = player.nickname || player.username
-  const reason = await showPrompt(`举报研究员 ${displayName} (UID: ${player.uid})`, '请输入举报原因', '违规行为举报')
+
+ (UID: ${player.uid})`, '请输入举报原因', '违规行为举报')
   if (!reason) return
   
   try {
@@ -534,14 +510,7 @@ const handleReportPlayer = async (player: any) => {
   }
 }
 
-const handleAdminAction = async () => {
-  if (!adminTargetUser.value) return
-  try {
-    if (adminActionType.value === 'kick') {
-      await adminAPI.kickPlayer(adminTargetUser.value.uid, banReason.value)
-      feedback.success()
-      showToast('该玩家已被强制下线并清除登录状态', '成功', 'success')
-    } else {
+ else {
       if (!banUntil.value) {
         showToast('请选择封禁截止时间', '参数缺失', 'warning')
         feedback.error()
@@ -2338,7 +2307,7 @@ const scheduleForceAutoDrawLoop = () => {
   }, forceAutoDrawIntervalMs)
 }
 
-const startForceAutoDrawFromConsole = (options?: { intervalMs?: number, silent?: boolean }) => {
+) => {
   if (typeof options?.intervalMs === 'number' && Number.isFinite(options.intervalMs)) {
     forceAutoDrawIntervalMs = Math.max(80, Math.floor(options.intervalMs))
   }
@@ -2353,15 +2322,9 @@ const startForceAutoDrawFromConsole = (options?: { intervalMs?: number, silent?:
   return getForceAutoDrawStatus()
 }
 
-const stopForceAutoDrawFromConsole = () => {
-  forceAutoDrawEnabled = false
-  stopForceAutoDrawLoop()
-  console.info('[ForceAutoDraw] stopped', getForceAutoDrawStatus())
-  return getForceAutoDrawStatus()
-}
 
-const exposeForceAutoDrawConsoleAPI = () => {
-  const win = window as Window & { __chemForceAutoDraw?: any }
+
+
   win.__chemForceAutoDraw = {
     start: (options?: { intervalMs?: number, silent?: boolean }) => startForceAutoDrawFromConsole(options),
     stop: () => stopForceAutoDrawFromConsole(),
@@ -2375,9 +2338,7 @@ const exposeForceAutoDrawConsoleAPI = () => {
   console.info('[ForceAutoDraw] console API ready: window.__chemForceAutoDraw.start({ intervalMs: 200, silent: true })')
 }
 
-const cleanupForceAutoDrawConsoleAPI = () => {
-  stopForceAutoDrawFromConsole()
-  const win = window as Window & { __chemForceAutoDraw?: any }
+
   if (win.__chemForceAutoDraw) {
     delete win.__chemForceAutoDraw
   }
@@ -3629,92 +3590,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </template>
 
-    <!-- Admin Management Modal -->
-    <div v-if="showAdminModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="feedback.click(); showAdminModal = false"></div>
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-              <ShieldAlert class="w-6 h-6 text-red-500" />
-              权限执行控制
-            </h3>
-            <button @click="feedback.click(); showAdminModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
-              <X class="w-6 h-6 text-slate-400" />
-            </button>
-          </div>
-          <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">Target: {{ adminTargetUser?.nickname || adminTargetUser?.username }} (UID: {{ adminTargetUser?.uid }})</p>
-        </div>
-
-        <div class="p-8 space-y-8">
-          <div class="grid grid-cols-2 gap-4">
-            <button 
-              @click="adminActionType = 'kick'; banReason = '你由于违规游戏而被踢出'"
-              :class="cn(
-                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
-                adminActionType === 'kick' ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
-              )"
-            >
-              <UserMinus class="w-8 h-8 group-hover:scale-110 transition-transform" />
-              <span class="text-xs font-black uppercase tracking-widest">驱逐出场</span>
-            </button>
-            <button 
-              @click="adminActionType = 'ban'; banReason = '你由于违规游戏而被封禁'"
-              :class="cn(
-                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
-                adminActionType === 'ban' ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
-              )"
-            >
-              <Ban class="w-8 h-8 group-hover:scale-110 transition-transform" />
-              <span class="text-xs font-black uppercase tracking-widest">限制访问</span>
-            </button>
-          </div>
-
-          <div v-if="adminActionType === 'ban'" class="space-y-4 animate-in slide-in-from-top-4 duration-300">
-            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">封禁时长</label>
-            <div class="grid grid-cols-4 gap-2">
-              <button
-                v-for="preset in banPresets"
-                :key="preset.hours"
-                @click="setBanDuration(preset.hours)"
-                :class="cn(
-                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
-                  selectedBanPreset === preset.hours
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
-                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
-                )"
-              >
-                {{ preset.label }}
-              </button>
-              <button
-                @click="selectedBanPreset = null"
-                :class="cn(
-                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
-                  selectedBanPreset === null
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
-                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
-                )"
-              >
-                自定义
-              </button>
-            </div>
-            <div v-if="selectedBanPreset === null" class="animate-in slide-in-from-top-2 duration-200">
-              <input
-                v-model="banUntil"
-                type="datetime-local"
-                :min="formatDatetimeLocal(new Date())"
-                @focus="handleInputFocus"
-                @blur="handleInputBlur"
-                class="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3 text-sm font-bold text-slate-700 dark:text-white focus:outline-none focus:border-red-500/50 transition-all"
-              />
-            </div>
-            <div class="flex items-center gap-2 ml-1 mt-1">
-              <div class="w-1.5 h-1.5 rounded-full" :class="banUntil ? 'bg-red-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'"></div>
-              <span class="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
-                截止: {{ banUntil ? new Date(banUntil).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) + '（UTC+8）' : '未设置' }}
-              </span>
-            </div>
-          </div>
+    
 
           <div class="space-y-4">
             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">操作事由</label>
@@ -3743,24 +3619,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </div>
 
-    <!-- Invite Friends Modal -->
-    <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="showInviteFriendsModal = false"></div>
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-                <UserPlus class="w-6 h-6 text-blue-500" />
-                邀请好友加入
-              </h3>
-              <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em] mt-2">选择一位好友发送游戏邀请</p>
-            </div>
-            <button @click="showInviteFriendsModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
-              <X class="w-6 h-6 text-slate-400" />
-            </button>
-          </div>
-        </div>
+    
 
         <div class="p-8 max-h-[500px] overflow-y-auto custom-scrollbar">
           <div v-if="friendsList.length === 0" class="flex flex-col items-center justify-center py-16 opacity-20 grayscale">

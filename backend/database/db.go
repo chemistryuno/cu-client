@@ -5,14 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -35,114 +31,43 @@ var errRedisDisabled = errors.New("redis is disabled")
 // InitDB 初始化GORM数据库连接和Redis
 func InitDB(dbPath string) error {
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 Chemistry UNO 数据库初始化")
+	log.Println("🚀 Chemistry UNO 数据库初始化 (本地单机版)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	// 从环境变量获取数据库类型（默认为sqlite）
-	dbType := strings.ToLower(os.Getenv("DB_TYPE"))
-	if dbType == "" {
-		dbType = "sqlite"
+	// 写死使用 SQLite
+	sqlitePath := "./chemistryuno.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
+	
+	dialector := sqlite.Dialector{
+		DriverName: "sqlite",
+		DSN:        sqlitePath,
 	}
+	log.Printf("📊 使用 SQLite 数据库 (单机版)")
 
-	// 配置GORM
 	var err error
-	var dialector gorm.Dialector
-
-	switch dbType {
-	case "mysql":
-		// MySQL配置
-		dsn := os.Getenv("MYSQL_DSN")
-		if dsn == "" {
-			host := os.Getenv("MYSQL_HOST")
-			if host == "" {
-				host = "localhost"
-			}
-			port := os.Getenv("MYSQL_PORT")
-			if port == "" {
-				port = "3306"
-			}
-			user := os.Getenv("MYSQL_USER")
-			if user == "" {
-				user = "root"
-			}
-			pass := os.Getenv("MYSQL_PASSWORD")
-			dbname := os.Getenv("MYSQL_DATABASE")
-			if dbname == "" {
-				dbname = "chemistryuno"
-			}
-			dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-				user, pass, host, port, dbname)
-		}
-		dialector = mysql.Open(dsn)
-		log.Printf("📊 使用 MySQL 数据库")
-		log.Printf("   连接地址: %s", formatDSN(dsn))
-
-	case "sqlite":
-		// SQLite配置 - 使用纯Go实现（modernc.org/sqlite）
-		sqlitePath := os.Getenv("SQLITE_PATH")
-		if sqlitePath == "" {
-			sqlitePath = "./chemistryuno.db"
-		}
-
-		// 添加SQLite并发优化参数
-		// WAL模式：支持并发读写，极大提升并发性能
-		// busy_timeout：数据库锁定时等待时间（毫秒）
-		// journal_mode=WAL：启用Write-Ahead Logging
-		// synchronous=NORMAL：在WAL模式下保证安全性的同时提升性能
-		sqlitePath = sqlitePath + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
-
-		// 指定使用 modernc.org/sqlite 纯Go驱动（SQLite3 默认使用 UTF-8）
-		dialector = sqlite.Dialector{
-			DriverName: "sqlite",
-			DSN:        sqlitePath,
-		}
-		log.Printf("📊 使用 SQLite 数据库 (纯Go驱动, WAL模式)")
-		log.Printf("   数据库文件: %s", strings.Split(sqlitePath, "?")[0])
-
-	default:
-		return fmt.Errorf("不支持的数据库类型: %s（支持: mysql, sqlite）", dbType)
-	}
-
 	DB, err = gorm.Open(dialector, &gorm.Config{
-		Logger: logger.Default.LogMode(getGormLogLevel()),
+		Logger: logger.Default.LogMode(logger.Warn),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
-		PrepareStmt:            true, // 预编译SQL语句，提高性能
-		SkipDefaultTransaction: true, // 跳过默认事务，提高写入性能
+		PrepareStmt:            true,
+		SkipDefaultTransaction: true,
 	})
 
 	if err != nil {
 		return fmt.Errorf("连接数据库失败: %v", err)
 	}
 
-	// 配置连接池
+	// 配置连接池 (单机版写死配置)
 	sqlDB, err := DB.DB()
 	if err == nil {
-		var maxIdle, maxOpen int
-		maxLifetime := getEnvInt("DB_CONN_MAX_LIFETIME", 3600) // 秒
-
-		// 根据数据库类型设置不同的连接池参数
-		if dbType == "sqlite" {
-			// SQLite：限制并发连接数以避免SQLITE_BUSY错误
-			// 在WAL模式下，建议：1个写连接 + 多个读连接
-			maxIdle = getEnvInt("DB_MAX_IDLE_CONNS", 2)
-			maxOpen = getEnvInt("DB_MAX_OPEN_CONNS", 10) // SQLite单写多读，不宜过高
-			log.Printf("⚙️  SQLite连接池配置: MaxIdle=%d, MaxOpen=%d (WAL模式优化)", maxIdle, maxOpen)
-		} else {
-			// MySQL等其他数据库：可以使用更高的并发
-			maxIdle = getEnvInt("DB_MAX_IDLE_CONNS", 10)
-			maxOpen = getEnvInt("DB_MAX_OPEN_CONNS", 100)
-			log.Printf("⚙️  数据库连接池配置: MaxIdle=%d, MaxOpen=%d, MaxLifetime=%ds", maxIdle, maxOpen, maxLifetime)
-		}
-
-		sqlDB.SetMaxIdleConns(maxIdle)
-		sqlDB.SetMaxOpenConns(maxOpen)
-		sqlDB.SetConnMaxLifetime(time.Duration(maxLifetime) * time.Second)
+		sqlDB.SetMaxIdleConns(2)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetConnMaxLifetime(time.Hour)
 	}
 
-	// 初始化Redis
-	initRedis()
+	// 单机版不需要 Redis
+	setRedisConfig(nil, false)
+	setRedisClient(nil)
 
 	// 自动迁移数据表
 	if err := autoMigrate(); err != nil {
@@ -161,61 +86,7 @@ func InitDB(dbPath string) error {
 	return nil
 }
 
-// initRedis 初始化Redis客户端（可选功能）
-func initRedis() {
-	if !getEnvBool("REDIS_ENABLED", true) {
-		setRedisConfig(nil, false)
-		setRedisClient(nil)
-		log.Println("ℹ️  Redis已禁用（REDIS_ENABLED=false）")
-		return
-	}
 
-	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
-	if redisAddr == "" && getEnvBool("REDIS_AUTO_DISCOVER", false) {
-		// 可选自动探测（默认关闭），避免误连到非预期本地实例
-		defaultAddrs := []string{"localhost:6379", "127.0.0.1:6379"}
-		for _, addr := range defaultAddrs {
-			if tryConnectRedis(addr, "") {
-				redisAddr = addr
-				log.Printf("✅ 自动连接到本地Redis: %s", addr)
-				break
-			}
-		}
-	}
-	if redisAddr == "" {
-		setRedisConfig(nil, false)
-		setRedisClient(nil)
-		log.Println("ℹ️  Redis未配置（缓存功能已禁用，不影响核心功能）")
-		log.Println("💡 如需启用Redis，请设置环境变量: REDIS_ADDR=localhost:6379")
-		return
-	}
-
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	redisDB := getEnvInt("REDIS_DB", 0)
-	poolSize := getEnvInt("REDIS_POOL_SIZE", 100)
-	minIdleConns := getEnvInt("REDIS_MIN_IDLE_CONNS", 10)
-
-	opts := &redis.Options{
-		Addr:         redisAddr,
-		Password:     redisPassword,
-		DB:           redisDB,
-		PoolSize:     poolSize,
-		MinIdleConns: minIdleConns,
-		MaxRetries:   1,
-		DialTimeout:  1 * time.Second,
-		ReadTimeout:  1 * time.Second,
-		WriteTimeout: 1 * time.Second,
-		PoolTimeout:  2 * time.Second,
-	}
-	setRedisConfig(opts, true)
-
-	// 启动时尝试连接；失败后保留配置，后续按需重连
-	if err := reconnectRedis(context.Background(), 2*time.Second); err != nil {
-		log.Printf("⚠️  Redis连接失败: %v (稍后将自动重试)", err)
-	} else {
-		log.Printf("✅ Redis连接成功: %s (db=%d)", redisAddr, redisDB)
-	}
-}
 
 // GetRedisStatus 返回 Redis 状态（disabled / ok / error）。
 // 当 Redis 已配置但连接断开时，会按退避策略尝试自动重连。
@@ -332,65 +203,13 @@ func tryConnectRedis(addr, password string) bool {
 	return err == nil
 }
 
-// getEnvInt 从环境变量获取整数值
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
 
-// getEnvBool 从环境变量获取布尔值
-func getEnvBool(key string, defaultValue bool) bool {
-	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
-	if value == "" {
-		return defaultValue
-	}
-	switch value {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return defaultValue
-	}
-}
 
-// getGormLogLevel 从环境变量获取 GORM 日志级别
-func getGormLogLevel() logger.LogLevel {
-	level := strings.ToUpper(os.Getenv("DB_LOG_LEVEL"))
-	switch level {
-	case "SILENT":
-		return logger.Silent
-	case "ERROR":
-		return logger.Error
-	case "WARN":
-		return logger.Warn
-	case "INFO":
-		return logger.Info
-	default:
-		// 默认非 Debug 模式下使用 Silent，否则使用 Warn
-		if os.Getenv("GIN_MODE") == "release" {
-			return logger.Silent
-		}
-		return logger.Warn
-	}
-}
 
-// formatDSN 格式化DSN以隐藏密码
-func formatDSN(dsn string) string {
-	parts := strings.Split(dsn, "@")
-	if len(parts) < 2 {
-		return dsn
-	}
-	userPass := strings.Split(parts[0], ":")
-	if len(userPass) < 2 {
-		return dsn
-	}
-	return fmt.Sprintf("%s:****@%s", userPass[0], parts[1])
-}
+
+
+
+
 
 // Close 关闭数据库连接
 func Close() {

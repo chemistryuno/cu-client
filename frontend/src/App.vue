@@ -7,21 +7,11 @@ import { useDialog } from './utils/dialog'
 import AnnouncementTicker from './components/AnnouncementTicker.vue'
 
 const CustomDialog = defineAsyncComponent(() => import('./components/CustomDialog.vue'))
-const DuelInviteModal = defineAsyncComponent(() => import('./components/DuelInviteModal.vue'))
-
-// --- 服务器重启横幅状态 ---
-const restartBanner = ref<{ visible: boolean; countdown: number; reason: string }>({
-  visible: false,
-  countdown: 0,
-  reason: ''
-})
-let restartInterval: ReturnType<typeof setInterval> | null = null
 
 const loading = ref(true)
 const { showAlert } = useDialog()
 const router = useRouter()
 
-const activeDuelInvite = ref<any>(null)
 let pluginRuntimePromise: Promise<typeof import('./utils/plugin-runtime')> | null = null
 let themeMediaQuery: MediaQueryList | null = null
 let sessionStartupScheduled = false
@@ -54,7 +44,7 @@ const scheduleSessionStartup = () => {
     sessionStartupScheduled = false
     if (!localStorage.getItem('user')) return
 
-    websocket.connect()
+    // websocket.connect() // Disabled in offline mode
     void getPluginRuntime()
       .then(({ loadPluginScripts }) => loadPluginScripts())
       .catch((error) => {
@@ -63,53 +53,13 @@ const scheduleSessionStartup = () => {
   }, 1200)
 }
 
-const handleFeedbackUpdate = (msg: any) => {
-  if (msg && msg.status) {
-    const statusLabel = msg.status === 'accepted' ? '已受理' : '不予受理'
-    showAlert(`您的反馈有新进展：状态更新为 [${statusLabel}]。\n回复：${msg.resolution_note || '无'}`, '反馈通知')
-  }
-}
-
-const handleDuelStart = (msg: any) => {
-  if (msg.room_id) {
-    showAlert('量子隧道已建立，正在进入单挑战场...', '单挑协议启动')
-    router.push(`/room/${msg.room_id}`)
-  }
-}
-
-const handleDuelInvite = (msg: any) => {
-  activeDuelInvite.value = {
-    challenger_name: msg.data.challenger_nickname || msg.data.challenger_name,
-    challenger_uid: msg.data.challenger_uid
-  }
-}
-
-const handleDuelDeclined = (msg: any) => {
-  const name = msg.data.nickname || msg.data.username || '研究员'
-  showAlert(`研究员 ${name} 拒绝了你的挑战邀请。`, '挑战被拒绝')
-}
-
-const handleForceLogout = async (msg: any) => {
-  // Token已存储在HttpOnly Cookie中，浏览器会自动处理
-  localStorage.removeItem('user')
-  websocket.disconnect()
-  const reason = msg?.message || msg?.data || '您已被管理员强制下线'
-  await showAlert(reason, '账号操作通知')
-  router.push('/login')
-}
-
 const handleSystemAnnouncement = (msg: any) => {
   const ann = msg.data
-  // 如果不是跑马灯，则视为弹窗公告
   if (ann && !ann.is_ticker) {
-    let title = ann.title || '系统公告'
-    if (ann.type === 'emergency' && !ann.title) title = '紧急通知'
-    if (ann.type === 'maintenance' && !ann.title) title = '维护通知'
-    showAlert(ann.content, title, '确定', ann.close_delay || 0)
+    showAlert(ann.content, ann.title || 'System Note')
   }
 }
 
-// 管理员广播：区分 global / room / user 三种来源
 const handleAdminBroadcast = (msg: any) => {
   const d = msg.data
   if (!d) return
@@ -121,32 +71,6 @@ const handleAdminBroadcast = (msg: any) => {
   }
   const title = titleMap[d.msg_type] || d.title || '管理员广播'
   showAlert(d.content, title)
-}
-
-// 服务器重启 WebSocket 事件
-const handleServerRestart = (msg: any) => {
-  const d = msg.data || {}
-  const seconds = typeof d === 'object' ? (d.seconds ?? 30) : 30
-  const reason = typeof d === 'object' ? (d.reason ?? '') : ''
-  restartBanner.value = { visible: true, countdown: seconds, reason }
-  if (restartInterval) clearInterval(restartInterval)
-  restartInterval = setInterval(() => {
-    restartBanner.value.countdown--
-    if (restartBanner.value.countdown <= 0) {
-      clearInterval(restartInterval!)
-      restartInterval = null
-    }
-  }, 1000)
-}
-
-const handleServerRestartNow = () => {
-  restartBanner.value = { visible: true, countdown: 0, reason: '服务器正在重启，请稍候…' }
-  if (restartInterval) { clearInterval(restartInterval); restartInterval = null }
-}
-
-const handleServerRestartCancelled = () => {
-  if (restartInterval) { clearInterval(restartInterval); restartInterval = null }
-  restartBanner.value = { visible: false, countdown: 0, reason: '' }
 }
 
 const updateTheme = () => {
@@ -165,7 +89,6 @@ const updateTheme = () => {
   }
 }
 
-// 立即运行一次以防止 FOUC
 updateTheme()
 
 const handleThemeStorage = (e: StorageEvent) => {
@@ -174,10 +97,8 @@ const handleThemeStorage = (e: StorageEvent) => {
 
 const handleGlobalClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement
-  // 检查点击目标或其祖先是否是可点击元素
   const clickable = target.closest('button, a, [role="button"], input[type="button"], input[type="submit"], select, summary, .clickable, .touch-feedback, .cursor-pointer')
   if (clickable) {
-    // 只有当没有被明确标记为禁用音效时才播放
     if (!clickable.hasAttribute('data-no-click-sound')) {
       feedback.click()
     }
@@ -193,7 +114,6 @@ const handlePluginMessage = (msg: any) => {
 }
 
 const handleAuthChanged = () => {
-  // Token?????ttpOnly Cookie???????ser??????????????
   const userData = localStorage.getItem('user')
   if (userData) {
     scheduleSessionStartup()
@@ -202,32 +122,21 @@ const handleAuthChanged = () => {
 
 onMounted(() => {
   try {
-    // ?????????
     themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     themeMediaQuery.addEventListener('change', updateTheme)
     window.addEventListener('storage', handleThemeStorage)
     window.addEventListener('theme-changed', updateTheme)
     window.addEventListener('auth-changed', handleAuthChanged)
-    // Token?????ttpOnly Cookie???????ser??????????????
     const userData = localStorage.getItem('user')
 
     if (userData) {
       scheduleSessionStartup()
     }
 
-    websocket.on('feedback_update', handleFeedbackUpdate)
-    websocket.on('duel_start', handleDuelStart)
-    websocket.on('duel_invite', handleDuelInvite)
-    websocket.on('duel_declined', handleDuelDeclined)
     websocket.on('system_announcement', handleSystemAnnouncement)
-    websocket.on('force_logout', handleForceLogout)
     websocket.on('admin_broadcast', handleAdminBroadcast)
-    websocket.on('server_restart', handleServerRestart)
-    websocket.on('server_restart_now', handleServerRestartNow)
-    websocket.on('server_restart_cancelled', handleServerRestartCancelled)
     websocket.on('plugin_message', handlePluginMessage)
 
-    // ????????????
     window.addEventListener('click', handleGlobalClick, true)
   } catch (err) {
     console.error('App initialization failed:', err)
@@ -238,20 +147,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   themeMediaQuery?.removeEventListener('change', updateTheme)
-  websocket.off('feedback_update', handleFeedbackUpdate)
-  websocket.off('duel_start', handleDuelStart)
-  websocket.off('duel_invite', handleDuelInvite)
-  websocket.off('duel_declined', handleDuelDeclined)
   websocket.off('system_announcement', handleSystemAnnouncement)
-  websocket.off('force_logout', handleForceLogout)
   websocket.off('admin_broadcast', handleAdminBroadcast)
-  websocket.off('server_restart', handleServerRestart)
-  websocket.off('server_restart_now', handleServerRestartNow)
-  websocket.off('server_restart_cancelled', handleServerRestartCancelled)
   websocket.off('plugin_message', handlePluginMessage)
-  if (restartInterval) clearInterval(restartInterval)
-
-  // ?????????
+  
   window.removeEventListener('click', handleGlobalClick, true)
   window.removeEventListener('storage', handleThemeStorage)
   window.removeEventListener('theme-changed', updateTheme)
@@ -277,19 +176,6 @@ onUnmounted(() => {
   <template v-else>
     <div class="app-viewport transition-colors duration-300 min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-200">
       <AnnouncementTicker />
-      <!-- 服务器重启横幅 -->
-      <Transition name="slide-down">
-        <div
-          v-if="restartBanner.visible"
-          class="fixed top-0 left-0 right-0 z-[9999] bg-orange-500 text-white text-sm font-bold px-4 py-2 flex items-center justify-center gap-3 shadow-lg"
-        >
-          <span>⚠️</span>
-          <span v-if="restartBanner.countdown > 0">
-            服务器将在 {{ restartBanner.countdown }} 秒后重启{{ restartBanner.reason ? `：${restartBanner.reason}` : '' }}，请尽快保存进度
-          </span>
-          <span v-else>{{ restartBanner.reason || '服务器正在重启，请稍候…' }}</span>
-        </div>
-      </Transition>
       <router-view v-slot="{ Component, route }">
         <Transition name="app-route" mode="out-in">
           <div :key="route.fullPath" class="app-route-shell">
@@ -298,9 +184,6 @@ onUnmounted(() => {
         </Transition>
       </router-view>
       <CustomDialog />
-      <Transition name="app-pop" appear>
-        <DuelInviteModal v-if="activeDuelInvite" :invite="activeDuelInvite" @close="activeDuelInvite = null" />
-      </Transition>
     </div>
   </template>
 </template>
@@ -324,33 +207,14 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.app-pop-enter-active,
-.app-pop-leave-active {
-  transition:
-    opacity 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.app-pop-enter-from,
-.app-pop-leave-to {
-  opacity: 0;
-  transform: translate3d(0, 10px, 0) scale(0.97);
-  filter: blur(4px);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .app-route-enter-active,
-  .app-route-leave-active,
-  .app-pop-enter-active,
-  .app-pop-leave-active {
+  .app-route-leave-active {
     transition-duration: 1ms;
   }
 
   .app-route-enter-from,
-  .app-route-leave-to,
-  .app-pop-enter-from,
-  .app-pop-leave-to {
+  .app-route-leave-to {
     opacity: 1;
     transform: none;
     filter: none;

@@ -39,10 +39,7 @@ const resolveApiOrigin = (): string => {
 
 export const API_ORIGIN = resolveApiOrigin()
 export const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
-export const OFFLINE_MODE = Boolean(
-  readRuntimeConfig().offlineMode ||
-  (!API_ORIGIN && window.location.protocol === 'file:')
-)
+export const OFFLINE_MODE = true
 
 export const buildApiURL = (path: string): string => {
   if (/^https?:\/\//i.test(path)) {

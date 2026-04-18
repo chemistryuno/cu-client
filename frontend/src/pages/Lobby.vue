@@ -356,65 +356,110 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <section class="lg:col-span-2 bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-7 shadow-sm">
-            <div class="flex items-start justify-between gap-4 mb-6">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 mb-2">{{ t('common.localMode') }}</p>
-                <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{{ t('lobby.aiArena') }}</h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-lg">
-                  {{ t('lobby.modal.mode') }}
-                </p>
-              </div>
-              <div class="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
-                <Bot class="w-7 h-7" />
-              </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <section class="lg:col-span-8 bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-[40px] p-8 sm:p-10 shadow-xl backdrop-blur-md relative overflow-hidden group">
+            <div class="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Bot class="w-48 h-48" />
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div class="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{{ t('lobby.currentPlayer') }}</p>
-                <div class="flex items-center gap-3">
-                  <div class="w-12 h-12 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden text-lg">
-                    <UserAvatar :avatar="user.avatar" />
+            
+            <div class="relative z-10">
+              <div class="flex items-start justify-between gap-4 mb-8">
+                <div>
+                  <div class="flex items-center gap-2 mb-3">
+                    <span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[9px] font-black uppercase tracking-widest rounded-md border border-purple-500/20">
+                      {{ t('common.localMode') }}
+                    </span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Offline Edition</span>
                   </div>
-                  <div>
-                    <p class="text-base font-black text-slate-900 dark:text-white">{{ user.nickname || t('common.localPlayer') }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('lobby.localSave') }}</p>
-                  </div>
+                  <h3 class="text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-4">{{ t('lobby.aiArena') }}</h3>
+                  <p class="text-base text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+                    {{ t('lobby.modal.mode') }}
+                  </p>
+                </div>
+                <div class="w-20 h-20 rounded-3xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shadow-inner shrink-0">
+                  <Bot class="w-10 h-10" />
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{{ t('lobby.deck') }}</p>
-                <button @click="handleOpenDeckDetail" class="w-full text-left rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 px-4 py-3 hover:border-blue-400 transition-colors">
-                  <p class="text-sm font-black text-slate-900 dark:text-white">{{ decks.find((deck: any) => deck.id === deckID)?.name || t('lobby.deck') }}</p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ t('lobby.deckDesc') }}</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
+                <div class="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 p-6 hover:border-purple-400/50 transition-all group/card">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{{ t('lobby.currentPlayer') }}</p>
+                  <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden text-2xl shadow-sm group-hover/card:scale-105 transition-transform">
+                      <UserAvatar :avatar="user.avatar" />
+                    </div>
+                    <div>
+                      <p class="text-xl font-black text-slate-900 dark:text-white">{{ user.nickname || t('common.localPlayer') }}</p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider font-mono">{{ t('lobby.localSave') }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 p-6 hover:border-blue-400/50 transition-all group/card">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{{ t('lobby.deck') }}</p>
+                  <button @click="handleOpenDeckDetail" class="w-full text-left rounded-2xl bg-white/80 dark:bg-black/20 border border-slate-200 dark:border-white/10 px-5 py-4 hover:border-blue-400 transition-all shadow-sm hover:shadow-md">
+                    <p class="text-lg font-black text-slate-900 dark:text-white">{{ decks.find((deck: any) => deck.id === deckID)?.name || t('lobby.deck') }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-2">
+                      <Beaker class="w-3.5 h-3.5" />
+                      {{ t('lobby.deckDesc') }}
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-4">
+                <button @click="showAIArenaModal = true" data-tutorial="ai-arena" class="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
+                  <Play class="w-5 h-5 fill-current" />
+                  <span>{{ t('lobby.aiArena') }}</span>
+                </button>
+                <button @click="createTutorialMatch" class="px-8 py-4 bg-slate-800 dark:bg-white/10 hover:bg-slate-700 dark:hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-3 border border-white/5">
+                  <BookOpen class="w-5 h-5" />
+                  <span>{{ t('lobby.tutorial') }}</span>
                 </button>
               </div>
             </div>
-
-            <div class="flex flex-wrap gap-3">
-              <button @click="showAIArenaModal = true" data-tutorial="ai-arena" class="btn-action-secondary">
-                <Bot class="w-4 h-4" />
-                <span class="uppercase tracking-widest text-[10px]">{{ t('lobby.aiArena') }}</span>
-              </button>
-              <button @click="createTutorialMatch" class="btn-action-primary">
-                <BookOpen class="w-4 h-4" />
-                <span class="uppercase tracking-widest text-[10px]">{{ t('lobby.tutorial') }}</span>
-              </button>
-            </div>
           </section>
 
-          <section class="bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 mb-2">{{ t('common.localMode') }}</p>
-            <h3 class="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-4">{{ t('lobby.localInfo') }}</h3>
-            <ul class="space-y-3 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              <li>• {{ t('lobby.info1') }}</li>
-              <li>• {{ t('lobby.info2') }}</li>
-              <li>• {{ t('lobby.info3') }}</li>
-              <li>• {{ t('lobby.info4') }}</li>
-            </ul>
+          <section class="lg:col-span-4 flex flex-col gap-6">
+            <div class="flex-1 bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-[40px] p-8 shadow-sm backdrop-blur-md">
+              <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 mb-6">
+                <FileText class="w-6 h-6" />
+              </div>
+              <h3 class="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-4">{{ t('lobby.localInfo') }}</h3>
+              <ul class="space-y-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                <li class="flex items-start gap-3">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
+                  {{ t('lobby.info1') }}
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
+                  {{ t('lobby.info2') }}
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
+                  {{ t('lobby.info3') }}
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
+                  {{ t('lobby.info4') }}
+                </li>
+              </ul>
+            </div>
+            
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[40px] p-8 text-white shadow-xl relative overflow-hidden group">
+              <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                <Database class="w-32 h-32" />
+              </div>
+              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200 mb-2">Experimental Data</p>
+              <h4 class="text-xl font-black mb-4">Mendeleef Database</h4>
+              <p class="text-xs text-blue-100/80 mb-6 leading-relaxed">
+                Explore thousands of chemical reactions and element properties in the offline laboratory.
+              </p>
+              <button @click="router.push('/data')" class="w-full py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                Access Archives
+              </button>
+            </div>
           </section>
         </div>
       </main>
