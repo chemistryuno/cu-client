@@ -28,9 +28,6 @@ const deckID = ref(0)
 const isPointsMode = ref(false)
 const pveDifficulty = ref(50)
 const aiCount = ref(1)
-const showLegalModal = ref(false)
-const legalModalTitle = ref('')
-const legalModalContent = ref('')
 const showTutorial = ref(false)
 
 const LOBBY_TUTORIAL_COMPLETED_KEY = 'chemistry-uno-lobby-tutorial-completed'
@@ -230,27 +227,6 @@ const handleResetLocalPlayer = async () => {
   }
 }
 
-const openUserAgreement = async () => {
-  try {
-    const res = await fetch('/USER_AGREEMENT.md')
-    legalModalContent.value = await res.text()
-  } catch {
-    legalModalContent.value = 'Unable to load agreement.'
-  }
-  legalModalTitle.value = t('lobby.footer.agreement')
-  showLegalModal.value = true
-}
-
-const openPrivacyPolicy = async () => {
-  try {
-    const res = await fetch('/PRIVACY_POLICY.md')
-    legalModalContent.value = await res.text()
-  } catch {
-    legalModalContent.value = 'Unable to load privacy policy.'
-  }
-  legalModalTitle.value = t('lobby.footer.privacy')
-  showLegalModal.value = true
-}
 
 onMounted(() => {
   try {
@@ -281,12 +257,9 @@ onMounted(() => {
       <header class="lobby-header">
         <div class="lobby-header-container">
           <div class="flex items-center gap-4">
-            <div class="lobby-logo-bundle">
+            <div class="flex items-center gap-3">
               <Beaker class="w-6 h-6 text-blue-500" />
-              <div>
-                <h1 class="lobby-logo-title">CHEMISTRY <span class="text-blue-500">UNO</span></h1>
-                <p class="lobby-logo-subtitle">{{ appVersion }}</p>
-              </div>
+              <h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tighter">CHEMISTRY <span class="text-blue-500">UNO</span></h1>
             </div>
           </div>
 
@@ -305,11 +278,8 @@ onMounted(() => {
               <button @click="router.push('/data')" class="lobby-nav-link" title="数据库查看">
                 <Database class="w-4 h-4" />
               </button>
-              <button @click="router.push('/profile')" class="lobby-nav-link" :title="t('common.localProfile')">
+              <button @click="router.push('/profile/settings')" class="lobby-nav-link" :title="t('profile.categories.settings')">
                 <Settings class="w-4 h-4" />
-              </button>
-              <button @click="handleResetLocalPlayer" class="lobby-nav-link lobby-nav-link-red" :title="t('lobby.resetProfile')">
-                <LogOut class="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -418,44 +388,7 @@ onMounted(() => {
           </section>
 
           <section class="lg:col-span-4 flex flex-col gap-6">
-            <div class="flex-1 bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-[40px] p-8 shadow-sm backdrop-blur-md">
-              <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 mb-6">
-                <FileText class="w-6 h-6" />
-              </div>
-              <h3 class="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-4">{{ t('lobby.localInfo') }}</h3>
-              <ul class="space-y-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                <li class="flex items-start gap-3">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                  {{ t('lobby.info1') }}
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                  {{ t('lobby.info2') }}
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                  {{ t('lobby.info3') }}
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                  {{ t('lobby.info4') }}
-                </li>
-              </ul>
-            </div>
             
-            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[40px] p-8 text-white shadow-xl relative overflow-hidden group">
-              <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                <Database class="w-32 h-32" />
-              </div>
-              <p class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200 mb-2">Experimental Data</p>
-              <h4 class="text-xl font-black mb-4">Mendeleef Database</h4>
-              <p class="text-xs text-blue-100/80 mb-6 leading-relaxed">
-                Explore thousands of chemical reactions and element properties in the offline laboratory.
-              </p>
-              <button @click="router.push('/data')" class="w-full py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                Access Archives
-              </button>
-            </div>
           </section>
         </div>
       </main>
@@ -463,11 +396,7 @@ onMounted(() => {
       <footer class="lobby-footer bg-black/40 backdrop-blur-md p-4 shrink-0">
         <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-slate-500 uppercase tracking-[0.15em] gap-4">
           <div class="flex items-center gap-4 order-2 md:order-1">
-            <button @click="openUserAgreement" class="hover:text-blue-400 transition-colors uppercase cursor-pointer">{{ t('lobby.footer.agreement') }}</button>
-            <span class="h-3 w-px bg-white/10"></span>
-            <button @click="openPrivacyPolicy" class="hover:text-blue-400 transition-colors uppercase cursor-pointer">{{ t('lobby.footer.privacy') }}</button>
-            <span class="h-3 w-px bg-white/10"></span>
-            <span class="text-blue-500/50">v{{ appVersion }}</span>
+            <span class="text-blue-500/50 font-black tracking-widest">Chemistry UNO · Mendeleef Protocol v{{ appVersion }}</span>
           </div>
           <div class="text-center md:text-right order-1 md:order-2 opacity-40 hover:opacity-100 transition-opacity">
             &copy; 2026 MENDELEEF PROTOCOL. LOCAL EDITION.
@@ -642,28 +571,5 @@ onMounted(() => {
 
     <TutorialGuide :show="showTutorial" :steps="lobbyTutorialSteps" @close="handleTutorialClose" @complete="handleTutorialComplete" />
 
-    <div v-if="showLegalModal" class="fixed inset-0 bg-slate-900/90 dark:bg-black/95 backdrop-blur-2xl z-[200] flex items-center justify-center p-5 overflow-y-auto">
-      <div class="relative w-full max-w-2xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-4xl flex flex-col max-h-[85vh] animate-in zoom-in duration-300">
-        <div class="px-8 py-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between sticky top-0 bg-inherit z-10">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center text-blue-500">
-              <FileText class="w-5 h-5" />
-            </div>
-            <div>
-              <h3 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest">{{ legalModalTitle }}</h3>
-            </div>
-          </div>
-          <button @click="showLegalModal = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400">
-            <X class="w-6 h-6" />
-          </button>
-        </div>
-
-        <div class="p-8 overflow-y-auto custom-scrollbar flex-1 whitespace-pre-wrap">
-          <div class="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed font-sans">
-            {{ legalModalContent }}
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>

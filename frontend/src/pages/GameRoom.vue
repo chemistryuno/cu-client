@@ -2,18 +2,17 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
-import { gameAPI, friendAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
+import { gameAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
-import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Users, Timer, Plus, QrCode, Copy, Sparkles, ShieldAlert, Ban, UserMinus, X, MessageCircle, UserPlus, Flag, Send, Binary } from 'lucide-vue-next'
+import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import ChatBox from '../components/ChatBox.vue'
 import LevelUpAnimation from '../components/LevelUpAnimation.vue'
 import GameToast from '../components/GameToast.vue'
 import ChemicalKeyboard from '../components/ChemicalKeyboard.vue'
 import FeedbackSettings from '../components/FeedbackSettings.vue'
-import PingDisplay from '../components/PingDisplay.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { getTutorialStep, TUTORIAL_TOTAL_STEPS } from '../utils/tutorialScript'
 import '../styles/mobile-game.css'
@@ -247,15 +246,8 @@ const shouldShowInBlue = (player: any) => {
   return !!(friend?.remark)
 }
 
-const handleAddFriend = async (player: any) => {
-  try {
-    const displayName = player.nickname || player.username
-    await friendAPI.sendRequest(player.uid)
-  showToast(`已向研究员 ${displayName} 发送同步请求，等待量子握手。`, '请求已发送', 'success')
-  } catch (error: any) {
-    showToast(error.response?.data?.error || '请求发送失败', '链路故障', 'error')
-  }
-}
+// Friends logic removed in offline mode
+const handleAddFriend = () => {}
 
 // Chat system
 const showPlayers = ref(false)
@@ -308,29 +300,8 @@ const addPvEToast = (text: string) => {
 // startPrivateChat 已被弃用，实验室内禁止私聊
 
 
-const sendGameInvite = async (friend: any) => {
-  const inviteData = {
-    type: 'game_invite',
-    room_id: id,
-    room_name: roomInfo.value?.name || '实验室',
-    player_count: allPlayers.value.length,
-    max_players: roomInfo.value?.max_players || 0,
-    is_points_mode: roomInfo.value?.is_points_mode || false,
-    is_private: roomInfo.value?.is_private || false,
-    access_key: roomInfo.value?.access_key || ''
-  }
-
-  websocket.send({
-    type: 'private_chat',
-    target_uid: friend.uid,
-    message: JSON.stringify(inviteData),
-    is_game_invite: true
-  })
-
-  feedback.success()
-  showToast(`游戏邀请已发送给 ${friend.remark || friend.nickname || friend.username}`, '邀请已发送', 'success')
-  showInviteFriendsModal.value = false
-}
+// Game invites removed in offline mode
+const sendGameInvite = () => {}
 
 
 
@@ -2307,7 +2278,6 @@ watch(() => gameState.value?.current_player, () => {
           <div class="hidden xs:block">
             <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
             <div class="flex items-center gap-1.5">
-              <PingDisplay />
             </div>
           </div>
         </div>
@@ -2854,42 +2824,7 @@ watch(() => gameState.value?.current_player, () => {
                     </div>
                   </div>
 
-                  <div class="flex items-center gap-1.5 w-full">
-                    <button
-                        @click="handleCopyLink"
-                        class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-800 dark:bg-white/10 hover:bg-slate-700 text-white rounded-lg transition-all active:scale-95 group shadow-md"
-                    >
-                        <Copy class="w-2.5 h-2.5 group-hover:rotate-12 transition-transform" />
-                        <span class="text-[8px] font-black uppercase tracking-widest">招募成员</span>
-                    </button>
-                    <button
-                        @click="feedback.click(); showInviteFriendsModal = true"
-                        class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all active:scale-95 group shadow-md"
-                    >
-                        <UserPlus class="w-2.5 h-2.5 group-hover:scale-110 transition-transform" />
-                        <span class="text-[8px] font-black uppercase tracking-widest">邀请好友</span>
-                    </button>
-                    <button
-                        @click="feedback.click(); showQrModal = !showQrModal"
-                        class="w-8 h-8 flex items-center justify-center bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg text-slate-500 hover:text-blue-500 transition-all active:scale-90 shadow-md"
-                    >
-                        <QrCode class="w-4 h-4" />
-                    </button>
-                  </div>
 
-                  <!-- QR Code 浮窗 -->
-                  <div v-if="showQrModal" class="mt-1 p-2 bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl animate-in zoom-in duration-300 flex flex-col items-center gap-2">
-                     <div class="p-1.5 bg-white rounded-lg border-2 border-blue-500/20">
-                        <img
-                          :src="`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(shareLink)}`"
-                          alt="Join QR Code"
-                          class="w-24 h-24"
-                        />
-                     </div>
-                     <div class="text-center pb-0.5">
-                        <p class="text-[8px] font-black uppercase tracking-widest text-blue-500">实验室快传</p>
-                     </div>
-                  </div>
                 </div>
              </div>
           </div>

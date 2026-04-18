@@ -1018,9 +1018,31 @@ const resetOfflineState = () => {
   aiTimers.forEach((timer) => clearTimeout(timer))
   turnTimers.clear()
   aiTimers.clear()
-  localStorage.removeItem(STORAGE_KEY)
+
+  // Clear all known storage keys for a truly fresh start
+  const keysToRemove = [
+    STORAGE_KEY,
+    'user',
+    'token',
+    'access_token',
+    'refresh_token',
+    'theme'
+  ]
+  keysToRemove.forEach(key => localStorage.removeItem(key))
+
+  // Broad sweep for any chemistry-uno related keys (tutorials, volume, etc.)
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith('chemistry-uno-')) {
+      localStorage.removeItem(key)
+      i-- // Adjust index after removal
+    }
+  }
+
   updateStoredUser(null)
-  return makeInitialState()
+  const initialState = makeInitialState()
+  writeState(initialState)
+  return initialState
 }
 const currentUser = (state: State) => state.users.find((u) => u.uid === state.session_uid) || null
 const requireAuth = (state: State) => {
@@ -1605,20 +1627,15 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
       const nickname = String(body.nickname || '').trim()
       const avatar = String(body.avatar || 'flask').trim() || 'flask'
       if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
-      const user = state.users[0] || makeLocalPlayer()
-      user.nickname = nickname
-      user.avatar = avatar
-      user.username = 'local-player'
-      user.password = ''
-      user.role = 'user'
-      user.is_admin = false
-      if (!state.users.length) {
-        state.users.push(user)
-      } else {
-        state.users[0] = user
-      }
-      state.session_uid = user.uid
-      writeState(state)
+
+      // Thoroughly clear any previous legacy data before initializing a new profile
+      const newState = resetOfflineState()
+
+      const user = makeLocalPlayer(nickname, avatar)
+      newState.users = [user]
+      newState.session_uid = user.uid
+
+      writeState(newState)
       updateStoredUser(user)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
@@ -1628,16 +1645,15 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
     if (method === 'POST' && path === '/auth/login') {
       const nickname = String(body.nickname || body.identifier || body.username || '').trim()
       if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
-      const user = state.users[0] || makeLocalPlayer()
-      user.nickname = nickname
-      user.avatar = user.avatar || 'flask'
-      if (!state.users.length) {
-        state.users.push(user)
-      } else {
-        state.users[0] = user
-      }
-      state.session_uid = user.uid
-      writeState(state)
+      
+      // Thoroughly clear any previous legacy data before initializing a new session
+      const newState = resetOfflineState()
+      
+      const user = makeLocalPlayer(nickname)
+      newState.users = [user]
+      newState.session_uid = user.uid
+      
+      writeState(newState)
       updateStoredUser(user)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }

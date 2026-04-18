@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import websocket from './utils/websocket'
 import feedback from './utils/feedback'
 import { useDialog } from './utils/dialog'
-import AnnouncementTicker from './components/AnnouncementTicker.vue'
 
 const CustomDialog = defineAsyncComponent(() => import('./components/CustomDialog.vue'))
 
@@ -155,7 +154,6 @@ onUnmounted(() => {
   </div>
   <template v-else>
     <div class="app-viewport transition-colors duration-300 min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-200">
-      <AnnouncementTicker />
       <router-view v-slot="{ Component, route }">
         <Transition name="app-route" mode="out-in">
           <div :key="route.fullPath" class="app-route-shell">

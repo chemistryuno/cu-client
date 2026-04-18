@@ -42,9 +42,9 @@ const handleSaveSettings = async () => {
       enable_element_input: enableElementInput.value
     })
     emit('update')
-    showAlert('系统偏好已成功同步至核心节点', '同步成功')
+    showAlert('系统偏好已成功保存', '保存成功')
   } catch (err: any) {
-    showAlert(err.response?.data?.error || '同步失败，请检查实验室连接', '同步异常')
+    showAlert(err.response?.data?.error || '保存失败', '异常')
   } finally {
     loading.value = false
   }
@@ -252,7 +252,7 @@ watch(() => props.user, (newUser) => {
           >
             <Save v-if="!loading" class="w-3.5 h-3.5" />
             <div v-else class="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-            同步系统偏好 / Sync Preferences
+            <span>保存设置 / Save Settings</span>
           </button>
         </div>
       </div>

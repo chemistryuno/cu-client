@@ -42,7 +42,7 @@ const categories = [
 const categoryIDs = categories.map((cat) => cat.id)
 
 const resolveProfileCategory = (raw: string) => {
-  return categoryIDs.includes(raw) ? raw : 'overview'
+  return categoryIDs.includes(raw) ? raw : 'settings'
 }
 
 const buildProfileCategoryPath = (category: string) => {
@@ -62,11 +62,15 @@ const switchCategory = (category: string, closeSidebar = false) => {
 }
 
 const syncCategoryFromRoute = () => {
-  const routeTab = typeof route.params.tab === 'string' ? route.params.tab : ''
+  const routeTab = typeof route.params.tab === 'string'
+    ? route.params.tab
+    : typeof route.query.tab === 'string'
+      ? route.query.tab
+      : ''
   const nextCategory = resolveProfileCategory(routeTab)
   currentCategory.value = nextCategory
   const canonicalPath = buildProfileCategoryPath(nextCategory)
-  if (route.path !== canonicalPath) {
+  if (route.path !== canonicalPath || route.query.tab) {
     router.replace(canonicalPath)
   }
 }

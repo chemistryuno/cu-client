@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell } = require('electron')
 const path = require('path')
 
 const isMac = process.platform === 'darwin'
+const isDev = Boolean(process.env.ELECTRON_RENDERER_URL)
 
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
@@ -35,6 +36,9 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
+    if (isDev) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' })
+    }
   })
 }
 

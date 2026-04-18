@@ -27,7 +27,7 @@ const setCached = (key: string, data: any, ttl = 5 * 60 * 1000) => {
 }
 
 const clearAuthState = () => {
-  apiCache.delete('user_info')
+  apiCache.clear()
   clearClientAuthState()
 }
 
@@ -62,11 +62,23 @@ api.interceptors.response.use(
 const createCacheKey = (url: string, params?: Record<string, any>) => url + (params ? JSON.stringify(params) : '')
 
 export const authAPI = {
-  initializeOfflineProfile: (data: { nickname: string; avatar: string }) => api.post('/auth/offline-profile', data),
+  initializeOfflineProfile: async (data: { nickname: string; avatar: string }) => {
+    const response = await api.post('/auth/offline-profile', data)
+    clearAuthState()
+    return response
+  },
   register: (data: any) => api.post('/auth/register', data),
-  login: (data: any) => api.post('/auth/login', data),
+  login: async (data: any) => {
+    const response = await api.post('/auth/login', data)
+    clearAuthState()
+    return response
+  },
   logout: () => api.post('/auth/logout'),
-  resetOfflineProfile: () => api.post('/auth/offline-profile/reset'),
+  resetOfflineProfile: async () => {
+    const response = await api.post('/auth/offline-profile/reset')
+    clearAuthState()
+    return response
+  },
   getAuthConfig: () => api.get('/auth/config'),
   unbindOAuth: (provider: string) => api.post(`/auth/oauth/unbind?provider=${provider}`),
   sendCode: (email: string, type = 'register', recaptcha_token?: string) => api.post('/auth/send-code', { email, type, recaptcha_token }),
