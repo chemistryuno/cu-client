@@ -162,13 +162,7 @@ const typeLabel = (type: string) => {
           <span class="font-bold tracking-wider uppercase text-xs">返回大厅</span>
         </button>
 
-        <router-link 
-          to="/ranking" 
-          class="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 hover:bg-amber-500/20 transition-all group shadow-sm"
-        >
-          <Trophy class="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span class="text-[10px] font-black uppercase tracking-widest">全球排名</span>
-        </router-link>
+
       </div>
 
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 mb-8">

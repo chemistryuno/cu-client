@@ -148,8 +148,6 @@ const createTutorialMatch = async () => {
       1,
       false,
       0,
-      false,
-      0,
       true,
     )
     localStorage.setItem('chemistry-uno-tutorial-mode', 'true')
@@ -175,8 +173,6 @@ const handleCreateAIRoom = async () => {
       true,
       pveDifficulty.value,
       aiCount.value,
-      false,
-      0,
       false,
       0,
       false,

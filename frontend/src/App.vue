@@ -53,25 +53,7 @@ const scheduleSessionStartup = () => {
   }, 1200)
 }
 
-const handleSystemAnnouncement = (msg: any) => {
-  const ann = msg.data
-  if (ann && !ann.is_ticker) {
-    showAlert(ann.content, ann.title || 'System Note')
-  }
-}
 
-const handleAdminBroadcast = (msg: any) => {
-  const d = msg.data
-  if (!d) return
-  const titleMap: Record<string, string> = {
-    info:    d.title || '📢 管理员通知',
-    warning: d.title || '⚠️ 管理员警告',
-    success: d.title || '✅ 系统提示',
-    error:   d.title || '🚨 紧急通知',
-  }
-  const title = titleMap[d.msg_type] || d.title || '管理员广播'
-  showAlert(d.content, title)
-}
 
 const updateTheme = () => {
   const storedTheme = localStorage.getItem('theme') || 'system'
@@ -133,8 +115,7 @@ onMounted(() => {
       scheduleSessionStartup()
     }
 
-    websocket.on('system_announcement', handleSystemAnnouncement)
-    websocket.on('admin_broadcast', handleAdminBroadcast)
+
     websocket.on('plugin_message', handlePluginMessage)
 
     window.addEventListener('click', handleGlobalClick, true)
@@ -147,8 +128,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   themeMediaQuery?.removeEventListener('change', updateTheme)
-  websocket.off('system_announcement', handleSystemAnnouncement)
-  websocket.off('admin_broadcast', handleAdminBroadcast)
+
   websocket.off('plugin_message', handlePluginMessage)
   
   window.removeEventListener('click', handleGlobalClick, true)

@@ -31,7 +31,7 @@ const error = ref<string | null>(null)
 let activeRequestId = 0
 
 const displayNickname = computed(() => user.value?.nickname || 'Researcher')
-const displayRole = computed(() => String(user.value?.role || 'user').toUpperCase())
+
 
 const resetState = () => {
   user.value = null
@@ -152,7 +152,7 @@ const handleStartChat = () => {
                 <h1 class="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase">
                   {{ displayNickname }}
                 </h1>
-                <p class="text-[9px] font-mono text-slate-400 dark:text-slate-500">UID: {{ user.uid }} | ROLE: {{ displayRole }}</p>
+                <p class="text-[9px] font-mono text-slate-400 dark:text-slate-500">UID: {{ user.uid }}</p>
               </div>
 
               <div class="flex flex-wrap items-center justify-center md:justify-start gap-5 py-1">

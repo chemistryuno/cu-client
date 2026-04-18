@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminAPI, gameAPI } from '../utils/api'
+import { gameAPI } from '../utils/api'
 import { useDialog } from '../utils/dialog'
 import { ArrowLeft, Ban, Eye, UserMinus } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
@@ -31,8 +31,8 @@ try {
   currentUser.value = {}
 }
 
-const isAdmin = computed(() => !!currentUser.value?.is_admin)
-const useAdminScope = computed(() => isAdmin.value && String(route.query.scope || '') === 'admin')
+const isAdmin = computed(() => false)
+const useAdminScope = computed(() => false)
 const replayReturnPath = computed(() => {
   const raw = String(route.query.from || '').trim()
   if (/^\/admin(?:\/[a-zA-Z0-9_-]+)?$/.test(raw)) {
@@ -433,17 +433,6 @@ const loadReplay = async () => {
     replayData.value = response.data
     chooseDefaultPerspective()
   } catch (error: any) {
-    if (!useAdminScope.value && isAdmin.value) {
-      try {
-        const fallback = await adminAPI.getGameReplay(historyId.value)
-        replayData.value = fallback.data
-        chooseDefaultPerspective()
-        loading.value = false
-        return
-      } catch {
-      }
-    }
-
     loadError.value = error?.response?.data?.error || '回放加载失败'
   } finally {
     loading.value = false
@@ -456,43 +445,7 @@ const enterLiveRoomAsSpectator = () => {
   router.push(`/room/${roomID}?spectator=true`)
 }
 
-const banFromReplay = async (profile: any) => {
-  if (!isAdmin.value || Number(profile.uid) <= 0) return
-
-  const hourText = await showPrompt(`请输入封禁时长（小时），目标：${profile.nickname || profile.username || profile.uid}`, '24', '封禁设置')
-  if (hourText === null) return
-
-  const hours = Number(hourText)
-  if (!Number.isFinite(hours) || hours <= 0) {
-    await showAlert('封禁时长必须是大于0的数字', '参数错误')
-    return
-  }
-
-  const reason = await showPrompt('请输入封禁原因', '回放审计判定违规', '封禁原因')
-  if (reason === null) return
-
-  const bannedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
-  try {
-    await adminAPI.banUser(Number(profile.uid), bannedUntil, reason || '回放审计判定违规')
-    await showAlert(`已封禁 ${profile.nickname || profile.username || profile.uid}`, '执行完成')
-  } catch (error: any) {
-    await showAlert(error?.response?.data?.error || '封禁失败', '错误')
-  }
-}
-
-const kickFromReplay = async (profile: any) => {
-  if (!isAdmin.value || Number(profile.uid) <= 0) return
-
-  const reason = await showPrompt(`请输入踢出原因，目标：${profile.nickname || profile.username || profile.uid}`, '回放审计判定违规', '踢出原因')
-  if (reason === null) return
-
-  try {
-    await adminAPI.kickPlayer(Number(profile.uid), reason || '回放审计判定违规')
-    await showAlert(`已踢出 ${profile.nickname || profile.username || profile.uid}`, '执行完成')
-  } catch (error: any) {
-    await showAlert(error?.response?.data?.error || '踢出失败', '错误')
-  }
-}
+// Admin functions removed
 
 onMounted(() => {
   lockPageScroll()
@@ -612,28 +565,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div v-if="isAdmin" class="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">管理员处置</p>
-          <div class="space-y-2">
-            <div
-              v-for="profile in participants.filter((p: any) => Number(p.uid) > 0)"
-              :key="`action-${profile.uid}`"
-              class="rounded-lg border border-slate-200 dark:border-white/10 px-2 py-2 bg-slate-50 dark:bg-white/5"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-[11px] font-semibold">{{ profile.nickname || profile.username || profile.uid }}</span>
-                <div class="flex items-center gap-1">
-                  <button @click="kickFromReplay(profile)" class="p-1.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20">
-                    <UserMinus class="w-3.5 h-3.5" />
-                  </button>
-                  <button @click="banFromReplay(profile)" class="p-1.5 rounded-md bg-rose-500/10 text-rose-500 hover:bg-rose-500/20">
-                    <Ban class="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Admin actions removed -->
       </aside>
 
       <main class="min-h-0 overflow-y-auto p-4 md:p-6 bg-slate-100/70 dark:bg-black/30">

@@ -95,7 +95,7 @@
           <Puzzle class="w-8 h-8 text-purple-500" />
         </div>
         <h3 class="text-xl font-bold text-slate-500">暂无已安装的插件</h3>
-        <p class="text-slate-400 mt-2">管理员可在管理面板中安装 .cumod 插件文件</p>
+        <p class="text-slate-400 mt-2">暂无已安装的实验室扩展模块</p>
       </div>
 
       <!-- Plugin List -->

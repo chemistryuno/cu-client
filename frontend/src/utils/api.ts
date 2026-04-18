@@ -1,4 +1,4 @@
-﻿import axios, { AxiosError, type AxiosInstance } from 'axios'
+import axios, { AxiosError, type AxiosInstance } from 'axios'
 import router from '../router'
 import { API_BASE_URL, OFFLINE_MODE } from './runtimeConfig'
 import { offlineAxiosAdapter } from './offlineBackend'
@@ -141,7 +141,7 @@ export const gameAPI = {
     setCached(key, response.data, 60 * 1000)
     return response
   },
-  createRoom: (name: string, maxPlayers: number, deckID: number, isPointsMode = false, isPrivate = false, accessKey?: string, isPvE = false, pveDifficulty = 0, aiCount = 0, enableAIBackfill = false, aiBackfillDifficulty = 50, isRanked = false, levelRange = 5, tutorialScript = false) => api.post('/rooms', {
+  createRoom: (name: string, maxPlayers: number, deckID: number, isPointsMode = false, isPrivate = false, accessKey?: string, isPvE = false, pveDifficulty = 0, aiCount = 0, enableAIBackfill = false, aiBackfillDifficulty = 50, tutorialScript = false) => api.post('/rooms', {
     name,
     max_players: maxPlayers,
     deck_id: deckID,
@@ -153,8 +153,6 @@ export const gameAPI = {
     ai_count: aiCount,
     enable_ai_backfill: enableAIBackfill,
     ai_backfill_difficulty: aiBackfillDifficulty,
-    is_ranked: isRanked,
-    level_range: levelRange,
     tutorial_script: tutorialScript
   }),
   getRoomState: (roomId: string) => api.get(`/rooms/${roomId}`),
@@ -186,74 +184,13 @@ export const gameAPI = {
   deleteMyDeck: (id: number) => api.delete(`/my-decks/${id}`)
 }
 
-export const pointsAPI = {
-  getLeaderboard: (mode = 'total') => api.get(`/points/leaderboard?mode=${mode}`),
-  createBounty: (target_uid: number, amount: number) => api.post('/points/bounty', { target_uid, amount })
-}
 
-export const adminAPI = {
-  getStats: () => api.get('/admin/stats'),
-  getAllUsers: () => api.get('/admin/users'),
-  createUser: (username: string, password: string) => api.post('/admin/users', { username, password }),
-  deleteUser: (uid: string) => api.delete(`/admin/users/${uid}`),
-  changeUserPassword: (uid: string, newPassword: string) => api.put(`/admin/users/${uid}/password`, { new_password: newPassword }),
-  promoteUser: (uid: string, role: string) => api.put(`/admin/users/${uid}/role`, { role }),
-  banUser: (targetUID: number, bannedUntil: string, reason: string) => api.post('/admin/users/ban', { target_uid: targetUID, banned_until: bannedUntil, reason }),
-  kickPlayer: (targetUID: number, reason: string) => api.post('/admin/users/kick', { target_uid: targetUID, reason }),
-  getGlobalDeckConfig: () => api.get('/admin/deck-config'),
-  updateGlobalDeckConfig: (name: string, cards: Record<string, number>, initialCards?: number) => api.put('/admin/deck-config', { name, cards, initial_cards: initialCards }),
-  resetGlobalDeckConfig: () => api.post('/admin/deck-config/reset'),
-  getGameHistory: () => api.get('/admin/game-history'),
-  getGameReplay: (historyId: number) => api.get(`/admin/game-history/${historyId}/replay`),
-  clearGameReplay: (historyId: number) => api.delete(`/admin/game-history/${historyId}/replay`),
-  getFeedbacks: () => api.get('/admin/feedbacks'),
-  updateFeedbackStatus: (id: number, status: string, note?: string) => api.put(`/admin/feedbacks/${id}/status`, { status, note }),
-  getConfigs: () => api.get('/admin/configs'),
-  updateConfig: (key: string, value: string) => api.put('/admin/configs', { key, value }),
-  getGameTimeConfigs: () => api.get('/admin/game-time-configs'),
-  updateGameTimeConfig: (data: any) => api.put('/admin/game-time-configs', data),
-  exportSubstances: () => api.get('/admin/export/substances', { responseType: 'blob' }),
-  exportReactions: () => api.get('/admin/export/reactions', { responseType: 'blob' }),
-  exportAllData: () => api.get('/admin/export/all', { responseType: 'blob' }),
-  batchApproveSubstances: (groupIDs: number[]) => api.post('/admin/substances/batch-approve', { group_ids: groupIDs }),
-  batchRejectSubstances: (groupIDs: number[]) => api.post('/admin/substances/batch-reject', { group_ids: groupIDs }),
-  batchApproveReactions: (groupIDs: number[]) => api.post('/admin/reactions/batch-approve', { group_ids: groupIDs }),
-  batchRejectReactions: (groupIDs: number[]) => api.post('/admin/reactions/batch-reject', { group_ids: groupIDs }),
-  broadcast: (data: any) => api.post('/admin/broadcast', data),
-  getActiveRooms: () => api.get('/admin/rooms/active'),
-  getAnnouncements: () => api.get('/admin/announcements'),
-  createAnnouncement: (title: string, content: string, type: string, is_ticker: boolean, expires_in?: string, on_join = false, cron_interval = 0, close_delay = 0, is_persistent = false) => api.post('/admin/announcements', { title, content, type, is_ticker, expires_in, on_join, cron_interval, close_delay, is_persistent }),
-  updateAnnouncement: (id: number, title: string, content: string, type: string, is_ticker: boolean, expires_in?: string, on_join = false, cron_interval = 0, close_delay = 0, is_persistent = false) => api.put(`/admin/announcements/${id}`, { title, content, type, is_ticker, expires_in, on_join, cron_interval, close_delay, is_persistent }),
-  updateAnnouncementStatus: (id: number, active: boolean) => api.put(`/admin/announcements/${id}/status`, { active }),
-  deleteAnnouncement: (id: number) => api.delete(`/admin/announcements/${id}`),
-  getSurveys: () => api.get('/admin/surveys'),
-  createSurvey: (data: any) => api.post('/admin/surveys', data),
-  updateSurvey: (id: number, data: any) => api.put(`/admin/surveys/${id}`, data),
-  updateSurveyStatus: (id: number, isActive: boolean) => api.put(`/admin/surveys/${id}/status`, { is_active: isActive }),
-  getSurveyResponses: (id: number, sortBy = 'created_at', order = 'desc') => api.get(`/admin/surveys/${id}/responses`, { params: { sort_by: sortBy, order } }),
-  repairSurvey: (id: number) => api.post(`/admin/surveys/${id}/repair`),
-  exportSurvey: (id: number) => api.get(`/admin/surveys/${id}/export`, { responseType: 'blob' }),
-  getSurveyConfig: (id: number) => api.get(`/admin/surveys/${id}/config`),
-  importSurveyConfig: (data: any) => api.post('/admin/surveys/import', data),
-  getLogs: (count?: number, level?: string) => {
-    const params = new URLSearchParams()
-    if (count) params.append('count', String(count))
-    if (level) params.append('level', level)
-    return api.get(`/admin/logs?${params.toString()}`)
-  },
-  clearLogs: () => api.post('/admin/logs/clear')
-}
+
+
 
 export const commonAPI = {
   getAnnouncements: () => api.get('/announcements'),
   getHints: () => api.get('/hints')
-}
-
-export const levelAPI = {
-  getLevelInfo: () => api.get('/level/info'),
-  getUserLevelInfo: (uid: number) => api.get(`/level/user/${uid}`),
-  getLevelLeaderboard: (limit = 100) => api.get(`/level/leaderboard?limit=${limit}`),
-  getLevelConfigs: () => api.get('/level/configs')
 }
 
 export const reactionAPI = {
@@ -307,27 +244,6 @@ export const pluginAPI = {
   getPluginsWithCards: () => api.get('/plugins'),
   getPluginScript: (pluginId: number) => api.get(`/plugins/${pluginId}/script`, { responseType: 'text' }),
   getPluginSettings: (pluginId: number) => api.get(`/plugins/${pluginId}/settings`),
-  getPlugins: () => api.get('/admin/plugins'),
-  createPlugin: (data: { name: string; description?: string }) => api.post('/admin/plugins', data),
-  updatePlugin: (id: number, data: { name?: string; description?: string; is_active?: boolean }) => api.put(`/admin/plugins/${id}`, data),
-  updatePluginSettings: (pluginId: number, settings: Record<string, string>) => api.put(`/admin/plugins/${pluginId}/settings`, { settings }),
-  getPluginSettingsHistory: (pluginId: number) => api.get(`/admin/plugins/${pluginId}/settings/history`),
-  rollbackPluginSettings: (pluginId: number, snapshotId: string) => api.post(`/admin/plugins/${pluginId}/settings/rollback`, { snapshot_id: snapshotId }),
-  deletePlugin: (id: number) => api.delete(`/admin/plugins/${id}`),
-  installPlugin: (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return api.post('/admin/plugins/install', form, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-  },
-  getPluginCardsByPlugin: (pluginId: number) => api.get(`/admin/plugins/${pluginId}/cards`),
-  createCard: (pluginId: number, data: any) => api.post(`/admin/plugins/${pluginId}/cards`, data),
-  updateCard: (cardId: number, data: any) => api.put(`/admin/plugin-cards/${cardId}`, data),
-  deleteCard: (cardId: number) => api.delete(`/admin/plugin-cards/${cardId}`),
-  reloadPlugins: () => api.post('/admin/plugins/reload'),
-  scheduleRestart: (delaySeconds: number, reason?: string) => api.post('/admin/server/restart', { delay_seconds: delaySeconds, reason }),
-  cancelRestart: () => api.post('/admin/server/restart/cancel')
 }
 
 export const invalidateApiCache = (...keys: string[]) => {

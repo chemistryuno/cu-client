@@ -234,6 +234,9 @@ const handleSubmit = async () => {
       security_question: securityQuestion.value,
       security_answer: securityAnswer.value,
     })
+    // Reset tutorial state for new user
+    localStorage.removeItem('chemistry-uno-lobby-tutorial-completed')
+    localStorage.removeItem('chemistry-uno-lobby-tutorial-skipped')
     await showAlert('注册成功，请使用用户名登录。', '研究员注册成功')
     router.push('/login')
   } catch (err: any) {

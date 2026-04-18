@@ -10,7 +10,6 @@ export function useGameUI() {
   const showHints = ref(true)
   const showPlayers = ref(false)
   const showChat = ref(false)
-  const showAdminModal = ref(false)
   const showInviteFriendsModal = ref(false)
   const showDeckDetailModal = ref(false)
   const showChemicalKeyboard = ref(false)
@@ -20,14 +19,12 @@ export function useGameUI() {
 
   // 计算属性
   const isAnyModalOpen = computed(() => {
-    return showAdminModal.value ||
-           showInviteFriendsModal.value ||
+    return showInviteFriendsModal.value ||
            showDeckDetailModal.value
   })
 
   // 方法
   const closeAllModals = () => {
-    showAdminModal.value = false
     showInviteFriendsModal.value = false
     showDeckDetailModal.value = false
     showQrModal.value = false
@@ -55,11 +52,8 @@ export function useGameUI() {
     }
   }
 
-  const openModal = (modal: 'admin' | 'inviteFriends' | 'deckDetail') => {
+  const openModal = (modal: 'inviteFriends' | 'deckDetail') => {
     switch (modal) {
-      case 'admin':
-        showAdminModal.value = true
-        break
       case 'inviteFriends':
         showInviteFriendsModal.value = true
         break

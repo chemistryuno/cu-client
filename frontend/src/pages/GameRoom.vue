@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
-import { gameAPI, adminAPI, friendAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
+import { gameAPI, friendAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
@@ -25,7 +25,7 @@ const gameToastRef = ref()
 const id = route.params.id as string
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
 const isReplayBridgeMode = computed(() => Number.isFinite(replayHistoryQueryID.value) && replayHistoryQueryID.value > 0)
-const replayScopeAdmin = computed(() => String(route.query.scope || '') === 'admin')
+// Replay scope logic removed
 
 const user = ref<any>({})
 try {
@@ -332,36 +332,7 @@ const sendGameInvite = async (friend: any) => {
   showInviteFriendsModal.value = false
 }
 
-// Admin management state
-const showAdminModal = ref(false)
-const adminTargetUser = ref<any>(null)
-const adminActionType = ref<'kick' | 'ban'>('kick')
-const banUntil = ref('')
-const banReason = ref('你由于违规游戏而被踢出')
-const selectedBanPreset = ref<number | null>(24)
 
-const formatDatetimeLocal = (d: Date) => {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
-}
-
-const getDefaultBanUntil = () => {
-  return formatDatetimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000))
-}
-
-const banPresets = [
-  { label: '1小时', hours: 1 },
-  { label: '6小时', hours: 6 },
-  { label: '24小时', hours: 24 },
-  { label: '3天', hours: 72 },
-  { label: '7天', hours: 168 },
-  { label: '30天', hours: 720 },
-  { label: '永久', hours: 87600 },
-]
-
-const setBanDuration = (hours: number) => {
-  selectedBanPreset.value = hours
-  banUntil.value = formatDatetimeLocal(new Date(Date.now() + hours * 3600 * 1000))
-}
 
 watch(showChat, (val) => {
   if (val) {
@@ -426,58 +397,11 @@ watch(() => gameState.value?.status, (newStatus, oldStatus) => {
   }
 })
 
-const openAdminAction = (player: any) => {
-  if (!user.value.is_admin || player.uid === user.value.uid) return
-  adminTargetUser.value = player
-  adminActionType.value = 'kick'
-  banReason.value = '你由于违规游戏而被踢出'
-  selectedBanPreset.value = 24
-  banUntil.value = getDefaultBanUntil()
-  showAdminModal.value = true
-}
 
-const handleReportPlayer = async (player: any) => {
-  const displayName = player.nickname || player.username
-  const reason = await showPrompt(`举报研究员 ${displayName} (UID: ${player.uid})`, '请输入举报原因', '违规行为举报')
-  if (!reason) return
-  
-  try {
-    await authAPI.submitFeedback(`举报用户: ${displayName} (UID: ${player.uid})\n原因: ${reason}`, 'report')
-    showToast('举报已提交，系统正在量子分析中。', '已收到报告', 'success')
-  } catch (err: any) {
-    showToast(err.response?.data?.error || '无法建立举报链路', '网络干扰', 'error')
-  }
-}
 
-const handleAdminAction = async () => {
-  if (!adminTargetUser.value) return
-  try {
-    if (adminActionType.value === 'kick') {
-      await adminAPI.kickPlayer(adminTargetUser.value.uid, banReason.value)
-      feedback.success()
-      showToast('该玩家已被强制下线并清除登录状态', '成功', 'success')
-    } else {
-      if (!banUntil.value) {
-        showToast('请选择封禁截止时间', '参数缺失', 'warning')
-        feedback.error()
-        return
-      }
-      const until = new Date(banUntil.value)
-      if (until <= new Date()) {
-        showToast('封禁截止时间必须晚于当前时间', '时间无效', 'warning')
-        feedback.error()
-        return
-      }
-      await adminAPI.banUser(adminTargetUser.value.uid, until.toISOString(), banReason.value)
-      feedback.success()
-      showToast('该玩家已被封禁', '成功', 'success')
-    }
-    showAdminModal.value = false
-  } catch (e: any) {
-    feedback.error()
-    showToast(e.response?.data?.error || '操作失败', '错误', 'error')
-  }
-}
+
+
+
 
 const allPlayers = computed(() => {
   if (gameState.value?.players) {
@@ -584,6 +508,11 @@ const winner = computed(() => {
      return gameState.value.players.find((p: any) => p.uid === winnerUid)
   }
   return gameState.value.players?.find((p: any) => p.card_count === 0)
+})
+const specialCards = new Set(['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr'])
+const isFunctionalLastCard = computed(() => {
+  if (!gameState.value?.last_card) return false
+  return specialCards.has(gameState.value.last_card.substance)
 })
 
 const isManualSettlement = ref(false)
@@ -1489,19 +1418,7 @@ const loadReplaySimulationState = async () => {
     }
 
     let response: any
-    try {
-      if (replayScopeAdmin.value && user.value?.is_admin) {
-        response = await adminAPI.getGameReplay(replayHistoryQueryID.value)
-      } else {
-        response = await gameAPI.getMyGameReplay(replayHistoryQueryID.value)
-      }
-    } catch (firstError) {
-      if (user.value?.is_admin) {
-        response = await adminAPI.getGameReplay(replayHistoryQueryID.value)
-      } else {
-        throw firstError
-      }
-    }
+    response = await gameAPI.getMyGameReplay(replayHistoryQueryID.value)
 
     const replayPayload = response?.data || {}
     const rawReplayEvents = Array.isArray(replayPayload?.replay?.events) ? replayPayload.replay.events : []
@@ -2040,7 +1957,7 @@ const handleKeyboardConfirm = async (formula: string) => {
 
 const handleLeaveRoom = async () => {
   if (isReplayBridgeMode.value) {
-    const scopeQuery = replayScopeAdmin.value ? '?scope=admin' : ''
+    const scopeQuery = ''
     router.push(`/replay/${replayHistoryQueryID.value}${scopeQuery}`)
     return
   }
@@ -2792,7 +2709,7 @@ watch(() => gameState.value?.current_player, () => {
           </Teleport>
 
           <!-- Latest Reaction Display -->
-          <div v-if="gameState?.last_card"
+          <div v-if="gameState?.last_card && !isFunctionalLastCard"
                :key="gameState?.last_card?.substance + (gameState?.discard_pile?.length || 0)"
                class="relative group scale-75 sm:scale-85 flex flex-col items-center justify-center animate-stamp">
              <div class="absolute -inset-16 bg-blue-600/10 rounded-full blur-[100px] opacity-50 group-hover:opacity-80 transition-opacity animate-pulse"></div>
@@ -2842,8 +2759,8 @@ watch(() => gameState.value?.current_player, () => {
              </div>
           </div>
 
-          <!-- Waiting for play state (Au triggered or Initial) -->
-          <div v-else-if="gameState?.status === 'playing' && !gameState?.last_card" class="flex flex-col items-center gap-4 sm:gap-6 animate-in fade-in zoom-in duration-700">
+          <!-- Waiting for play state (Au triggered or Initial or Functional card played) -->
+          <div v-else-if="gameState?.status === 'playing' && (!gameState?.last_card || isFunctionalLastCard)" class="flex flex-col items-center gap-4 sm:gap-6 animate-in fade-in zoom-in duration-700">
              <div class="relative group">
                 <div class="absolute -inset-8 bg-emerald-500/10 rounded-full blur-[60px] group-hover:bg-emerald-500/20 transition-all animate-pulse"></div>
                 <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-[32px] sm:rounded-[40px] border-2 border-emerald-500/30 flex items-center justify-center relative z-10 backdrop-blur-md bg-emerald-500/5">
@@ -3227,7 +3144,7 @@ watch(() => gameState.value?.current_player, () => {
                 重新播放
               </button>
               <button
-                @click="router.push(`/replay/${replayHistoryQueryID}${replayScopeAdmin ? '?scope=admin' : ''}`)"
+                @click="router.push(`/replay/${replayHistoryQueryID}`)"
                 class="flex-1 h-11 rounded-xl border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-200 font-black uppercase tracking-widest text-xs hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
               >
                 返回时间线
@@ -3238,119 +3155,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </template>
 
-    <!-- Admin Management Modal -->
-    <div v-if="showAdminModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="feedback.click(); showAdminModal = false"></div>
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-              <ShieldAlert class="w-6 h-6 text-red-500" />
-              权限执行控制
-            </h3>
-            <button @click="feedback.click(); showAdminModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
-              <X class="w-6 h-6 text-slate-400" />
-            </button>
-          </div>
-          <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">Target: {{ adminTargetUser?.nickname || adminTargetUser?.username }} (UID: {{ adminTargetUser?.uid }})</p>
-        </div>
 
-        <div class="p-8 space-y-8">
-          <div class="grid grid-cols-2 gap-4">
-            <button 
-              @click="adminActionType = 'kick'; banReason = '你由于违规游戏而被踢出'"
-              :class="cn(
-                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
-                adminActionType === 'kick' ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
-              )"
-            >
-              <UserMinus class="w-8 h-8 group-hover:scale-110 transition-transform" />
-              <span class="text-xs font-black uppercase tracking-widest">驱逐出场</span>
-            </button>
-            <button 
-              @click="adminActionType = 'ban'; banReason = '你由于违规游戏而被封禁'"
-              :class="cn(
-                'flex flex-col items-center gap-3 p-6 rounded-3xl border transition-all group',
-                adminActionType === 'ban' ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
-              )"
-            >
-              <Ban class="w-8 h-8 group-hover:scale-110 transition-transform" />
-              <span class="text-xs font-black uppercase tracking-widest">限制访问</span>
-            </button>
-          </div>
-
-          <div v-if="adminActionType === 'ban'" class="space-y-4 animate-in slide-in-from-top-4 duration-300">
-            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">封禁时长</label>
-            <div class="grid grid-cols-4 gap-2">
-              <button
-                v-for="preset in banPresets"
-                :key="preset.hours"
-                @click="setBanDuration(preset.hours)"
-                :class="cn(
-                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
-                  selectedBanPreset === preset.hours
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
-                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
-                )"
-              >
-                {{ preset.label }}
-              </button>
-              <button
-                @click="selectedBanPreset = null"
-                :class="cn(
-                  'px-2 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95',
-                  selectedBanPreset === null
-                    ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-sm'
-                    : 'bg-slate-50 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-500 hover:border-red-500/20 hover:text-red-400'
-                )"
-              >
-                自定义
-              </button>
-            </div>
-            <div v-if="selectedBanPreset === null" class="animate-in slide-in-from-top-2 duration-200">
-              <input
-                v-model="banUntil"
-                type="datetime-local"
-                :min="formatDatetimeLocal(new Date())"
-                @focus="handleInputFocus"
-                @blur="handleInputBlur"
-                class="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3 text-sm font-bold text-slate-700 dark:text-white focus:outline-none focus:border-red-500/50 transition-all"
-              />
-            </div>
-            <div class="flex items-center gap-2 ml-1 mt-1">
-              <div class="w-1.5 h-1.5 rounded-full" :class="banUntil ? 'bg-red-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'"></div>
-              <span class="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
-                截止: {{ banUntil ? new Date(banUntil).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) + '（UTC+8）' : '未设置' }}
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest block">操作事由</label>
-            <div class="relative group">
-              <div class="absolute inset-0 bg-red-500/5 rounded-2xl blur-lg group-focus-within:bg-red-500/10 transition-all"></div>
-              <textarea
-                v-model="banReason"
-                placeholder="请输入详细的违规事由..."
-                @focus="handleInputFocus"
-                @blur="handleInputBlur"
-                class="relative w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 text-sm font-medium text-slate-700 dark:text-white focus:outline-none focus:border-red-500/50 min-h-[100px] transition-all"
-              ></textarea>
-            </div>
-          </div>
-
-          <button 
-            @click="handleAdminAction"
-            :class="cn(
-              'w-full h-16 rounded-[24px] font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl active:scale-95',
-              adminActionType === 'kick' ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-amber-500/20' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-500/20'
-            )"
-          >
-            确认执行操作
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- Invite Friends Modal -->
     <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -3530,18 +3335,7 @@ watch(() => gameState.value?.current_player, () => {
                      >
                        <UserPlus class="w-2.5 h-2.5" />
                      </button>
-                     <button v-if="Number(player.uid) !== Number(user.uid) && !isReplayBridgeMode"
-                             @click.stop="handleReportPlayer(player)"
-                             :class="cn('p-0.5 rounded-md transition-all active:scale-90', gameState?.current_player === index ? 'bg-white/20 text-white' : 'bg-slate-200/50 dark:bg-white/5 text-slate-500')"
-                     >
-                       <Flag class="w-2.5 h-2.5" />
-                     </button>
-                     <button v-if="user.is_admin && Number(player.uid) !== Number(user.uid) && !isReplayBridgeMode"
-                             @click.stop="openAdminAction(player)"
-                             :class="cn('p-0.5 rounded-md transition-all active:scale-90', gameState?.current_player === index ? 'bg-white/20 text-white' : 'bg-rose-500/20 text-rose-500')"
-                     >
-                       <ShieldAlert class="w-2.5 h-2.5" />
-                     </button>
+
                   </div>
                </div>
             </div>

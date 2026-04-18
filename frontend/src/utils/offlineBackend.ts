@@ -7,8 +7,8 @@ type User = {
   password: string
   nickname: string
   avatar: string
-  role: 'admin' | 'user'
-  is_admin: boolean
+  role: 'user'
+  is_admin: false
   points: number
   exp: number
   level: number
@@ -104,8 +104,7 @@ type Room = {
   ai_count: number
   enable_ai_backfill: boolean
   ai_backfill_difficulty: number
-  is_ranked: boolean
-  level_range: number
+
   created_by_uid: number
   tutorial_script: boolean
   game_state?: GameState
@@ -1408,8 +1407,9 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
     player.double_action_available = true
   }
 
+  const isSpecial = specialCards.has(normalized)
   const playedCard: PlayedCard = {
-    card: { type: normalized, count: 1, effect: specialCards.has(normalized) ? normalized : undefined },
+    card: { type: normalized, count: 1, effect: isSpecial ? normalized : undefined },
     substance: normalized,
     player_uid: player.uid,
     reactants
@@ -1431,8 +1431,21 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
     game.pending_draw_types.push('+4')
   }
 
+  if (['He', 'Ne', 'Ar', 'Kr'].includes(normalized)) {
+    game.direction *= -1
+  }
+  if (normalized === 'Au') {
+    // Au is a skip card in this implementation
+    game.current_player = nextActivePlayerIndex(game)
+  }
+
   if (player.hand_cards.length === 0) {
     appendFinishedPlayer(game, player.uid)
+  }
+
+  if (isSpecial) {
+    const effectText = normalized === '+2' ? '摸 2 张牌' : (normalized === '+4' ? '摸 4 张牌' : (normalized === 'Au' ? '跳过对方回合' : '反转出牌顺序'))
+    emit('action_toast', { type: 'action_toast', data: `${player.nickname} 使用了 ${normalized} (${effectText})` })
   }
 }
 
@@ -1582,11 +1595,7 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
   const state = readState()
 
   const authed = () => requireAuth(state)
-  const authedAdmin = () => {
-    const user = requireAuth(state)
-    if (!user.is_admin) throw { status: 403, data: { error: 'Admin only in offline mode' } }
-    return user
-  }
+
 
   try {
     if (method === 'GET' && path === '/auth/config') {
@@ -1738,7 +1747,7 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
         id: randomId('room'), name: String(body.name || 'Offline Room'), players: [user.uid], ready_uids: [], countdown: 0, spectators: [], max_players: Number(body.max_players || 4),
         deck_config: clone(deck), status: 'waiting', is_points_mode: Boolean(body.is_points_mode), is_private: Boolean(body.is_private), access_key: body.access_key || '', created_at: nowISO(),
         is_pve: Boolean(body.is_pve), pve_difficulty: Number(body.pve_difficulty || 0), ai_count: Number(body.ai_count || 0), enable_ai_backfill: Boolean(body.enable_ai_backfill),
-        ai_backfill_difficulty: Number(body.ai_backfill_difficulty || 0), is_ranked: Boolean(body.is_ranked), level_range: Number(body.level_range || 5), created_by_uid: user.uid,
+        ai_backfill_difficulty: Number(body.ai_backfill_difficulty || 0), created_by_uid: user.uid,
         tutorial_script: Boolean(body.tutorial_script), room_messages: []
       }
       state.rooms.unshift(room)
@@ -1882,8 +1891,6 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
       const valid = isReactionPair(String(body.r1 || ''), String(body.r2 || ''))
       return { status: 200, data: { can_react: valid, valid } }
     }
-    if (method === 'GET' && path === '/points/leaderboard') return { status: 200, data: clone(state.users).sort((a, b) => b.points - a.points).map(serializeUser) }
-    if (method === 'GET' && path === '/level/leaderboard') return { status: 200, data: clone(state.users).sort((a, b) => b.level - a.level || b.exp - a.exp).map(serializeUser) }
     if (method === 'GET' && path === '/level/info') {
       const user = authed()
       return { status: 200, data: { level: user.level, exp: user.exp, next_level_exp: user.level * 100 } }
@@ -1920,18 +1927,7 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
     if (method === 'GET' && path === '/plugin-cards') return { status: 200, data: [] }
     if (method === 'GET' && path === '/chat/global/history') return { status: 200, data: state.global_messages.slice(-Number(query.limit || 50)) }
     if (method === 'GET' && path.startsWith('/chat/private/history/')) return { status: 200, data: [] }
-    if (method === 'GET' && path === '/admin/rooms/active') {
-      authedAdmin()
-      return { status: 200, data: state.rooms }
-    }
-    if (method === 'POST' && path === '/admin/users/kick') {
-      authedAdmin()
-      return { status: 200, data: { ok: true } }
-    }
-    if (path.startsWith('/admin/')) {
-      authedAdmin()
-      return { status: 200, data: [] }
-    }
+
     return { status: 200, data: [] }
   } catch (error: any) {
     if (error?.status) return error

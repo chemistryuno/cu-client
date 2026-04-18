@@ -18,7 +18,7 @@
           </div>
           <div>
             <h1 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase flex items-center gap-3">
-              Data Hub <span class="text-[8px] font-mono bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30 not-italic">{{ userRole }}</span>
+              Data Hub
             </h1>
             <p class="text-slate-400 dark:text-slate-500 text-[10px] font-bold tracking-widest uppercase mt-0.5">
               核心数据配置与管理中心 / Core configuration center
@@ -115,9 +115,5 @@ try {
   console.error('Failed to parse user in DataConfig:', e)
 }
 
-const userRole = computed(() => {
-  const role = user.role?.toUpperCase() || 'USER'
-  if (role === 'ADMIN' || role === 'CO-WORKER') return `WIKI_CONSOLE [${role}]`
-  return `WIKI_READER`
-})
+const userRole = computed(() => 'WIKI_READER')
 </script>

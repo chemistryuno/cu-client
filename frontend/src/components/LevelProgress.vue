@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { levelAPI } from '../utils/api'
 import LevelBadge from './LevelBadge.vue'
 
 interface LevelInfo {
@@ -19,17 +18,18 @@ const error = ref<string | null>(null)
 
 // 获取等级信息
 async function fetchLevelInfo() {
-  try {
-    loading.value = true
-    const response = await levelAPI.getLevelInfo()
-    levelInfo.value = response.data
-    error.value = null
-  } catch (err: any) {
-    console.error('获取等级信息失败:', err)
-    error.value = err.response?.data?.error || '获取等级信息失败'
-  } finally {
-    loading.value = false
+  loading.value = true
+  // 本地模式：固定显示为初级研究员
+  levelInfo.value = {
+    level: 1,
+    xp: 0,
+    total_xp: 0,
+    tier: 'bronze',
+    tier_name: '初级研究员',
+    next_level_xp: 100,
+    progress_percent: 0
   }
+  loading.value = false
 }
 
 // 格式化数字（添加千分位）

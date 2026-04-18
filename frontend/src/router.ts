@@ -7,14 +7,10 @@ const Register = () => import('./pages/Register.vue')
 const Lobby = () => import('./pages/Lobby.vue')
 const GameRoom = () => import('./pages/GameRoom.vue')
 const Profile = () => import('./pages/Profile.vue')
-const Admin = () => import('./pages/Admin.vue')
-const AdminPlugins = () => import('./pages/AdminPlugins.vue')
-const AdminSurveyResponses = () => import('./pages/AdminSurveyResponses.vue')
 const Plugins = () => import('./pages/Plugins.vue')
 const Reactions = () => import('./pages/Reactions.vue')
 const Feedbacks = () => import('./pages/Feedbacks.vue')
 const Survey = () => import('./pages/Survey.vue')
-const Ranking = () => import('./pages/Ranking.vue')
 const DataConfig = () => import('./pages/DataConfig.vue')
 const Substances = () => import('./pages/Substances.vue')
 const Chat = () => import('./pages/Chat.vue')
@@ -88,30 +84,6 @@ const routes = [
     redirect: '/feedbacks'
   },
   {
-    path: '/admin',
-    name: 'Admin',
-    component: Admin,
-    meta: { requiresAuth: true, coWorkerOnly: true }
-  },
-  {
-    path: '/admin/plugins',
-    name: 'AdminPlugins',
-    component: AdminPlugins,
-    meta: { requiresAuth: true, adminOnly: true }
-  },
-  {
-    path: '/admin/surveys/:id/responses',
-    name: 'AdminSurveyResponses',
-    component: AdminSurveyResponses,
-    meta: { requiresAuth: true, coWorkerOnly: true }
-  },
-  {
-    path: '/admin/:tab',
-    name: 'AdminTab',
-    component: Admin,
-    meta: { requiresAuth: true, coWorkerOnly: true }
-  },
-  {
     path: '/plugins',
     name: 'Plugins',
     component: Plugins,
@@ -133,12 +105,6 @@ const routes = [
     path: '/data/substances',
     name: 'Substances',
     component: Substances,
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/ranking',
-    name: 'Ranking',
-    component: Ranking,
     meta: { requiresAuth: true }
   },
   {
@@ -172,10 +138,6 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
     }
   } else if (to.meta.guestOnly && user) {
     return getSafeInternalRedirect(to.query.redirect, '/')
-  } else if (to.meta.adminOnly && (!user || !user.is_admin)) {
-    return '/'
-  } else if (to.meta.coWorkerOnly && (!user || (user.role !== 'admin' && user.role !== 'co-worker'))) {
-    return '/'
   }
 
   return true
