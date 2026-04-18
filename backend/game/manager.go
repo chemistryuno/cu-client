@@ -1175,10 +1175,11 @@ func handlePointsCalculation(gr *GameRoom) {
 			}
 			for _, bounty := range bounties {
 				if gr.Room.IsDuel && targetUID == gr.Room.TargetUID {
-					if winnerUID == gr.Room.ChallengerUID {
+					switch winnerUID {
+					case gr.Room.ChallengerUID:
 						totalBountyForWinner += bounty.Amount
 						repository.BountyRepo.UpdateStatus(bounty.ID, "claimed")
-					} else if winnerUID == gr.Room.TargetUID {
+					case gr.Room.TargetUID:
 						reward := bounty.Amount / 2
 						totalBountyForWinner += reward
 						repository.BountyRepo.UpdateStatus(bounty.ID, "claimed")
@@ -2214,7 +2215,7 @@ func StartGame(roomID string, uid int) error {
 	if gameRoom.Room.TutorialScript {
 		gameRoom.BroadcastSystemMessage("实验脚本已加载。正在按照教学规程引导研究员进行初次反应。")
 		log.Printf("[教学脚本] 启用脚本化教学模式，使用固定手牌和初始配置")
-		if err := initTutorialGame(gameRoom, roomID); err != nil {
+		if err := initTutorialGame(gameRoom); err != nil {
 			return err
 		}
 		emitGameStart(roomID, gameRoom.GameState)
@@ -2532,7 +2533,7 @@ func StartGame(roomID string, uid int) error {
 }
 
 // initTutorialGame 初始化教学脚本游戏
-func initTutorialGame(gameRoom *GameRoom, roomID string) error {
+func initTutorialGame(gameRoom *GameRoom) error {
 	log.Printf("[教学脚本] 开始初始化教学关卡...")
 
 	// 固定手牌配置
@@ -3180,13 +3181,14 @@ func PlayCard(roomID string, uid int, card models.Card, substance string) error 
 		if gameRoom.Room.IsPointsMode && uid > 0 {
 			rank := len(gameRoom.GameState.FinishedPlayers)
 			earnedPoints := 0
-			if rank == 1 {
+			switch rank {
+			case 1:
 				earnedPoints = 100
-			} else if rank == 2 {
+			case 2:
 				earnedPoints = 50
-			} else if rank == 3 {
+			case 3:
 				earnedPoints = 33
-			} else {
+			default:
 				earnedPoints = 25
 			}
 
@@ -3222,13 +3224,14 @@ func PlayCard(roomID string, uid int, card models.Card, substance string) error 
 	}
 
 	// 3. 处理卡牌效果及回合转移
-	if activeEffect == "+2" || activeEffect == "+4" {
+	switch activeEffect {
+	case "+2", "+4":
 		// 叠加加牌累计
 		gameRoom.GameState.PendingDrawCount += map[string]int{"+2": 2, "+4": 4}[activeEffect]
 		gameRoom.GameState.PendingDrawTypes = append(gameRoom.GameState.PendingDrawTypes, activeEffect)
 		// 传递至下家
 		gameRoom.GameState.CurrentPlayer = getNextPlayer(gameRoom.GameState)
-	} else if activeEffect == "Au" {
+	case "Au":
 		// Au 效果：清空场面且跳过一人
 		gameRoom.GameState.LastCard = nil
 		skippedIdx := getNextPlayer(gameRoom.GameState)
@@ -3248,7 +3251,7 @@ func PlayCard(roomID string, uid int, card models.Card, substance string) error 
 				Data: fmt.Sprintf("Au 金元素触发！跳过研究员 %s，等待 %s 出牌...", skippedPlayer, nextPlayer),
 			})
 		}
-	} else if activeEffect == "skip" {
+	case "skip":
 		// 稀有气体跳过效果
 		skippedIdx := getNextPlayer(gameRoom.GameState)
 		gameRoom.GameState.CurrentPlayer = skippedIdx
@@ -3263,7 +3266,7 @@ func PlayCard(roomID string, uid int, card models.Card, substance string) error 
 				Data: fmt.Sprintf("稀有气体具有稳定性！跳过研究员 %s，轮到 %s 出牌...", skippedPlayer, nextPlayer),
 			})
 		}
-	} else {
+	default:
 		// 转向效果及常规回合转移
 		if activeEffect == "reverse" {
 			gameRoom.GameState.Direction *= -1

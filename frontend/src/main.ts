@@ -4,6 +4,7 @@ import router from './router'
 import { OFFLINE_MODE } from './utils/runtimeConfig'
 import { installOfflineFetchInterceptor } from './utils/offlineBackend'
 import { ensureAuthReady } from './utils/authSession'
+import { initializeI18n } from './utils/i18n'
 import './index.css'
 
 const syncViewportHeight = () => {
@@ -50,6 +51,7 @@ const scheduleNonCriticalTask = (task: () => void, timeout = 1000) => {
 }
 
 async function bootstrap() {
+  initializeI18n()
   if (OFFLINE_MODE) {
     installOfflineFetchInterceptor()
   }

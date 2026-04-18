@@ -1,4 +1,4 @@
-﻿package game
+package game
 
 import (
 	"chemistryuno/backend/database"
@@ -163,6 +163,18 @@ func CanReact(substance1, substance2 string) bool {
 		return true
 	}
 
+	// 优先使用硬编码数据库进行判断
+	if reacts, ok := HardcodedReactions[s1]; ok {
+		if contains(reacts, s2) {
+			return true
+		}
+	}
+	if reacts, ok := HardcodedReactions[s2]; ok {
+		if contains(reacts, s1) {
+			return true
+		}
+	}
+
 	// 完全依赖数据库查询验证反应是否存在
 	// 优势：规则统一存储，易于管理和扩展；支持用户自定义反应
 	if database.DB != nil {
@@ -178,6 +190,15 @@ func CanReact(substance1, substance2 string) bool {
 // 获取能与指定物质反应的所有物质
 func GetReactableSubstances(substance string) []string {
 	var results []string
+
+	// 从硬编码库获取所有可能的反应物
+	if reacts, ok := HardcodedReactions[substance]; ok {
+		for _, r := range reacts {
+			if !contains(results, r) {
+				results = append(results, r)
+			}
+		}
+	}
 
 	// 严格从数据库获取所有允许接续的反应物
 	if database.DB != nil {

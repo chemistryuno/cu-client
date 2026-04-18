@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import PhlogistonIcon from '../icons/PhlogistonIcon.vue'
-import { Shield, Fingerprint, Calendar, Award, User as UserIcon, RefreshCw, Zap, Edit2 } from 'lucide-vue-next'
+import { Fingerprint, Calendar, Award, User as UserIcon, RefreshCw } from 'lucide-vue-next'
 import LevelBadge from '../LevelBadge.vue'
 import UserAvatar from '../UserAvatar.vue'
 import { levelAPI } from '../../utils/api'
+import { useI18n } from '../../utils/i18n'
 
 defineProps<{
   user: any
@@ -12,9 +13,9 @@ defineProps<{
 
 defineEmits<{
   (e: 'changeAvatar'): void
-  (e: 'changeNickname'): void
 }>()
 
+const { t } = useI18n()
 const levelInfo = ref<any>(null)
 
 // 获取等级信息
@@ -56,30 +57,23 @@ onMounted(() => {
       <div class="text-center space-y-1 w-full relative">
         <div class="flex items-center justify-center gap-1.5 mb-0.5">
           <UserIcon class="w-3 h-3 text-blue-500 opacity-50" />
-          <span class="text-[8px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">{{ user.nickname || user.username }} | LOCAL PLAYER</span>
+          <span class="text-[8px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">{{ user.nickname || user.username }} | {{ t('profileHeader.localPlayer') }}</span>
         </div>
         <div class="flex items-center justify-center gap-2 group/nick">
           <h2 class="text-xl font-black tracking-tight text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors uppercase italic truncate px-2 leading-none">
             {{ user.nickname || user.username }}
           </h2>
-          <button 
-            @click="$emit('changeNickname')"
-            class="p-1 px-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-md transition-all text-slate-400 hover:text-blue-500"
-            title="修改昵称"
-          >
-            <Edit2 class="w-2.5 h-2.5" />
-          </button>
         </div>
         <div class="flex items-center justify-center gap-2 pt-1">
           <span class="bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-slate-500/20 flex items-center gap-1 uppercase tracking-widest">
-            <Fingerprint class="w-2 h-2" /> LOCAL PLAYER
+            <Fingerprint class="w-2 h-2" /> {{ t('profileHeader.localPlayer') }}
           </span>
         </div>
       </div>
 
       <div class="w-full mt-4 pt-4 border-t border-slate-200 dark:border-white/5 space-y-2">
         <div class="flex justify-between items-center text-[10px]">
-          <span class="text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><Award class="w-2.5 h-2.5" /> 研究员等级</span>
+          <span class="text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><Award class="w-2.5 h-2.5" /> {{ t('profileHeader.level') }}</span>
           <div v-if="levelInfo" class="flex items-center gap-2">
             <div class="flex-1 h-1 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden min-w-[64px]">
               <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500" :style="{ width: (levelInfo.progress_percent || 0) + '%' }" />
@@ -90,12 +84,12 @@ onMounted(() => {
         </div>
         <div class="flex justify-between items-center text-[10px]">
           <span class="text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-            <PhlogistonIcon :size="10" color="#f59e0b" class="shrink-0" /> 燃素
+            <PhlogistonIcon :size="10" color="#f59e0b" class="shrink-0" /> {{ t('profileHeader.points') }}
           </span>
           <span class="font-black text-slate-900 dark:text-white uppercase font-mono">{{ Math.floor(user.points || 0) }}</span>
         </div>
         <div v-if="user.created_at" class="flex justify-between items-center text-[10px]">
-          <span class="text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><Calendar class="w-2.5 h-2.5" /> 注册时间</span>
+          <span class="text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><Calendar class="w-2.5 h-2.5" /> {{ t('profileHeader.createdAt') }}</span>
           <span class="font-mono text-slate-500 dark:text-slate-400">{{ new Date(user.created_at).toLocaleDateString() }}</span>
         </div>
       </div>

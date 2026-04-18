@@ -292,6 +292,16 @@ const readState = (): State => {
 }
 
 const writeState = (state: State) => localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+const resetOfflineState = () => {
+  turnTimers.forEach((timer) => clearTimeout(timer))
+  aiTimers.forEach((timer) => clearTimeout(timer))
+  turnTimers.clear()
+  aiTimers.clear()
+  const fresh = makeInitialState()
+  writeState(fresh)
+  updateStoredUser(null)
+  return fresh
+}
 const currentUser = (state: State) => state.users.find((u) => u.uid === state.session_uid) || null
 const requireAuth = (state: State) => {
   const user = currentUser(state)
@@ -416,7 +426,11 @@ const getAvailableSubstances = (cards: Card[]) => {
   return formulas.filter((formula) => canFormSubstance(cards, formula))
 }
 
-const serializeUser = (user: User) => ({ ...user, id: user.uid })
+const serializeUser = (user: User) => {
+  const serialized = { ...user, id: user.uid } as Record<string, any>
+  delete serialized.password
+  return serialized
+}
 const getPlayerInfo = (state: State, uid: number) => state.users.find((user) => user.uid === uid)
 const ensureRoom = (state: State, roomId: string) => {
   const room = state.rooms.find((item) => item.id === roomId)
@@ -897,6 +911,10 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
       state.session_uid = null
       writeState(state)
       updateStoredUser(null)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'POST' && path === '/auth/offline-profile/reset') {
+      resetOfflineState()
       return { status: 200, data: { ok: true } }
     }
     if (method === 'POST' && path === '/auth/refresh') {

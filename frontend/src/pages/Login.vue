@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Beaker, Loader2, PencilLine } from 'lucide-vue-next'
+import { Beaker, Globe, Loader2, PencilLine } from 'lucide-vue-next'
 import { authAPI } from '../utils/api'
-import { useDialog } from '../utils/dialog'
 import { completeAuthSuccess } from '../utils/authSession'
 import UserAvatar from '../components/UserAvatar.vue'
 import { AVATAR_PRESETS } from '../utils/avatarPresets'
+import { useI18n } from '../utils/i18n'
 
 const router = useRouter()
-const dialog = useDialog()
+const { locale, t, setLocale } = useI18n()
 
 const nickname = ref('')
 const avatar = ref('flask')
@@ -24,17 +24,17 @@ const handleSubmit = async () => {
   error.value = ''
 
   if (!trimmedNickname) {
-    error.value = '请输入昵称'
+    error.value = t('login.errors.empty')
     return
   }
 
   if (trimmedNickname.length > 20) {
-    error.value = '昵称不能超过 20 个字符'
+    error.value = t('login.errors.tooLong')
     return
   }
 
   if (!nicknameRegex.test(trimmedNickname)) {
-    error.value = '昵称只能包含中英文字母、数字和下划线'
+    error.value = t('login.errors.invalid')
     return
   }
 
@@ -52,19 +52,32 @@ const handleSubmit = async () => {
       replace: true,
     })
   } catch (err: any) {
-    error.value = err.response?.data?.error || '本地玩家资料初始化失败'
+    error.value = err.response?.data?.error || t('login.errors.failed')
   } finally {
     loading.value = false
   }
 }
 
 const randomizeNickname = () => {
-  const seeds = ['元素旅人', '反应学徒', '量子牌手', '轨道漫游者', '催化大师', '分子猎手']
-  nickname.value = `${seeds[Math.floor(Math.random() * seeds.length)]}${Math.floor(Math.random() * 90 + 10)}`
+  if (locale.value === 'zh-CN') {
+    const prefixes = ['元素', '量子', '轨道', '催化', '离子', '星焰', '裂变', '晶格', '燃素', '极光', '反应', '分子']
+    const suffixes = ['旅人', '术士', '猎手', '行者', '学徒', '骑士', '使者', '工匠', '指挥官', '观测者', '调和者', '先驱']
+    const extra = ['甲', '乙', '零', 'X', 'Z', 'Nova', 'Prime']
+    const useExtra = Math.random() > 0.55
+    nickname.value = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${suffixes[Math.floor(Math.random() * suffixes.length)]}${useExtra ? extra[Math.floor(Math.random() * extra.length)] : ''}${Math.floor(Math.random() * 90 + 10)}`
+    return
+  }
+
+  const prefixes = ['Element', 'Quantum', 'Orbital', 'Catalyst', 'Ion', 'Photon', 'Nebula', 'Plasma', 'Nova', 'Rune', 'Echo', 'Fusion']
+  const suffixes = ['Walker', 'Crafter', 'Hunter', 'Voyager', 'Knight', 'Weaver', 'Pilot', 'Striker', 'Sage', 'Smith', 'Spark', 'Rider']
+  const extras = ['X', 'Prime', 'Nova', 'Zero', 'Core', 'Flux']
+  const connector = Math.random() > 0.6 ? '_' : ''
+  const useExtra = Math.random() > 0.5
+  nickname.value = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${connector}${suffixes[Math.floor(Math.random() * suffixes.length)]}${useExtra ? extras[Math.floor(Math.random() * extras.length)] : ''}${Math.floor(Math.random() * 90 + 10)}`
 }
 
 const previewUser = computed(() => ({
-  nickname: nickname.value.trim() || '本地玩家',
+  nickname: nickname.value.trim() || t('common.localPlayer'),
   avatar: avatar.value,
 }))
 </script>
@@ -77,14 +90,40 @@ const previewUser = computed(() => ({
     <div class="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
       <div class="glass-panel-light rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden">
         <div class="p-5 sm:p-6 md:p-7">
+          <div class="flex items-center justify-end mb-3">
+            <div class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 p-1">
+              <button
+                type="button"
+                @click="setLocale('zh-CN')"
+                :class="[
+                  'px-3 py-1.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5',
+                  locale === 'zh-CN' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400'
+                ]"
+              >
+                <Globe class="w-3.5 h-3.5" />
+                {{ t('common.zh') }}
+              </button>
+              <button
+                type="button"
+                @click="setLocale('en-US')"
+                :class="[
+                  'px-3 py-1.5 rounded-xl text-[11px] font-black transition-all',
+                  locale === 'en-US' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400'
+                ]"
+              >
+                {{ t('common.en') }}
+              </button>
+            </div>
+          </div>
+
           <div class="flex flex-col items-center mb-5">
             <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-500">
               <Beaker class="w-6 h-6 text-white" />
             </div>
             <h1 class="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tighter">
-              化学<span class="text-blue-600">UNO</span>
+              Chemistry <span class="text-blue-600">UNO</span>
             </h1>
-            <p class="text-slate-400 dark:text-slate-500 text-xs font-black uppercase tracking-[0.2em] mt-1 font-mono">LOCAL PLAYER SETUP</p>
+            <p class="text-slate-400 dark:text-slate-500 text-xs font-black uppercase tracking-[0.2em] mt-1 font-mono">{{ t('login.setup') }}</p>
           </div>
 
           <div class="mb-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 p-4 flex items-center gap-4">
@@ -92,9 +131,9 @@ const previewUser = computed(() => ({
               <UserAvatar :avatar="previewUser.avatar" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-1">本地玩家预览</p>
+              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-1">{{ t('login.preview') }}</p>
               <p class="text-lg font-black text-slate-900 dark:text-white truncate">{{ previewUser.nickname }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">仅用于本机单人对战与本地战绩</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('login.previewDesc') }}</p>
             </div>
           </div>
 
@@ -105,13 +144,13 @@ const previewUser = computed(() => ({
           <form @submit.prevent="handleSubmit" class="space-y-5">
             <div class="space-y-2">
               <div class="flex items-center justify-between px-1">
-                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">昵称</label>
+                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.nickname') }}</label>
                 <button
                   type="button"
                   @click="randomizeNickname"
                   class="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest"
                 >
-                  随机生成
+                  {{ t('login.random') }}
                 </button>
               </div>
               <div class="relative group">
@@ -124,14 +163,14 @@ const previewUser = computed(() => ({
                   maxlength="20"
                   required
                   class="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 pl-10 pr-3 py-3 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-500/50 text-sm font-bold"
-                  placeholder="输入你的玩家昵称"
+                  :placeholder="t('login.nicknamePlaceholder')"
                 />
               </div>
             </div>
 
             <div class="space-y-3">
               <div class="px-1">
-                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">头像</label>
+                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.avatar') }}</label>
               </div>
               <div class="grid grid-cols-4 sm:grid-cols-6 gap-3">
                 <button
@@ -154,7 +193,7 @@ const previewUser = computed(() => ({
             </div>
 
             <div class="rounded-2xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-4 py-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              本版本为仅单机的玩家 VS AI 模式。昵称、头像、战绩与设置都会保存在当前设备中。
+              {{ t('login.intro') }}
             </div>
 
             <button
@@ -164,10 +203,10 @@ const previewUser = computed(() => ({
             >
               <template v-if="loading">
                 <Loader2 class="w-4 h-4 animate-spin" />
-                初始化中...
+                {{ t('login.submitting') }}
               </template>
               <template v-else>
-                进入单机模式
+                {{ t('login.submit') }}
               </template>
             </button>
           </form>

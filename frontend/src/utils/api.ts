@@ -66,6 +66,7 @@ export const authAPI = {
   register: (data: any) => api.post('/auth/register', data),
   login: (data: any) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
+  resetOfflineProfile: () => api.post('/auth/offline-profile/reset'),
   getAuthConfig: () => api.get('/auth/config'),
   unbindOAuth: (provider: string) => api.post(`/auth/oauth/unbind?provider=${provider}`),
   sendCode: (email: string, type = 'register', recaptcha_token?: string) => api.post('/auth/send-code', { email, type, recaptcha_token }),

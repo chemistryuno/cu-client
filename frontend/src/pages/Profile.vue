@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authAPI } from '../utils/api'
+import { sanitizeStoredUser } from '../utils/authSession'
 import { useDialog } from '../utils/dialog'
 import ProfileHeader from '../components/profile/ProfileHeader.vue'
-import StatsGrid from '../components/profile/StatsGrid.vue'
 import SettingsPanel from '../components/profile/SettingsPanel.vue'
 import CustomDecks from '../components/profile/CustomDecks.vue'
 import MatchHistory from '../components/profile/MatchHistory.vue'
 import ChangeAvatarModal from '../components/profile/ChangeAvatarModal.vue'
+import { useI18n } from '../utils/i18n'
 import { ArrowLeft, FlaskConical, History, LogOut, Menu, Sliders, X as CloseIcon } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
-const { showAlert, showConfirm, showPrompt } = useDialog()
+const { showAlert, showConfirm } = useDialog()
+const { locale, t } = useI18n()
 
 let initialUser: any = {}
 try {
@@ -32,11 +34,9 @@ const showChangeAvatar = ref(false)
 const loading = ref(false)
 
 const categories = [
-  { id: 'overview', name: '数据概览', icon: LayoutDashboard },
-  { id: 'space', name: '玩家资料', icon: UserIcon },
-  { id: 'research', name: '本地牌组', icon: FlaskConical },
-  { id: 'history', name: '对局记录', icon: History },
-  { id: 'settings', name: '外观偏好', icon: Sliders },
+  { id: 'research', name: 'profile.categories.research', icon: FlaskConical },
+  { id: 'history', name: 'profile.categories.history', icon: History },
+  { id: 'settings', name: 'profile.categories.settings', icon: Sliders },
 ]
 
 const categoryIDs = categories.map((cat) => cat.id)
@@ -75,48 +75,16 @@ watch(() => route.params.tab, () => {
   syncCategoryFromRoute()
 }, { immediate: true })
 
-const userStats = computed(() => {
-  const total = user.value.total_games || 0
-  const wins = user.value.win_count || 0
-  return {
-    totalGames: total,
-    winRate: total > 0 ? Math.round((wins / total) * 100) : 0,
-  }
-})
-
 const fetchLatestUserInfo = async () => {
   try {
     const response = await authAPI.getUserInfo()
-    user.value = response.data
-    localStorage.setItem('user', JSON.stringify(response.data))
+    const sanitized = sanitizeStoredUser(response.data)
+    user.value = sanitized || {}
+    if (sanitized) {
+      localStorage.setItem('user', JSON.stringify(sanitized))
+    }
   } catch (error) {
     console.error('获取用户信息失败:', error)
-  }
-}
-
-const nicknameRegex = /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/
-
-const handleUpdateNickname = async () => {
-  const newNickname = await showPrompt('请输入新的玩家昵称:', user.value.nickname, '修改昵称')
-  if (newNickname === null || newNickname === user.value.nickname) return
-
-  if (newNickname.length > 20) {
-    showAlert('昵称不能超过 20 位。', '格式错误')
-    return
-  }
-
-  if (!nicknameRegex.test(newNickname)) {
-    showAlert('昵称只能包含中英文字母、数字和下划线。', '格式错误')
-    return
-  }
-
-  try {
-    await authAPI.updateProfile({ nickname: newNickname })
-    user.value.nickname = newNickname
-    localStorage.setItem('user', JSON.stringify(user.value))
-    showAlert('玩家昵称已更新。', '变更成功')
-  } catch (error: any) {
-    showAlert(error.response?.data?.error || '更新昵称失败', '错误')
   }
 }
 
@@ -124,26 +92,26 @@ const handleChangeAvatar = async (newAvatar: string) => {
   loading.value = true
   try {
     await authAPI.updateAvatar(newAvatar)
-    const updatedUser = { ...user.value, avatar: newAvatar }
+    const updatedUser = sanitizeStoredUser({ ...user.value, avatar: newAvatar }) || {}
     localStorage.setItem('user', JSON.stringify(updatedUser))
     user.value = updatedUser
     showChangeAvatar.value = false
-    await showAlert('头像更新成功。', '同步完成')
+    await showAlert(locale.value === 'zh-CN' ? '头像更新成功。' : 'Avatar updated successfully.', locale.value === 'zh-CN' ? '同步完成' : 'Updated')
   } catch (error: any) {
-    showAlert(error.response?.data?.error || '更新头像失败', '错误')
+    showAlert(error.response?.data?.error || (locale.value === 'zh-CN' ? '更新头像失败' : 'Failed to update avatar'), locale.value === 'zh-CN' ? '错误' : 'Error')
   } finally {
     loading.value = false
   }
 }
 
 const handleResetLocalPlayer = async () => {
-  const confirmed = await showConfirm('确定要重设当前本地玩家资料吗？这会返回资料设置页。', '重设本地资料')
+  const confirmed = await showConfirm(t('profile.resetProfileConfirm'), t('profile.resetTitle'))
   if (!confirmed) return
 
   try {
-    await authAPI.logout()
+    await authAPI.resetOfflineProfile()
   } catch (error) {
-    console.error('Failed to clear offline session:', error)
+    console.error('Failed to reset offline profile:', error)
   } finally {
     localStorage.removeItem('user')
     localStorage.removeItem('token')
@@ -174,7 +142,7 @@ onMounted(() => {
       ]"
     >
       <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-        <span class="font-black text-xs tracking-[0.2em] text-slate-400">LOCAL_PROFILE</span>
+        <span class="font-black text-xs tracking-[0.2em] text-slate-400">{{ t('profile.title') }}</span>
         <button @click="isSidebarOpen = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg">
           <CloseIcon class="w-4 h-4" />
         </button>
@@ -192,7 +160,7 @@ onMounted(() => {
           ]"
         >
           <component :is="cat.icon" class="w-4 h-4" />
-          <span class="text-sm">{{ cat.name }}</span>
+          <span class="text-sm">{{ t(cat.name) }}</span>
         </button>
 
         <div class="pt-4 mt-4 border-t border-slate-100 dark:border-white/5">
@@ -201,7 +169,7 @@ onMounted(() => {
             class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm text-red-500 hover:bg-red-500/10"
           >
             <LogOut class="w-4 h-4" />
-            <span>重设本地资料</span>
+            <span>{{ t('profile.resetProfile') }}</span>
           </button>
         </div>
       </nav>
@@ -215,11 +183,11 @@ onMounted(() => {
           </button>
           <div class="lg:hidden">
             <button @click="isSidebarOpen = true" class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500">
-              <Menu class="w-3.5 h-3.5" /> NAV
+              <Menu class="w-3.5 h-3.5" /> {{ t('common.localProfile') }}
             </button>
           </div>
           <div class="hidden md:block">
-            <h1 class="text-2xl font-black tracking-tighter uppercase italic text-slate-800 dark:text-white">本地玩家档案 <span class="text-blue-500 font-mono text-[10px] not-italic ml-2 opacity-50">/ LOCAL_PROFILE</span></h1>
+            <h1 class="text-2xl font-black tracking-tighter uppercase italic text-slate-800 dark:text-white">{{ t('profile.title') }} <span class="text-blue-500 font-mono text-[10px] not-italic ml-2 opacity-50">/ LOCAL_PROFILE</span></h1>
           </div>
         </div>
 
@@ -236,35 +204,17 @@ onMounted(() => {
             ]"
           >
             <component :is="cat.icon" class="w-3.5 h-3.5" />
-            <span class="text-[9px] font-black uppercase tracking-tight mt-0.5">{{ cat.name }}</span>
+            <span class="text-[9px] font-black uppercase tracking-tight mt-0.5">{{ t(cat.name) }}</span>
           </button>
         </div>
       </div>
 
       <div class="flex flex-col lg:flex-row gap-6 items-start">
         <div class="w-full lg:w-[320px] space-y-5 shrink-0 lg:sticky lg:top-6">
-          <ProfileHeader :user="user" @change-avatar="showChangeAvatar = true" @change-nickname="handleUpdateNickname" />
-          <StatsGrid :stats="userStats" />
+          <ProfileHeader :user="user" @change-avatar="showChangeAvatar = true" />
         </div>
 
         <div class="flex-1 w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div v-if="currentCategory === 'overview'" class="space-y-6">
-            <LevelProgress />
-            <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-              <h3 class="text-base font-black uppercase tracking-widest mb-5 flex items-center gap-2 text-slate-400">
-                <Award class="w-4 h-4 transition-colors group-hover:text-blue-500" />
-                本地成就 <span class="text-[10px] font-mono opacity-30">/ ACHIEVEMENTS</span>
-              </h3>
-              <div class="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-2xl bg-slate-50 dark:bg-white/[0.02]">
-                <Award class="w-10 h-10 text-slate-300 dark:text-slate-700 mb-3 opacity-30" />
-                <p class="text-slate-400 font-medium italic text-xs uppercase tracking-widest">Local progress only</p>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="currentCategory === 'space'" class="space-y-6">
-            <PersonalSpacePanel :user="user" @update="fetchLatestUserInfo" />
-          </div>
 
           <div v-if="currentCategory === 'research'">
             <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
@@ -283,7 +233,7 @@ onMounted(() => {
             <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
               <button @click="handleResetLocalPlayer" class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border border-red-500/20">
                 <LogOut class="w-4 h-4" />
-                重设本地玩家资料
+                {{ t('profile.resetProfile') }}
               </button>
             </div>
           </div>

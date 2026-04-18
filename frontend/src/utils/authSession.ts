@@ -34,8 +34,18 @@ const fetchWithTimeout = async (url: string, init: RequestInit = {}, timeoutMs =
   }
 }
 
+export const sanitizeStoredUser = (value: any): StoredUser => {
+  if (!value || typeof value !== 'object') return null
+  const normalized = { ...value }
+  delete normalized.password
+  if (normalized.id && !normalized.uid) {
+    normalized.uid = normalized.id
+  }
+  return normalized
+}
+
 const normalizeUser = (payload: any): StoredUser => {
-  const user = payload?.user ?? payload
+  const user = sanitizeStoredUser(payload?.user ?? payload)
   return user && (user.nickname || user.uid || user.id) ? user : null
 }
 
@@ -52,7 +62,7 @@ export const getStoredUser = (): StoredUser => {
   if (!rawUser) return null
 
   try {
-    return JSON.parse(rawUser)
+    return sanitizeStoredUser(JSON.parse(rawUser))
   } catch (error) {
     console.error('[Auth] Failed to parse stored user', error)
     localStorage.removeItem('user')
@@ -61,7 +71,12 @@ export const getStoredUser = (): StoredUser => {
 }
 
 export const setAuthenticatedUser = (user: any, dispatchEvent = true) => {
-  localStorage.setItem('user', JSON.stringify(user))
+  const sanitized = sanitizeStoredUser(user)
+  if (!sanitized) {
+    localStorage.removeItem('user')
+  } else {
+    localStorage.setItem('user', JSON.stringify(sanitized))
+  }
   if (dispatchEvent) {
     dispatchAuthChanged()
   }

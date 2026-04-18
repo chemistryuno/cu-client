@@ -2,7 +2,6 @@ package game
 
 import (
 	"testing"
-	"time"
 
 	"chemistryuno/backend/models"
 )
@@ -19,8 +18,6 @@ func TestLeaveRoom_ObserverPromotion(t *testing.T) {
 			Spectators: []int{2},
 			ReadyUIDs:  []int{},
 		},
-		GameState: nil,
-		OfflineAt: make(map[int]time.Time),
 	}
 
 	// 玩家1离开，观战者2应该升级为玩家
@@ -73,8 +70,6 @@ func TestLeaveRoom_NoDuplicateInPlayers(t *testing.T) {
 			Spectators: []int{2, 3}, // 注意：玩家2也在观战者列表中（错误状态）
 			ReadyUIDs:  []int{},
 		},
-		GameState: nil,
-		OfflineAt: make(map[int]time.Time),
 	}
 
 	// 模拟升级逻辑
@@ -200,7 +195,6 @@ func TestSpectatorsSync(t *testing.T) {
 			},
 			CurrentPlayer: 0,
 		},
-		OfflineAt: make(map[int]time.Time),
 	}
 
 	// 模拟观战者3升级为玩家（在waiting状态）
@@ -243,7 +237,6 @@ func BenchmarkLeaveRoomPromotion(b *testing.B) {
 			Spectators: make([]int, 0, 100),
 			Players:    []*models.PlayerState{{UID: 1, Username: "p1"}},
 		},
-		OfflineAt: make(map[int]time.Time),
 	}
 
 	// 添加大量观战者

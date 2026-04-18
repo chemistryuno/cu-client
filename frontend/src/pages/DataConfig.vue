@@ -54,10 +54,10 @@
             </div>
             <h2 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase">反应方程式库</h2>
             <p class="text-slate-500 dark:text-slate-500 text-xs leading-relaxed font-medium">
-              查看或管理游戏中允许的所有化学反应。审核、编辑或提交新的反应方程，这是游戏规则的核心。
+              查看游戏中允许的所有化学反应。当前玩家模式仅提供只读浏览，不提供审核、编辑或提交流程。
             </p>
             <div class="pt-4 flex items-center gap-2 group-hover:translate-x-3 transition-transform duration-500 text-emerald-600 dark:text-emerald-400">
-              <span class="text-[10px] font-black uppercase tracking-widest">进入配置界面</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">进入查看界面</span>
               <ArrowRight class="w-4 h-4" />
             </div>
           </div>
@@ -78,10 +78,10 @@
             </div>
             <h2 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase">物质百科全书</h2>
             <p class="text-slate-500 dark:text-slate-500 text-xs leading-relaxed font-medium">
-              查阅或定义化学物质。你可以提交新发现的物质化学式，系统会自动分析涉及的元素需求。
+              查阅游戏中的化学物质与名称映射。当前玩家模式仅提供只读浏览，不提供提交流程。
             </p>
             <div class="pt-4 flex items-center gap-2 group-hover:translate-x-3 transition-transform duration-500 text-blue-600 dark:text-blue-400">
-              <span class="text-[10px] font-black uppercase tracking-widest">进入配置界面</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">进入查看界面</span>
               <ArrowRight class="w-4 h-4" />
             </div>
           </div>
