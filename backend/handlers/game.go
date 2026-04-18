@@ -6,11 +6,8 @@ import (
 	"chemistryuno/backend/repository"
 	"chemistryuno/backend/websocket"
 	"encoding/json"
-	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -127,42 +124,7 @@ func CreateRoom(c *gin.Context) {
 	go game.BroadcastRoomsUpdate()
 }
 
-// 加入房间
-func JoinRoom(c *gin.Context) {
-	roomID := c.Param("id")
-	uid := c.GetInt("uid")
-	isAdmin := c.GetBool("is_admin")
 
-	// 从查询参数获取访问密钥和观战模式
-	accessKey := c.Query("key")
-	asSpectator := c.Query("spectator") == "true" || c.Query("spectator") == "1"
-
-	// 如果是以玩家身份加入，检查是否已经在其他房间
-	if !asSpectator {
-		currentRoomID := game.GetUserRoomID(uid)
-		if currentRoomID != "" && currentRoomID != roomID {
-			c.JSON(http.StatusConflict, gin.H{
-				"error":   "您正在另一个实验室进行实验，请先完成或离开当前房间",
-				"room_id": currentRoomID,
-			})
-			return
-		}
-	}
-
-	err := game.JoinRoomWithKeyAsSpectator(roomID, uid, accessKey, asSpectator, isAdmin)
-	if err != nil {
-		if err.Error() == "房间不存在" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		}
-		return
-	}
-
-	broadcastPlayerJoint(roomID)
-	go game.BroadcastRoomsUpdate() // 广播房间列表更新
-	c.JSON(http.StatusOK, gin.H{"message": "加入房间成功"})
-}
 
 // 离开房间
 func LeaveRoom(c *gin.Context) {
@@ -438,155 +400,9 @@ func DoublePlay(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "双联反应发动成功！"})
 }
 
-// InitiateDuel 发起单挑
-func InitiateDuel(c *gin.Context) {
-	var req struct {
-		TargetUID int `json:"target_uid" binding:"required"`
-	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
-		return
-	}
 
-	challengerUID := c.GetInt("uid")
-	challengerName := ""
-	challengerNickname := "玩家"
 
-	// 获取挑战者完整信息
-	cUser, err := repository.UserRepo.FindByUID(uint(challengerUID))
-	if err == nil && cUser != nil {
-		challengerName = cUser.Username
-		challengerNickname = cUser.Nickname
-	}
-
-	if challengerUID == req.TargetUID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "不能挑战自己"})
-		return
-	}
-
-	// 1. 检查目标是否空闲
-	if !game.IsPlayerIdle(req.TargetUID) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "目标用户正在游戏中，请稍后再试"})
-		return
-	}
-
-	// 2. 检查目标是否存在且在线
-	if websocket.GlobalHub == nil || !websocket.GlobalHub.IsUIDOnline(req.TargetUID) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "目标用户不在线"})
-		return
-	}
-
-	// 获取目标用户信息
-	user, err := repository.UserRepo.FindByUID(uint(req.TargetUID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "目标用户不存在"})
-		return
-	}
-	targetName := user.Username
-	targetNickname := user.Nickname
-
-	// 生成挑战 ID
-	challengeID := fmt.Sprintf("challenge_%d_%d", time.Now().Unix(), rand.Intn(1000))
-
-	// 存储挑战信息 (临时使用同步锁或管理类)
-	// 这里我们直接在 game 包里处理逻辑，或者在这里手动维护
-	// 为了简单，我们先在 InitiateDuel 发送一个 invite 消息
-
-	msg := websocket.Message{
-		Type: "duel_invite",
-		Data: gin.H{
-			"challenge_id":        challengeID,
-			"challenger_uid":      challengerUID,
-			"challenger_name":     challengerName,
-			"challenger_nickname": challengerNickname,
-			"target_name":         targetName,
-			"target_nickname":     targetNickname,
-			"timeout":             20,
-		},
-	}
-
-	// 发送给被挑战者
-	websocket.GlobalHub.SendToUID(req.TargetUID, msg)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "挑战邀请已发送",
-		"challenge_id": challengeID,
-	})
-}
-
-// RespondToDuel 响应单挑邀请
-func RespondToDuel(c *gin.Context) {
-	var req struct {
-		TargetUID int  `json:"target_uid" binding:"required"` // 发起挑战的人 (这里的 Target 是指请求的目标，即 Challenger)
-		Accept    bool `json:"accept"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
-		return
-	}
-
-	responderUID := c.GetInt("uid")
-	responderName := ""
-	responderNickname := "玩家" // 默认
-
-	// 获取完整用户信息以获取昵称
-	user, err := repository.UserRepo.FindByUID(uint(responderUID))
-	if err == nil && user != nil {
-		responderName = user.Username
-		responderNickname = user.Nickname
-	}
-
-	challengerUID := req.TargetUID
-
-	if !req.Accept {
-		// 通知挑战者被拒绝
-		websocket.GlobalHub.SendToUID(challengerUID, websocket.Message{
-			Type: "duel_declined",
-			Data: gin.H{
-				"uid":      responderUID,
-				"nickname": responderNickname,
-			},
-		})
-		c.JSON(http.StatusOK, gin.H{"message": "已拒绝挑战"})
-		return
-	}
-
-	// 检查双方是否仍然空闲且在线
-	if !game.IsPlayerIdle(responderUID) || !game.IsPlayerIdle(challengerUID) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "某方已进入游戏"})
-		return
-	}
-
-	if !websocket.GlobalHub.IsUIDOnline(challengerUID) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "挑战者已离线"})
-		return
-	}
-
-	// 获取挑战者名称
-	var challengerName string
-	if user, err := repository.UserRepo.FindByUID(uint(challengerUID)); err == nil {
-		challengerName = user.Username
-	}
-
-	// 创建单挑房间
-	room, err := game.StartDuel(challengerUID, challengerName, responderUID, responderName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 通知双方进入
-	msg := websocket.Message{
-		Type:   "duel_start",
-		RoomID: room.ID,
-	}
-	websocket.GlobalHub.SendToUID(challengerUID, msg)
-	websocket.GlobalHub.SendToUID(responderUID, msg)
-
-	c.JSON(http.StatusOK, gin.H{"message": "挑战已接受", "room_id": room.ID})
-}
 
 // GetReactionHints 获取基于场上物质的反应提示
 func GetReactionHints(c *gin.Context) {
