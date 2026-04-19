@@ -144,6 +144,13 @@ export const authAPI = {
   removeWebAuthnCredential: (id: string) => api.delete(`/user/webauthn/credentials/${id}`)
 }
 
+export const levelAPI = {
+  getLevelInfo: () => api.get('/level/info'),
+  getUserLevelInfo: (uid: number) => api.get(`/level/user/${uid}`),
+  getLeaderboard: () => api.get('/level/leaderboard'),
+  getConfigs: () => api.get('/level/configs')
+}
+
 export const gameAPI = {
   getRooms: async () => {
     const key = 'rooms_list'

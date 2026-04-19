@@ -9,7 +9,7 @@ import { vibrationEngine, VibrationPattern, VibrationPreset } from './vibrationE
 class FeedbackManager {
   private soundEnabled = true
   private vibrationEnabled = true
-  private volume = 0.3
+  private volume = 0.15
 
   /**
    * 初始化
@@ -46,8 +46,8 @@ class FeedbackManager {
 
     this.soundEnabled = soundSetting !== 'false' // 默认启用
     this.vibrationEnabled = vibrationSetting !== 'false' // 默认启用
-    const parsedVolume = volumeSetting ? parseFloat(volumeSetting) : 0.3
-    this.volume = Number.isFinite(parsedVolume) ? parsedVolume : 0.3
+    const parsedVolume = volumeSetting ? parseFloat(volumeSetting) : 0.15
+    this.volume = Number.isFinite(parsedVolume) ? parsedVolume : 0.15
 
     audioEngine.setEnabled(this.soundEnabled)
     audioEngine.setVolume(this.volume)
