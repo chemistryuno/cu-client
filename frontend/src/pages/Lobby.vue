@@ -2,11 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authAPI, gameAPI } from '../utils/api'
-import { sanitizeStoredUser } from '../utils/authSession'
+import { clearClientAuthState, getStoredUser, sanitizeStoredUser } from '../utils/authSession'
 import { useDialog } from '../utils/dialog'
 import UserAvatar from '../components/UserAvatar.vue'
 import TutorialGuide from '../components/TutorialGuide.vue'
-import { Beaker, BookOpen, Bot, Database, Loader2, LogOut, Play, Settings, Swords, X, FileText } from 'lucide-vue-next'
+import { Beaker, Bot, Database, Loader2, LogOut, Play, Settings, Swords, X, FileText } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { useI18n } from '../utils/i18n'
 import '../styles/lobby.css'
@@ -219,23 +219,14 @@ const handleResetLocalPlayer = async () => {
   } catch (error) {
     console.error('Failed to reset offline profile:', error)
   } finally {
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    clearClientAuthState()
     router.replace('/login')
   }
 }
 
 
 onMounted(() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem('user') || '{}')
-    if (raw?.id && !raw?.uid) raw.uid = raw.id
-    user.value = raw
-  } catch {
-    user.value = {}
-  }
+  user.value = getStoredUser() || {}
 
   void loadUserInfo()
   void loadRooms()

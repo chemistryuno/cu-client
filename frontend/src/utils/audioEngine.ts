@@ -19,9 +19,11 @@ export type SoundType =
   | 'special'        // 特殊效果
   | 'level-up'       // 升级
 
+export const DEFAULT_FEEDBACK_VOLUME = 0.15
+
 export class AudioEngine {
   private context: AudioContext | null = null
-  private volume: number = 0.3
+  private volume: number = DEFAULT_FEEDBACK_VOLUME
   private enabled: boolean = true
 
   /**

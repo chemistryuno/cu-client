@@ -132,12 +132,13 @@
 import { ref, onMounted } from 'vue'
 import { Settings, X, Volume2, VolumeX, Smartphone, SmartphoneNfc, Play } from 'lucide-vue-next'
 import feedback from '../utils/feedback'
+import { DEFAULT_FEEDBACK_VOLUME } from '../utils/audioEngine'
 
 const showPanel = ref(false)
 const settings = ref({
   soundEnabled: true,
   vibrationEnabled: true,
-  volume: 0.15
+  volume: DEFAULT_FEEDBACK_VOLUME
 })
 
 onMounted(() => {

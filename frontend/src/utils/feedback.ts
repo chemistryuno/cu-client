@@ -3,13 +3,13 @@
  * 协调音效引擎和振动引擎，提供统一的反馈接口
  */
 
-import { audioEngine, SoundType } from './audioEngine'
+import { audioEngine, DEFAULT_FEEDBACK_VOLUME, SoundType } from './audioEngine'
 import { vibrationEngine, VibrationPattern, VibrationPreset } from './vibrationEngine'
 
 class FeedbackManager {
   private soundEnabled = true
   private vibrationEnabled = true
-  private volume = 0.15
+  private volume = DEFAULT_FEEDBACK_VOLUME
 
   /**
    * 初始化
@@ -46,8 +46,8 @@ class FeedbackManager {
 
     this.soundEnabled = soundSetting !== 'false' // 默认启用
     this.vibrationEnabled = vibrationSetting !== 'false' // 默认启用
-    const parsedVolume = volumeSetting ? parseFloat(volumeSetting) : 0.15
-    this.volume = Number.isFinite(parsedVolume) ? parsedVolume : 0.15
+    const parsedVolume = volumeSetting ? parseFloat(volumeSetting) : DEFAULT_FEEDBACK_VOLUME
+    this.volume = Number.isFinite(parsedVolume) ? parsedVolume : DEFAULT_FEEDBACK_VOLUME
 
     audioEngine.setEnabled(this.soundEnabled)
     audioEngine.setVolume(this.volume)

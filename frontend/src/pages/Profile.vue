@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authAPI } from '../utils/api'
-import { sanitizeStoredUser } from '../utils/authSession'
+import { clearClientAuthState, getStoredUser, sanitizeStoredUser } from '../utils/authSession'
 import { useDialog } from '../utils/dialog'
 import ProfileHeader from '../components/profile/ProfileHeader.vue'
 import SettingsPanel from '../components/profile/SettingsPanel.vue'
@@ -17,18 +17,8 @@ const route = useRoute()
 const { showAlert, showConfirm } = useDialog()
 const { locale, t } = useI18n()
 
-let initialUser: any = {}
-try {
-  initialUser = JSON.parse(localStorage.getItem('user') || '{}')
-  if (initialUser.id && !initialUser.uid) {
-    initialUser.uid = initialUser.id
-  }
-} catch {
-  initialUser = {}
-}
-
-const user = ref<any>(initialUser)
-const currentCategory = ref('research')
+const user = ref<any>(getStoredUser() || {})
+const currentCategory = ref('settings')
 const isSidebarOpen = ref(false)
 const showChangeAvatar = ref(false)
 const loading = ref(false)
@@ -117,10 +107,7 @@ const handleResetLocalPlayer = async () => {
   } catch (error) {
     console.error('Failed to reset offline profile:', error)
   } finally {
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    clearClientAuthState()
     router.replace('/login')
   }
 }

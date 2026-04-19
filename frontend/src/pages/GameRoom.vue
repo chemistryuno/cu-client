@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { OFFLINE_MODE } from '../utils/runtimeConfig'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
 import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/api'
@@ -42,6 +43,10 @@ const gameState = ref<any>(null)
 const roomInfo = ref<any>(null)
 const playersInfo = ref<any[]>([])
 const friendsList = ref<any[]>([])
+const friendMap = computed(() => {
+  const entries = friendsList.value.map((friend) => [Number(friend.uid), friend] as const)
+  return new Map(entries)
+})
 const availableSubstances = ref<string[]>([])
 
 // 教学模式检测
@@ -217,7 +222,7 @@ const handleToggleReady = async () => {
 }
 
 const isFriend = (uid: number) => {
-  return friendsList.value?.some(f => Number(f.uid) === Number(uid)) ?? false
+  return friendMap.value.has(Number(uid))
 }
 
 // 获取玩家显示名称（优先显示备注）
@@ -230,7 +235,7 @@ const getPlayerDisplayName = (player: any) => {
   }
 
   // 查找好友备注
-  const friend = friendsList.value?.find(f => Number(f.uid) === Number(player.uid))
+  const friend = friendMap.value.get(Number(player.uid))
   if (friend?.remark) {
     return friend.remark
   }
@@ -242,7 +247,7 @@ const getPlayerDisplayName = (player: any) => {
 // 检查是否应该用蓝色显示（有备注的好友）
 const shouldShowInBlue = (player: any) => {
   if (!player) return false
-  const friend = friendsList.value?.find(f => Number(f.uid) === Number(player.uid))
+  const friend = friendMap.value.get(Number(player.uid))
   return !!(friend?.remark)
 }
 
@@ -1612,16 +1617,16 @@ onMounted(() => {
     }
   }, 15000)
 
-  // 加载好友列表，添加错误处理
-  friendAPI.getFriends()
-    .then(res => {
-      friendsList.value = res.data || []
-    })
-    .catch(err => {
-      console.error('Failed to load friends list:', err)
-      friendsList.value = [] // 确保失败时也初始化为空数组
-      // 继续加载游戏状态，即使好友列表加载失败
-    })
+  if (!OFFLINE_MODE) {
+    void friendAPI.getFriends()
+      .then(res => {
+        friendsList.value = res.data || []
+      })
+      .catch(err => {
+        console.error('Failed to load friends list:', err)
+        friendsList.value = []
+      })
+  }
 
   loadGameState()
     .then(() => {
