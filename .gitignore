@@ -70,3 +70,4 @@ frontend/dev.log
 frontend/.vite/
 frontend/.capacitor/
 coverage/
+.codex/
