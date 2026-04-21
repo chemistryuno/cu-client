@@ -6,7 +6,7 @@
       <div class="absolute inset-0 opacity-20 brightness-50 contrast-150" />
     </div>
 
-    <div class="max-w-7xl mx-auto relative z-10">
+    <div class="max-w-7xl mx-auto relative z-10" data-testid="reactions-page">
       <header class="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8">
         <div class="flex items-center gap-6">
           <div class="relative group">

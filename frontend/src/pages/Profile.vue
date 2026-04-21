@@ -118,7 +118,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-white selection:bg-blue-500/30">
+  <div class="min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-white selection:bg-blue-500/30" data-testid="profile-page">
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
       <div class="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[120px]" />
       <div class="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[120px]" />
@@ -142,6 +142,7 @@ onMounted(() => {
         <button
           v-for="cat in categories"
           :key="cat.id"
+          :data-testid="`profile-nav-${cat.id}`"
           @click="switchCategory(cat.id, true)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm"
           :class="[
@@ -186,6 +187,7 @@ onMounted(() => {
           <button
             v-for="cat in categories"
             :key="cat.id"
+            :data-testid="`profile-tab-${cat.id}`"
             @click="switchCategory(cat.id)"
             class="flex flex-col items-center justify-center min-w-[90px] py-2 px-4 rounded-xl transition-all"
             :class="[

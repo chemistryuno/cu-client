@@ -2349,16 +2349,16 @@ watch(() => gameState.value?.current_player, () => {
 
         <!-- Global Status -->
         <div class="flex items-center gap-2 sm:gap-1.5 pl-3 border-l border-slate-200 dark:border-white/10 shrink-0">
-          <button @click="feedback.click(); showPlayers = !showPlayers" class="btn-touch relative flex items-center justify-center gap-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+          <button data-testid="game-players-toggle" @click="feedback.click(); showPlayers = !showPlayers" class="btn-touch relative flex items-center justify-center gap-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <Users class="icon-touch" :class="showPlayers && 'fill-current text-blue-500'" />
              <span class="text-[10px] sm:text-xs-mobile font-black text-slate-400">{{ allPlayers.length }}</span>
           </button>
 
-           <button v-if="!roomInfo?.is_points_mode && !isReplayBridgeMode" @click="feedback.click(); showHints = !showHints" class="btn-touch flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+           <button v-if="!roomInfo?.is_points_mode && !isReplayBridgeMode" data-testid="game-hints-toggle" @click="feedback.click(); showHints = !showHints" class="btn-touch flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <Sparkles class="icon-touch" :class="showHints && 'fill-current text-blue-500'" />
           </button>
 
-           <button v-if="!isReplayBridgeMode" @click="feedback.click(); showChat = !showChat; hasNewMessage = false" class="btn-touch relative flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+           <button v-if="!isReplayBridgeMode" data-testid="game-chat-toggle" @click="feedback.click(); showChat = !showChat; hasNewMessage = false" class="btn-touch relative flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <MessageCircle class="icon-touch" :class="showChat && 'fill-current text-blue-500'" />
              <div v-if="hasNewMessage" class="absolute -top-1 -right-1 w-3 h-3 sm:w-2.5 sm:h-2.5 bg-rose-500 border-2 border-white dark:border-[#0d0d10] rounded-full animate-pulse"></div>
           </button>
@@ -2428,6 +2428,7 @@ watch(() => gameState.value?.current_player, () => {
           <div class="flex items-center bg-white/90 dark:bg-black/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl sm:rounded-lg p-1 sm:p-0.5 shadow-xl">
             <input
               v-model="substanceInput"
+              data-testid="game-substance-input"
               @keyup.enter="handleInputPlay"
               @focus="handleInputFocus"
               @blur="handleInputBlur"
@@ -2439,6 +2440,7 @@ watch(() => gameState.value?.current_player, () => {
 
             <div class="flex items-center gap-1">
                <button
+                  data-testid="game-play-button"
                   @click="handleInputPlay"
                   class="btn-touch bg-blue-600 hover:bg-blue-500 rounded-lg sm:rounded-md flex items-center justify-center transition-all touch-feedback shadow-md group"
                   title="执行反应"
@@ -2450,6 +2452,7 @@ watch(() => gameState.value?.current_player, () => {
 
                <button
                   v-if="!tutorialScriptMode"
+                  data-testid="game-draw-button"
                   @click="handleDrawCard"
                   :disabled="!isMyTurn"
                   :class="cn(
@@ -2646,6 +2649,7 @@ watch(() => gameState.value?.current_player, () => {
                       <button
                          v-for="(hint, idx) in filteredReactionHints"
                          :key="idx"
+                         :data-testid="`reaction-hint-${idx}`"
                          @click="selectedSubstance = hint.substance; handlePlayCard()"
                          class="w-full text-left px-3 py-2 bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:border-emerald-500 hover:bg-emerald-500/5 transition-all group cursor-pointer"
                       >
@@ -2785,6 +2789,7 @@ watch(() => gameState.value?.current_player, () => {
 
                   <!-- Compact Ready Button -->
                   <button
+                    data-testid="game-ready-button"
                     @click="handleToggleReady"
                     :class="cn(
                       'px-6 sm:px-8 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-[0.2em] transition-all duration-500 shadow-lg relative overflow-hidden active:scale-95 text-white',

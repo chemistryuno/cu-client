@@ -10,6 +10,7 @@ export function useGameUI() {
   const showHints = ref(true)
   const showPlayers = ref(false)
   const showChat = ref(false)
+  const showAdminModal = ref(false)
   const showInviteFriendsModal = ref(false)
   const showDeckDetailModal = ref(false)
   const showChemicalKeyboard = ref(false)

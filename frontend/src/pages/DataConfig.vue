@@ -6,7 +6,7 @@
       <div class="absolute inset-0 bg-[url('/noise.svg')] opacity-20 brightness-50 contrast-150" />
     </div>
 
-    <div class="max-w-6xl mx-auto relative z-10">
+    <div class="max-w-6xl mx-auto relative z-10" data-testid="data-config-page">
       <!-- 头部 -->
       <header class="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8">
         <div class="flex items-center gap-6">
@@ -40,8 +40,9 @@
       <!-- 导航卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- 反应方程式 -->
-        <router-link 
-          to="/data/reactions" 
+        <router-link
+          to="/data/reactions"
+          data-testid="data-nav-reactions"
           class="group relative overflow-hidden bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-2xl hover:border-emerald-500/30 transition-all duration-500"
         >
           <div class="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -64,8 +65,9 @@
         </router-link>
 
         <!-- 物质百科 -->
-        <router-link 
-          to="/data/substances" 
+        <router-link
+          to="/data/substances"
+          data-testid="data-nav-substances"
           class="group relative overflow-hidden bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-2xl hover:border-blue-500/30 transition-all duration-500"
         >
           <div class="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">

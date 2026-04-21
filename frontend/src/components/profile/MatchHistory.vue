@@ -40,7 +40,7 @@ const openReplay = (game: any) => {
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-5" data-testid="match-history-panel">
     <div class="flex items-center justify-between">
       <h3 class="text-base font-black italic uppercase text-slate-800 dark:text-white flex items-center gap-4">
         <History class="w-5 h-5 text-cyan-500" />
@@ -116,6 +116,7 @@ const openReplay = (game: any) => {
 
           <button
             v-if="game.has_replay"
+            :data-testid="`history-replay-${game.id}`"
             @click="openReplay(game)"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 text-[11px] font-black hover:bg-cyan-500/20 transition-colors"
           >

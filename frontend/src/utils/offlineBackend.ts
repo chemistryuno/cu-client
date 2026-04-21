@@ -1,14 +1,5 @@
 import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
-import {
-  chatRepository,
-  deckRepository,
-  feedbackRepository,
-  friendRepository,
-  historyRepository,
-  sessionRepository,
-  stateRepository,
-  userRepository,
-} from './clientRepositories'
+import { sessionRepository, stateRepository, userRepository } from './clientRepositories'
 import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage, removeClientRuntimeKeys } from './clientRuntimeStorage'
 import type {
   Card,
@@ -17,7 +8,6 @@ import type {
   DispatchResult,
   FeedbackItem,
   GameState,
-  History,
   PlayerState,
   PlayedCard,
   Room,
@@ -1820,6 +1810,28 @@ const sendOfflineChat = (payload: { uid: number; nickname: string; username: str
     return
   }
   emit('chat', { type: 'chat', uid: payload.uid, message: payload.message, data: { nickname: payload.nickname, username: payload.username, avatar: payload.avatar } })
+}
+
+export const seedOfflineTestState = (partial: Partial<State>) => {
+  const baseState = readState()
+  const nextState: State = {
+    ...baseState,
+    ...partial,
+    users: partial.users || baseState.users,
+    decks: partial.decks || baseState.decks,
+    rooms: partial.rooms || baseState.rooms,
+    histories: partial.histories || baseState.histories,
+    feedbacks: partial.feedbacks || baseState.feedbacks,
+    friends: partial.friends || baseState.friends,
+    global_messages: partial.global_messages || baseState.global_messages,
+  }
+  writeState(nextState)
+  return clone(nextState)
+}
+
+export const resetOfflineTestState = () => {
+  const nextState = resetOfflineState()
+  return clone(nextState)
 }
 
 export const offlineSocket = {

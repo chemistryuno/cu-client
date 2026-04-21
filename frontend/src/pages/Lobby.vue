@@ -237,7 +237,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lobby-page">
+  <div class="lobby-page" data-testid="lobby-page">
     <div class="lobby-bg-decor">
       <div class="lobby-bg-decor-blob-1"></div>
       <div class="lobby-bg-decor-blob-2"></div>
@@ -255,7 +255,7 @@ onMounted(() => {
           </div>
 
           <div class="flex items-center gap-3">
-            <div data-tutorial="user-chip" @click="router.push('/profile')" class="user-identity-chip cursor-pointer">
+            <div data-tutorial="user-chip" data-testid="lobby-user-chip" @click="router.push('/profile')" class="user-identity-chip cursor-pointer">
               <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center text-base shadow-inner overflow-hidden border border-slate-200 dark:border-white/5">
                 <UserAvatar :avatar="user.avatar" />
               </div>
@@ -266,10 +266,10 @@ onMounted(() => {
             </div>
 
             <div data-tutorial="desktop-nav" class="hidden md:flex items-center gap-2">
-              <button @click="router.push('/data')" class="lobby-nav-link" title="数据库查看">
+              <button data-testid="lobby-data-button" @click="router.push('/data')" class="lobby-nav-link" title="数据库查看">
                 <Database class="w-4 h-4" />
               </button>
-              <button @click="router.push('/profile/settings')" class="lobby-nav-link" :title="t('profile.categories.settings')">
+              <button data-testid="lobby-settings-button" @click="router.push('/profile/settings')" class="lobby-nav-link" :title="t('profile.categories.settings')">
                 <Settings class="w-4 h-4" />
               </button>
             </div>
@@ -366,11 +366,11 @@ onMounted(() => {
               </div>
 
               <div class="flex flex-wrap gap-4">
-                <button @click="showAIArenaModal = true" data-tutorial="ai-arena" class="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
+                <button @click="showAIArenaModal = true" data-tutorial="ai-arena" data-testid="lobby-ai-arena-button" class="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
                   <Play class="w-5 h-5 fill-current" />
                   <span>{{ t('lobby.aiArena') }}</span>
                 </button>
-                <button @click="createTutorialMatch" class="px-8 py-4 bg-slate-800 dark:bg-white/10 hover:bg-slate-700 dark:hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-3 border border-white/5">
+                <button @click="createTutorialMatch" data-testid="lobby-tutorial-button" class="px-8 py-4 bg-slate-800 dark:bg-white/10 hover:bg-slate-700 dark:hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-3 border border-white/5">
                   <BookOpen class="w-5 h-5" />
                   <span>{{ t('lobby.tutorial') }}</span>
                 </button>
@@ -414,12 +414,13 @@ onMounted(() => {
           </button>
         </div>
 
-        <form @submit.prevent="handleCreateAIRoom" class="flex flex-col min-h-0">
+        <form @submit.prevent="handleCreateAIRoom" class="flex flex-col min-h-0" data-testid="ai-room-form">
           <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
             <div class="space-y-3">
               <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">{{ t('lobby.modal.roomName') }}</label>
               <input
                 v-model="roomName"
+                data-testid="ai-room-name-input"
                 type="text"
                 :placeholder="t('lobby.modal.roomNamePlaceholder')"
                 class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500/20"
@@ -503,7 +504,7 @@ onMounted(() => {
 
           <div class="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex gap-3 shrink-0">
             <button type="button" @click="showAIArenaModal = false" class="flex-1 px-4 py-3 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-500">{{ t('common.cancel') }}</button>
-            <button type="submit" :disabled="loading" class="flex-[2] px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button type="submit" data-testid="ai-room-start-button" :disabled="loading" class="flex-[2] px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
               <span>{{ t('lobby.modal.start') }}</span>
             </button>

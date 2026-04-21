@@ -1,8 +1,8 @@
 ## 1. Runtime foundation
 
-- [ ] 1.1 Inventory `frontend/src/utils/api.ts` endpoints and map them into auth, data, game, and admin client runtime modules
-- [ ] 1.2 Create a shared client runtime service layer and keep `api.ts` as a compatibility facade during migration
-- [ ] 1.3 Define shared domain models, command/result types, and error contracts used by runtime services and UI callers
+- [x] 1.1 Inventory `frontend/src/utils/api.ts` endpoints and map them into auth, data, game, and admin client runtime modules
+- [x] 1.2 Create a shared client runtime service layer and keep `api.ts` as a compatibility facade during migration
+- [x] 1.3 Define shared domain models, command/result types, and error contracts used by runtime services and UI callers
 
 ## 2. Local persistence and migration
 

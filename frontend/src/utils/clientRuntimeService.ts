@@ -1,7 +1,7 @@
 import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { getClientRuntimeModule } from './clientRuntimeRoutes'
 import type { RuntimeRequest, RuntimeResult } from './clientRuntimeTypes'
-import { dispatchOfflineRequest } from './offlineBackend'
+import { dispatchOfflineRequest, resetOfflineTestState, seedOfflineTestState } from './offlineBackend'
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
@@ -46,6 +46,11 @@ export const clientRuntimeAxiosAdapter: AxiosAdapter = async (config) => {
     throwAxiosError(config, result)
   }
   return toAxiosResponse(config, result)
+}
+
+export const clientRuntimeTestHooks = {
+  resetState: resetOfflineTestState,
+  seedState: seedOfflineTestState,
 }
 
 export const installClientRuntimeFetchInterceptor = () => {

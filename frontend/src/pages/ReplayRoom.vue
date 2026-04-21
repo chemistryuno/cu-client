@@ -458,7 +458,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30">
+  <div class="h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30" data-testid="replay-page">
     <header class="px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-white/90 dark:bg-black/30 backdrop-blur-md flex items-center justify-between">
       <div class="flex items-center gap-3">
         <button @click="goBackToEntryPage" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest">

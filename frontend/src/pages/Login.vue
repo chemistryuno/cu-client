@@ -141,12 +141,13 @@ const previewUser = computed(() => ({
             {{ error }}
           </div>
 
-          <form @submit.prevent="handleSubmit" class="space-y-5">
+          <form @submit.prevent="handleSubmit" class="space-y-5" data-testid="login-form">
             <div class="space-y-2">
               <div class="flex items-center justify-between px-1">
                 <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.nickname') }}</label>
                 <button
                   type="button"
+                  data-testid="login-randomize-button"
                   @click="randomizeNickname"
                   class="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest"
                 >
@@ -159,6 +160,7 @@ const previewUser = computed(() => ({
                 </div>
                 <input
                   v-model="nickname"
+                  data-testid="login-nickname-input"
                   type="text"
                   maxlength="20"
                   required
@@ -176,6 +178,7 @@ const previewUser = computed(() => ({
                 <button
                   v-for="item in avatarOptions"
                   :key="item"
+                  :data-testid="`avatar-option-${item}`"
                   type="button"
                   @click="avatar = item"
                   :class="[
@@ -198,6 +201,7 @@ const previewUser = computed(() => ({
 
             <button
               type="submit"
+              data-testid="login-submit-button"
               :disabled="loading"
               class="w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-2xl font-black transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm"
             >

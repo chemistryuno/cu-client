@@ -20,6 +20,8 @@
     "android:build:release": "node scripts/android-build-release.cjs",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "copy-dist": "node -e \"const fs=require('fs'),path=require('path');const src='dist',dst='../backend/static/dist';if(fs.existsSync(dst))fs.rmSync(dst,{recursive:true});fs.mkdirSync(path.dirname(dst),{recursive:true});fs.cpSync(src,dst,{recursive:true});console.log('✓ 前端文件已复制到 backend/static/dist')\""
   },
   "dependencies": {
@@ -49,6 +51,7 @@
     "terser": "^5.46.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
-    "wait-on": "^9.0.5"
+    "wait-on": "^9.0.5",
+    "@playwright/test": "^1.54.2"
   }
 }
