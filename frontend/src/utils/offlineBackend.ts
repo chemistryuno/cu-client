@@ -1,181 +1,33 @@
 import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
+import {
+  chatRepository,
+  deckRepository,
+  feedbackRepository,
+  friendRepository,
+  historyRepository,
+  sessionRepository,
+  stateRepository,
+  userRepository,
+} from './clientRepositories'
+import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage, removeClientRuntimeKeys } from './clientRuntimeStorage'
+import type {
+  Card,
+  ChatMessage,
+  Deck,
+  DispatchResult,
+  FeedbackItem,
+  GameState,
+  History,
+  PlayerState,
+  PlayedCard,
+  Room,
+  RoomMessage,
+  State,
+  User,
+} from './clientRuntimeTypes'
 import { TUTORIAL_INITIAL_STATE } from './tutorialScript'
 
-type User = {
-  uid: number
-  username: string
-  password: string
-  nickname: string
-  avatar: string
-  role: 'user'
-  is_admin: false
-  points: number
-  exp: number
-  level: number
-  created_at: string
-  sound_volume?: number
-  vibration_enabled?: boolean
-  enable_element_input?: boolean
-  custom_contact?: string
-  bio?: string
-  qq?: string
-  wechat?: string
-  email?: string
-  show_email?: boolean
-}
-
-type Deck = {
-  id: number
-  name: string
-  is_global: boolean
-  cards: Record<string, number>
-  initial_cards: number
-  created_by: number
-  created_at: string
-}
-
-type Card = { type: string; count: number; effect?: string }
-type PlayedCard = { card: Card; substance: string; player_uid: number; reactants?: string[] }
-type PlayerState = {
-  uid: number
-  username: string
-  nickname: string
-  avatar: string
-  hand_cards: Card[]
-  card_count: number
-  is_ready: boolean
-  double_action_available: boolean
-  action_progress: number
-  is_ai: boolean
-  is_offline?: boolean
-}
-
-type GameState = {
-  room_id: string
-  players: PlayerState[]
-  spectators: number[]
-  finished_players: number[]
-  current_player: number
-  direction: number
-  last_card: PlayedCard | null
-  discard_pile: PlayedCard[]
-  original_player_count: number
-  quitted_count: number
-  status: 'playing' | 'finished'
-  is_points_mode: boolean
-  turn_end_time: number
-  pending_draw_count: number
-  pending_draw_types: string[]
-  allowed_any_player: number
-  points_changes: Record<number, number>
-  xp_changes: Record<number, number>
-  current_reaction: string
-  tutorial_script_mode: boolean
-  tutorial_current_step: number
-  pending_forced_plays: number
-  draw_pile: Card[]
-}
-
-type RoomMessage = {
-  uid: number
-  username: string
-  nickname: string
-  avatar: string
-  message: string
-  created_at: string
-}
-
-type Room = {
-  id: string
-  name: string
-  players: number[]
-  ready_uids: number[]
-  countdown: number
-  spectators: number[]
-  max_players: number
-  deck_config: Deck
-  status: 'waiting' | 'playing' | 'finished'
-  is_points_mode: boolean
-  is_private: boolean
-  access_key: string
-  created_at: string
-  is_pve: boolean
-  pve_difficulty: number
-  ai_count: number
-  enable_ai_backfill: boolean
-  ai_backfill_difficulty: number
-
-  created_by_uid: number
-  tutorial_script: boolean
-  game_state?: GameState
-  room_messages: RoomMessage[]
-}
-
-type History = {
-  id: number
-  room_id: string
-  winner_uid: number | null
-  winner_name: string
-  is_invalid: boolean
-  invalid_reason: string
-  has_replay: boolean
-  replay_events: any[]
-  replay_permanent: boolean
-  replay_expires_at: string | null
-  replay_cleared_at: string | null
-  cheat_detected: boolean
-  cheat_uids: number[]
-  players: number[]
-  original_player_count: number
-  quitted_count: number
-  finished_players: number[]
-  started_at: string
-  finished_at: string
-  created_at: string
-}
-
-type FeedbackItem = {
-  id: number
-  uid: number
-  content: string
-  type: string
-  status: string
-  created_at: string
-}
-
-type ChatMessage = {
-  user_uid: number
-  username: string
-  nickname: string
-  avatar: string
-  message: string
-  created_at: string
-}
-
-type FriendLink = {
-  uid: number
-  friend_uid: number
-  remark?: string
-}
-
-type State = {
-  users: User[]
-  session_uid: number | null
-  next_uid: number
-  next_deck_id: number
-  next_history_id: number
-  next_feedback_id: number
-  decks: Deck[]
-  rooms: Room[]
-  histories: History[]
-  feedbacks: FeedbackItem[]
-  friends: FriendLink[]
-  global_messages: ChatMessage[]
-}
-
-type DispatchResult = { status: number; data: any }
-
-const STORAGE_KEY = 'chemistry-uno-offline-state-v2'
+const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
 const eventBus = new EventTarget()
 const turnTimers = new Map<string, number>()
@@ -987,32 +839,22 @@ const makeInitialState = (): State => ({
 })
 
 const readState = (): State => {
-  const raw = localStorage.getItem(STORAGE_KEY)
   const seeded = makeInitialState()
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
-    return seeded
-  }
-  try {
-    const parsed = JSON.parse(raw) as Partial<State>
-    return {
-      ...seeded,
-      ...parsed,
-      rooms: parsed.rooms || [],
-      histories: parsed.histories || [],
-      feedbacks: parsed.feedbacks || [],
-      friends: parsed.friends || [],
-      decks: parsed.decks || seeded.decks,
-      users: parsed.users || seeded.users,
-      global_messages: parsed.global_messages || seeded.global_messages
-    }
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
-    return seeded
+  const parsed = stateRepository.read(seeded) as Partial<State>
+  return {
+    ...seeded,
+    ...parsed,
+    rooms: parsed.rooms || [],
+    histories: parsed.histories || [],
+    feedbacks: parsed.feedbacks || [],
+    friends: parsed.friends || [],
+    decks: parsed.decks || seeded.decks,
+    users: parsed.users || seeded.users,
+    global_messages: parsed.global_messages || seeded.global_messages
   }
 }
 
-const writeState = (state: State) => localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+const writeState = (state: State) => stateRepository.write(state)
 const resetOfflineState = () => {
   turnTimers.forEach((timer) => clearTimeout(timer))
   aiTimers.forEach((timer) => clearTimeout(timer))
@@ -1022,20 +864,19 @@ const resetOfflineState = () => {
   // Clear all known storage keys for a truly fresh start
   const keysToRemove = [
     STORAGE_KEY,
-    'user',
-    'token',
-    'access_token',
-    'refresh_token',
-    'theme'
+    CLIENT_RUNTIME_STORAGE_KEYS.user,
+    CLIENT_RUNTIME_STORAGE_KEYS.token,
+    CLIENT_RUNTIME_STORAGE_KEYS.accessToken,
+    CLIENT_RUNTIME_STORAGE_KEYS.refreshToken,
+    CLIENT_RUNTIME_STORAGE_KEYS.theme,
   ]
-  keysToRemove.forEach(key => localStorage.removeItem(key))
+  removeClientRuntimeKeys(keysToRemove)
 
-  // Broad sweep for any chemistry-uno related keys (tutorials, volume, etc.)
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
+  for (let i = 0; i < clientRuntimeStorage.length; i++) {
+    const key = clientRuntimeStorage.key(i)
     if (key && key.startsWith('chemistry-uno-')) {
-      localStorage.removeItem(key)
-      i-- // Adjust index after removal
+      clientRuntimeStorage.removeItem(key)
+      i -= 1
     }
   }
 
@@ -1044,7 +885,7 @@ const resetOfflineState = () => {
   writeState(initialState)
   return initialState
 }
-const currentUser = (state: State) => state.users.find((u) => u.uid === state.session_uid) || null
+const currentUser = (state: State) => userRepository.current(state)
 const requireAuth = (state: State) => {
   const user = currentUser(state)
   if (!user) throw { status: 401, data: { error: 'Not logged in' } }
@@ -1595,20 +1436,17 @@ const updateStoredUser = (user: User | null) => {
     const serialized = serializeUser(user)
     delete (serialized as Record<string, any>).password
     delete (serialized as Record<string, any>).username
-    localStorage.setItem('user', JSON.stringify(serialized))
-    localStorage.setItem('token', 'offline-token')
-    localStorage.setItem('access_token', 'offline-access-token')
-    localStorage.setItem('refresh_token', 'offline-refresh-token')
+    clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.user, JSON.stringify(serialized))
+    clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.token, 'offline-token')
+    clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.accessToken, 'offline-access-token')
+    clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.refreshToken, 'offline-refresh-token')
   } else {
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    sessionRepository.clearStoredTokens()
   }
   window.dispatchEvent(new Event('auth-changed'))
 }
 
-const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
+export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResult => {
   const method = String(config.method || 'get').toUpperCase()
   const url = new URL(config.url || '/', 'http://offline.local')
   const path = url.pathname.replace(/^\/api/, '') || '/'
@@ -1640,7 +1478,7 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
     if (method === 'POST' && path === '/auth/register') {
-      return dispatchRequest({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
+      return dispatchOfflineRequest({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
     }
     if (method === 'POST' && path === '/auth/login') {
       const nickname = String(body.nickname || body.identifier || body.username || '').trim()
@@ -1955,7 +1793,7 @@ const dispatchRequest = (config: AxiosRequestConfig): DispatchResult => {
 
 export const offlineAxiosAdapter: AxiosAdapter = async (config) => {
   await sleep(30)
-  const result = dispatchRequest(config)
+  const result = dispatchOfflineRequest(config)
   if (result.status >= 400) failure(config, result.status, result.data)
   return success(config, result.data, result.status)
 }
@@ -1971,7 +1809,7 @@ export const installOfflineFetchInterceptor = () => {
     const url = new URL(requestUrl, window.location.origin)
     if (!url.pathname.startsWith('/api/')) return g.__offlineOriginalFetch!(input as any, init)
 
-    const result = dispatchRequest({ url: url.pathname + url.search, method: init?.method || 'GET', data: init?.body })
+    const result = dispatchOfflineRequest({ url: url.pathname + url.search, method: init?.method || 'GET', data: init?.body })
     return new Response(JSON.stringify(result.data), { status: result.status, headers: { 'Content-Type': 'application/json' } })
   }
 }

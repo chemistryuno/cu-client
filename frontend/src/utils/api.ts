@@ -1,8 +1,8 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios'
 import router from '../router'
 import { API_BASE_URL, OFFLINE_MODE } from './runtimeConfig'
-import { offlineAxiosAdapter } from './offlineBackend'
 import { clearClientAuthState } from './authSession'
+import { clientRuntimeAxiosAdapter } from './clientRuntimeService'
 
 interface CacheEntry {
   data: any
@@ -45,7 +45,7 @@ const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   withCredentials: true,
-  adapter: OFFLINE_MODE ? offlineAxiosAdapter : undefined
+  adapter: OFFLINE_MODE ? clientRuntimeAxiosAdapter : undefined
 })
 
 api.interceptors.response.use(

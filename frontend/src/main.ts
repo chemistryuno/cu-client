@@ -2,8 +2,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { OFFLINE_MODE } from './utils/runtimeConfig'
-import { installOfflineFetchInterceptor } from './utils/offlineBackend'
 import { ensureAuthReady } from './utils/authSession'
+import { installClientRuntimeFetchInterceptor } from './utils/clientRuntimeService'
 import { initializeI18n } from './utils/i18n'
 import './index.css'
 
@@ -53,7 +53,7 @@ const scheduleNonCriticalTask = (task: () => void, timeout = 1000) => {
 async function bootstrap() {
   initializeI18n()
   if (OFFLINE_MODE) {
-    installOfflineFetchInterceptor()
+    installClientRuntimeFetchInterceptor()
   }
   scheduleViewportSync()
   window.addEventListener('resize', scheduleViewportSync, { passive: true })
