@@ -7,8 +7,68 @@ export const LOCAL_STORAGE_KEYS = {
   offlineState: 'chemistry-uno-offline-state-v2',
 } as const
 
+export type RuntimeHostMode = 'browser' | 'electron' | 'capacitor'
+
 const resolveRuntimeStateStorageKey = (keys: string[], targetKey: string) => {
   return keys.find((key) => key === targetKey || key.endsWith(`:${targetKey}`)) || targetKey
+}
+
+export const getExpectedRuntimeStateKey = (host: RuntimeHostMode) => {
+  if (host === 'electron') return `chemistry-uno-electron-runtime:${LOCAL_STORAGE_KEYS.offlineState}`
+  if (host === 'capacitor') return `chemistry-uno-capacitor-runtime:${LOCAL_STORAGE_KEYS.offlineState}`
+  return LOCAL_STORAGE_KEYS.offlineState
+}
+
+export const simulateRuntimeHost = async (page: Page, host: RuntimeHostMode) => {
+  await page.addInitScript(({ hostMode }) => {
+    const win = window as Window & typeof globalThis & {
+      process?: { versions?: { electron?: string } }
+      Capacitor?: { isNativePlatform?: () => boolean }
+    }
+
+    if (hostMode === 'electron') {
+      win.process = {
+        versions: {
+          electron: '41.2.0',
+        },
+      }
+      delete win.Capacitor
+      return
+    }
+
+    if (hostMode === 'capacitor') {
+      win.Capacitor = {
+        isNativePlatform: () => true,
+      }
+      delete win.process
+      return
+    }
+
+    delete win.Capacitor
+    delete win.process
+  }, { hostMode: host })
+}
+
+export const callOfflineApi = async (page: Page, path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', payload?: unknown) => {
+  return page.evaluate(async ({ requestPath, requestMethod, requestPayload }) => {
+    const response = await fetch(`/api${requestPath}`, {
+      method: requestMethod,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: requestPayload === undefined ? undefined : JSON.stringify(requestPayload),
+    })
+    const data = await response.json().catch(() => null)
+    return {
+      status: response.status,
+      data,
+    }
+  }, {
+    requestPath: path,
+    requestMethod: method,
+    requestPayload: payload,
+  })
 }
 
 export const resetRuntimeState = async (page: Page) => {
@@ -69,7 +129,7 @@ export const completeLobbyTutorial = async (page: Page) => {
 export const seedReplayHistory = async (page: Page, nickname = 'ReplayUser') => {
   await page.evaluate(({ stateKey, replayKey, userName }) => {
     const keys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(Boolean) as string[]
-    const resolvedStateKey = keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey
+    const resolvedStateKey = (keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey)
     const raw = window.localStorage.getItem(resolvedStateKey)
     if (!raw) return
     const state = JSON.parse(raw)
@@ -112,7 +172,7 @@ export const seedReplayHistory = async (page: Page, nickname = 'ReplayUser') => 
 export const setCurrentUserRole = async (page: Page, role: 'user' | 'co_worker' | 'admin') => {
   return page.evaluate(({ stateKey, targetRole }) => {
     const keys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(Boolean) as string[]
-    const resolvedStateKey = keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey
+    const resolvedStateKey = (keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey)
     const rawState = window.localStorage.getItem(resolvedStateKey)
     if (!rawState) return false
 

@@ -31,5 +31,5 @@
 ## 6. Integration and rollout
 
 - [x] 6.1 Rewire existing pages to consume client runtime services without requiring remote backend availability
-- [ ] 6.2 Validate browser, Electron, and Capacitor startup, persistence, room flow, replay flow, and admin flow in frontend-only mode
+- [x] 6.2 Validate browser, Electron, and Capacitor startup, persistence, room flow, replay flow, and admin flow in frontend-only mode
 - [x] 6.3 Remove or disable remaining frontend runtime dependencies on Go backend endpoints once core workflows are covered
