@@ -1,6 +1,15 @@
 import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { sessionRepository, stateRepository, userRepository } from './clientRepositories'
-import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage, removeClientRuntimeKeys } from './clientRuntimeStorage'
+import {
+  announcementRepository,
+  configRepository,
+  leaderboardRepository,
+  reactionRepository,
+  sessionRepository,
+  stateRepository,
+  substanceRepository,
+  userRepository,
+} from './clientRepositories'
+import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage, getClientRuntimeHost, removeClientRuntimeKeys } from './clientRuntimeStorage'
 import type {
   Card,
   ChatMessage,
@@ -12,6 +21,7 @@ import type {
   PlayedCard,
   Room,
   RoomMessage,
+  RuntimeSessionMetadata,
   State,
   User,
 } from './clientRuntimeTypes'
@@ -765,14 +775,138 @@ const reactionPairs: Record<string, string> = {
   'P|S': '2P + 5S = P₂S₅',
   'S|Zn': 'Zn + S = ZnS',
 }
+const OFFLINE_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
-
-const announcements = [{ id: 1, title: 'Offline Mode', content: 'Running fully offline with local data only.', type: 'info', is_ticker: false, is_persistent: true }]
+const defaultAnnouncements = [{ id: 1, title: 'Offline Mode', content: 'Running fully offline with local data only.', type: 'info', is_ticker: false, is_persistent: true }]
 const hints = [
   { id: 1, content: 'Offline mode is active. Everything stays on this device.' },
   { id: 2, content: 'Use AI Arena in the lobby for quick local matches.' },
   { id: 3, content: 'No backend server is required in this build.' }
 ]
+
+const buildDefaultSubstances = () => Object.keys(substanceNames).map((formula, index) => ({
+  id: index + 1,
+  formula,
+  name: substanceNames[formula],
+  elements: formula,
+  status: 'approved',
+  group_id: null,
+  needs_improvement: false,
+  has_invalid_elements: false,
+  creator_uid: 0,
+  creator_name: 'offline',
+  created_at: nowISO(),
+}))
+
+const buildDefaultReactions = () => Object.entries(reactionPairs).map(([pair, formula], index) => {
+  const [r1, r2] = pair.split('|')
+  return {
+    id: index + 1,
+    r1,
+    r2,
+    display: formula,
+    status: 'approved',
+    creator_uid: 0,
+    creator_name: 'offline',
+    has_invalid_elements: false,
+    created_at: nowISO(),
+  }
+})
+
+const defaultLevelConfigs = {
+  level_step_exp: 100,
+  level_cap: 100,
+  offline_mode: true,
+}
+
+const buildSessionContext = (): Omit<RuntimeSessionMetadata, 'id' | 'uid' | 'created_at' | 'last_active' | 'expires_at' | 'revoked_at'> => ({
+  user_agent: navigator.userAgent || 'offline-runtime',
+  ip: '127.0.0.1',
+  host: getClientRuntimeHost(),
+  mode: 'offline',
+})
+
+const isTrustedLocalHost = (host: ReturnType<typeof getClientRuntimeHost>) => host === 'electron' || host === 'capacitor'
+
+const isSecuritySensitivePath = (path: string) => (
+  path === '/auth/send-code' ||
+  path === '/auth/reset-password' ||
+  path === '/auth/2fa/verify' ||
+  path === '/auth/2fa/reset-password' ||
+  path.startsWith('/auth/webauthn/') ||
+  path.startsWith('/user/2fa/') ||
+  path.startsWith('/user/webauthn/') ||
+  path === '/user/change-email' ||
+  path === '/user/set-email'
+)
+
+const buildSecurityGateResponse = (path: string) => {
+  const host = getClientRuntimeHost()
+  const trusted = isTrustedLocalHost(host)
+  const trustLevel = trusted ? 'trusted-local-host' : 'browser-untrusted'
+
+  if (!trusted) {
+    return {
+      status: 403,
+      data: {
+        error: 'This security-sensitive flow is blocked in browser-only offline mode. Use a trusted host runtime.',
+        code: 'OFFLINE_TRUST_REQUIRED',
+        path,
+        host,
+        trust_level: trustLevel,
+      },
+    }
+  }
+
+  return {
+    status: 501,
+    data: {
+      error: 'This security-sensitive flow requires host security bridges that are not wired in the current local runtime.',
+      code: 'HOST_SECURITY_BRIDGE_UNAVAILABLE',
+      path,
+      host,
+      trust_level: trustLevel,
+    },
+  }
+}
+
+const nextNumericId = (items: Array<{ id?: number | string }>) => {
+  return items.reduce((maxId, item) => {
+    const id = Number(item.id)
+    if (!Number.isFinite(id)) return maxId
+    return Math.max(maxId, id)
+  }, 0) + 1
+}
+
+const parseBooleanQueryValue = (value: string | undefined) => {
+  if (value === 'true' || value === '1') return true
+  if (value === 'false' || value === '0') return false
+  return null
+}
+
+const readRuntimeReactions = () => reactionRepository.read(buildDefaultReactions())
+const writeRuntimeReactions = (records: Array<Record<string, any>>) => reactionRepository.write(records)
+
+const readRuntimeSubstances = () => substanceRepository.read(buildDefaultSubstances())
+const writeRuntimeSubstances = (records: Array<Record<string, any>>) => substanceRepository.write(records)
+
+const paginateRecords = <T>(items: T[], page: number, pageSize: number) => {
+  const normalizedPage = Math.max(1, page)
+  const normalizedPageSize = Math.max(1, pageSize)
+  const total = items.length
+  const totalPages = Math.max(1, Math.ceil(total / normalizedPageSize))
+  const safePage = Math.min(normalizedPage, totalPages)
+  const offset = (safePage - 1) * normalizedPageSize
+  return {
+    items: items.slice(offset, offset + normalizedPageSize),
+    pagination: {
+      page: safePage,
+      page_size: normalizedPageSize,
+      total,
+      total_pages: totalPages,
+    }
+  }
+}
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 const nowISO = () => new Date().toISOString()
@@ -876,9 +1010,57 @@ const resetOfflineState = () => {
   return initialState
 }
 const currentUser = (state: State) => userRepository.current(state)
+
+const ensureCurrentSession = (user: User) => {
+  sessionRepository.pruneExpired(nowMs())
+  const currentSessionId = sessionRepository.getCurrentSessionId()
+  if (!currentSessionId) {
+    return true
+  }
+
+  const activeSessions = sessionRepository.listActive(user.uid)
+  const current = activeSessions.find((session) => session.id === currentSessionId)
+  if (!current) {
+    return false
+  }
+
+  sessionRepository.touch(currentSessionId, nowISO(), user.uid)
+  return true
+}
+
 const requireAuth = (state: State) => {
   const user = currentUser(state)
   if (!user) throw { status: 401, data: { error: 'Not logged in' } }
+  if (!ensureCurrentSession(user)) {
+    state.session_uid = null
+    sessionRepository.clearStoredTokens()
+    throw { status: 401, data: { error: 'Session expired' } }
+  }
+  return user
+}
+
+const getUserRole = (user: User) => String(user.role || 'user').toLowerCase()
+
+const isAdminUser = (user: User) => Boolean(user.is_admin || getUserRole(user) === 'admin')
+
+const canModerate = (user: User) => isAdminUser(user) || getUserRole(user) === 'co_worker'
+
+const requireCapability = (state: State, scope: 'moderate' | 'admin') => {
+  const user = requireAuth(state)
+  const allowed = scope === 'admin' ? isAdminUser(user) : canModerate(user)
+  if (!allowed) {
+    const host = getClientRuntimeHost()
+    throw {
+      status: 403,
+      data: {
+        error: 'This privileged operation is gated by local role capabilities and trust assumptions in frontend-only mode.',
+        code: 'LOCAL_CAPABILITY_REQUIRED',
+        required_scope: scope,
+        host,
+        trust_notice: 'Privileged flows in frontend-only runtime are advisory gates, not server-enforced isolation.',
+      }
+    }
+  }
   return user
 }
 
@@ -1421,7 +1603,7 @@ const failure = (config: AxiosRequestConfig, status: number, data: any): never =
   throw error
 }
 
-const updateStoredUser = (user: User | null) => {
+const updateStoredUser = (user: User | null, currentSessionId?: string | null) => {
   if (user) {
     const serialized = serializeUser(user)
     delete (serialized as Record<string, any>).password
@@ -1430,10 +1612,30 @@ const updateStoredUser = (user: User | null) => {
     clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.token, 'offline-token')
     clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.accessToken, 'offline-access-token')
     clientRuntimeStorage.setItem(CLIENT_RUNTIME_STORAGE_KEYS.refreshToken, 'offline-refresh-token')
+    if (currentSessionId) {
+      sessionRepository.setCurrentSessionId(currentSessionId)
+    }
   } else {
     sessionRepository.clearStoredTokens()
   }
   window.dispatchEvent(new Event('auth-changed'))
+}
+
+const parseImportedEntries = (body: Record<string, any>) => {
+  const entries = body.entries || body.bundle?.entries || null
+  if (!entries || typeof entries !== 'object') {
+    return null
+  }
+
+  const normalized: Record<string, string> = {}
+  Object.entries(entries).forEach(([key, value]) => {
+    if (typeof value !== 'string') {
+      normalized[key] = JSON.stringify(value)
+      return
+    }
+    normalized[key] = value
+  })
+  return normalized
 }
 
 export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResult => {
@@ -1442,14 +1644,33 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
   const path = url.pathname.replace(/^\/api/, '') || '/'
   const body = parseData(config)
   const query = getQueryParams(url)
-  const state = readState()
+  let state = readState()
 
   const authed = () => requireAuth(state)
 
 
   try {
     if (method === 'GET' && path === '/auth/config') {
-      return { status: 200, data: { enable_email: false, enable_oauth: false, enable_webauthn: false, offline_mode: true } }
+      const host = getClientRuntimeHost()
+      const trustedHost = host === 'electron' || host === 'capacitor'
+      return {
+        status: 200,
+        data: {
+          enable_email: false,
+          smtp_enabled: false,
+          enable_oauth: false,
+          enable_webauthn: false,
+          offline_mode: true,
+          host,
+          trust_level: trustedHost ? 'trusted-local-host' : 'browser-untrusted',
+          trust_notice: trustedHost
+            ? 'Security features run with local-host trust assumptions in offline mode.'
+            : 'Browser-only offline mode cannot enforce server-grade trust boundaries for WebAuthn/2FA/email recovery.',
+        }
+      }
+    }
+    if (isSecuritySensitivePath(path)) {
+      return buildSecurityGateResponse(path)
     }
     if (method === 'POST' && path === '/auth/offline-profile') {
       const nickname = String(body.nickname || '').trim()
@@ -1462,9 +1683,14 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       const user = makeLocalPlayer(nickname, avatar)
       newState.users = [user]
       newState.session_uid = user.uid
+      const session = sessionRepository.create(user.uid, {
+        ...buildSessionContext(),
+        expiresAt: new Date(nowMs() + OFFLINE_SESSION_TTL_MS).toISOString(),
+      })
 
       writeState(newState)
-      updateStoredUser(user)
+      state = newState
+      updateStoredUser(user, session.id)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
     if (method === 'POST' && path === '/auth/register') {
@@ -1480,24 +1706,33 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       const user = makeLocalPlayer(nickname)
       newState.users = [user]
       newState.session_uid = user.uid
+      const session = sessionRepository.create(user.uid, {
+        ...buildSessionContext(),
+        expiresAt: new Date(nowMs() + OFFLINE_SESSION_TTL_MS).toISOString(),
+      })
       
       writeState(newState)
-      updateStoredUser(user)
+      state = newState
+      updateStoredUser(user, session.id)
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
     if (method === 'POST' && path === '/auth/logout') {
+      const user = currentUser(state)
+      const currentSessionId = sessionRepository.getCurrentSessionId()
+      if (user && currentSessionId) {
+        sessionRepository.revoke(currentSessionId, nowISO(), user.uid)
+      }
       state.session_uid = null
       writeState(state)
       updateStoredUser(null)
       return { status: 200, data: { ok: true } }
     }
     if (method === 'POST' && path === '/auth/offline-profile/reset') {
-      resetOfflineState()
+      state = resetOfflineState()
       return { status: 200, data: { ok: true } }
     }
     if (method === 'POST' && path === '/auth/refresh') {
-      const user = currentUser(state)
-      if (!user) throw { status: 401, data: { error: 'Not logged in' } }
+      const user = authed()
       return { status: 200, data: { access_token: 'offline-access-token', refresh_token: 'offline-refresh-token', user: serializeUser(user) } }
     }
     if (method === 'GET' && path === '/user/info') return { status: 200, data: serializeUser(authed()) }
@@ -1522,8 +1757,40 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       return { status: 200, data: serializeUser(user) }
     }
     if (method === 'GET' && path === '/version') return { status: 200, data: { version: 'offline', fullVersion: 'Chemistry UNO Offline Local Build' } }
-    if (method === 'GET' && path === '/announcements') return { status: 200, data: announcements }
+    if (method === 'GET' && path === '/announcements') return { status: 200, data: announcementRepository.read(defaultAnnouncements) }
     if (method === 'GET' && path === '/hints') return { status: 200, data: hints }
+    if (method === 'POST' && path === '/runtime/export') {
+      authed()
+      return { status: 200, data: stateRepository.exportBundle() }
+    }
+    if (method === 'POST' && path === '/runtime/import') {
+      authed()
+      const entries = parseImportedEntries(body)
+      if (!entries) {
+        throw { status: 400, data: { error: 'Import payload must include entries' } }
+      }
+
+      const mode = String(body.mode || 'merge') === 'replace' ? 'replace' : 'merge'
+      if (mode === 'replace') {
+        stateRepository.clear((key) => key !== CLIENT_RUNTIME_STORAGE_KEYS.theme)
+      }
+
+      stateRepository.import(entries)
+      state = readState()
+      const current = currentUser(state)
+      if (current) {
+        updateStoredUser(current)
+      }
+
+      return {
+        status: 200,
+        data: {
+          ok: true,
+          mode,
+          imported_keys: Object.keys(entries).length,
+        }
+      }
+    }
     if (method === 'GET' && path === '/feedbacks/my') {
       const user = authed()
       return { status: 200, data: state.feedbacks.filter((item) => item.uid === user.uid) }
@@ -1534,6 +1801,21 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       state.feedbacks.unshift(item)
       writeState(state)
       return { status: 200, data: { ok: true, id: item.id } }
+    }
+    if (method === 'GET' && path === '/admin/feedbacks') {
+      requireCapability(state, 'moderate')
+      return { status: 200, data: state.feedbacks }
+    }
+    if (method === 'POST' && /^\/admin\/feedbacks\/\d+\/status$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const feedbackId = Number(path.split('/')[3])
+      const feedback = state.feedbacks.find((item) => item.id === feedbackId)
+      if (!feedback) {
+        throw { status: 404, data: { error: 'Feedback not found' } }
+      }
+      feedback.status = String(body.status || feedback.status || 'reviewed')
+      writeState(state)
+      return { status: 200, data: feedback }
     }
     if (method === 'GET' && path === '/friends') {
       const user = authed()
@@ -1739,18 +2021,278 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       const user = authed()
       return { status: 200, data: { level: user.level, exp: user.exp, next_level_exp: user.level * 100 } }
     }
-    if (method === 'GET' && path === '/data/substances') {
-      return { status: 200, data: Object.keys(substanceNames).map((formula, index) => ({ id: index + 1, formula, name: substanceNames[formula], status: 'approved', creator_name: 'offline', created_at: nowISO() })) }
+    if (method === 'GET' && path === '/level/leaderboard') {
+      authed()
+      const fallback = state.users
+        .map((user) => ({
+          uid: user.uid,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          points: user.points,
+          exp: user.exp,
+          level: user.level,
+        }))
+        .sort((left, right) => right.points - left.points)
+      return { status: 200, data: leaderboardRepository.read(fallback) }
     }
-    if (method === 'GET' && path === '/substances/names') return { status: 200, data: substanceNames }
-    if (method === 'GET' && (path === '/reactions' || path === '/reactions/all' || path === '/reactions/my')) {
-      return {
-        status: 200,
-        data: Object.entries(reactionPairs).map(([pair, formula], index) => {
-          const [r1, r2] = pair.split('|')
-          return { id: index + 1, r1, r2, display: formula, status: 'approved' }
-        })
+    if (method === 'GET' && path === '/level/configs') {
+      authed()
+      return { status: 200, data: configRepository.read(defaultLevelConfigs) }
+    }
+    if (method === 'GET' && path === '/data/substances') {
+      return { status: 200, data: substanceRepository.read(buildDefaultSubstances()) }
+    }
+    if (method === 'GET' && path === '/data/substances/my') {
+      const user = authed()
+      const records = readRuntimeSubstances().filter((item) => Number(item.creator_uid) === user.uid)
+      return { status: 200, data: records }
+    }
+    if (method === 'GET' && /^\/data\/substances\/\d+\/group$/.test(path)) {
+      const substanceId = Number(path.split('/')[3])
+      const records = readRuntimeSubstances()
+      const target = records.find((item) => Number(item.id) === substanceId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Substance not found' } }
       }
+      const groupId = target.group_id == null ? target.id : target.group_id
+      const grouped = records.filter((item) => (item.group_id == null ? item.id : item.group_id) === groupId)
+      return { status: 200, data: grouped }
+    }
+    if (method === 'POST' && path === '/data/substances/new') {
+      const user = authed()
+      const formula = String(body.formula || '').trim()
+      const name = String(body.name || '').trim()
+      if (!formula || !name) {
+        throw { status: 400, data: { error: 'Formula and name are required' } }
+      }
+
+      const records = readRuntimeSubstances()
+      const record = {
+        id: nextNumericId(records),
+        formula,
+        name,
+        elements: String(body.elements || formula),
+        status: canModerate(user) ? 'approved' : 'pending_admin',
+        group_id: null,
+        needs_improvement: false,
+        has_invalid_elements: false,
+        creator_uid: user.uid,
+        creator_name: user.nickname || user.username || 'local-user',
+        created_at: nowISO(),
+      }
+      records.unshift(record)
+      writeRuntimeSubstances(records)
+      return { status: 200, data: record }
+    }
+    if (method === 'POST' && /^\/data\/substances\/\d+\/update$/.test(path)) {
+      const user = authed()
+      const substanceId = Number(path.split('/')[3])
+      const records = readRuntimeSubstances()
+      const target = records.find((item) => Number(item.id) === substanceId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Substance not found' } }
+      }
+      const ownedByUser = Number(target.creator_uid) === user.uid
+      if (!ownedByUser && !canModerate(user)) {
+        throw { status: 403, data: { error: 'You cannot update this substance entry' } }
+      }
+      target.formula = String(body.formula || target.formula)
+      target.name = String(body.name || target.name)
+      target.elements = String(body.elements || target.elements || target.formula)
+      target.status = canModerate(user) ? String(target.status || 'approved') : 'pending_admin'
+      target.updated_at = nowISO()
+      writeRuntimeSubstances(records)
+      return { status: 200, data: target }
+    }
+    if (method === 'PUT' && /^\/data\/substances\/\d+$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const substanceId = Number(path.split('/')[3])
+      const records = readRuntimeSubstances()
+      const target = records.find((item) => Number(item.id) === substanceId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Substance not found' } }
+      }
+      target.formula = String(body.formula || target.formula)
+      target.name = String(body.name || target.name)
+      target.elements = String(body.elements || target.elements || target.formula)
+      target.status = String(body.status || target.status || 'approved')
+      target.updated_at = nowISO()
+      writeRuntimeSubstances(records)
+      return { status: 200, data: target }
+    }
+    if (method === 'POST' && /^\/data\/substances\/\d+\/approve$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const substanceId = Number(path.split('/')[3])
+      const records = readRuntimeSubstances()
+      const target = records.find((item) => Number(item.id) === substanceId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Substance not found' } }
+      }
+      target.status = 'approved'
+      target.reviewed_at = nowISO()
+      writeRuntimeSubstances(records)
+      return { status: 200, data: target }
+    }
+    if (method === 'DELETE' && /^\/data\/substances\/\d+\/reject$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const substanceId = Number(path.split('/')[3])
+      const records = readRuntimeSubstances()
+      const target = records.find((item) => Number(item.id) === substanceId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Substance not found' } }
+      }
+      target.status = 'rejected'
+      target.reviewed_at = nowISO()
+      writeRuntimeSubstances(records)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'GET' && path === '/substances/names') {
+      const names = substanceRepository.read(buildDefaultSubstances()).reduce<Record<string, string>>((acc, item) => {
+        const formula = String(item.formula || '').trim()
+        if (!formula) return acc
+        acc[formula] = String(item.name || formula)
+        return acc
+      }, {})
+      return { status: 200, data: names }
+    }
+    if (method === 'GET' && (path === '/reactions' || path === '/reactions/all' || path === '/reactions/my')) {
+      const current = currentUser(state)
+      let reactions = readRuntimeReactions()
+
+      if (path === '/reactions/all') {
+        reactions = reactions.filter((item) => item.status === 'approved')
+      }
+      if (path === '/reactions/my') {
+        const user = authed()
+        reactions = reactions.filter((item) => Number(item.creator_uid) === user.uid)
+      }
+
+      const queryText = String(query.q || '').trim().toLowerCase()
+      if (queryText) {
+        reactions = reactions.filter((item) => [item.display, item.r1, item.r2]
+          .map((value) => String(value || '').toLowerCase())
+          .some((value) => value.includes(queryText)))
+      }
+
+      if (query.status && query.status !== 'all') {
+        reactions = reactions.filter((item) => String(item.status || '').toLowerCase() === String(query.status || '').toLowerCase())
+      }
+
+      const hasInvalid = parseBooleanQueryValue(query.has_invalid)
+      if (hasInvalid !== null) {
+        reactions = reactions.filter((item) => Boolean(item.has_invalid_elements) === hasInvalid)
+      }
+
+      reactions = reactions.sort((left, right) => Number(right.id || 0) - Number(left.id || 0))
+      const paginated = query.paginated === '1' || query.paginated === 'true'
+      if (paginated) {
+        const page = Number(query.page || 1)
+        const pageSize = Number(query.page_size || query.pageSize || 30)
+        return { status: 200, data: paginateRecords(reactions, page, pageSize) }
+      }
+
+      // 非登录场景下允许浏览公开已审核数据
+      if (!current && path !== '/reactions/all') {
+        reactions = reactions.filter((item) => item.status === 'approved')
+      }
+      return { status: 200, data: reactions }
+    }
+    if (method === 'POST' && path === '/reactions') {
+      const user = authed()
+      const display = String(body.display || '').trim()
+      if (!display) {
+        throw { status: 400, data: { error: 'Reaction display is required' } }
+      }
+
+      const reactions = readRuntimeReactions()
+      const match = display.match(/^\s*([^=+]+?)\s*\+\s*([^=+]+?)\s*=.*$/)
+      const r1 = String(match?.[1] || body.r1 || '').trim() || 'Unknown'
+      const r2 = String(match?.[2] || body.r2 || '').trim() || 'Unknown'
+      const record = {
+        id: nextNumericId(reactions),
+        r1,
+        r2,
+        display,
+        status: canModerate(user) ? 'approved' : 'pending_admin',
+        creator_uid: user.uid,
+        creator_name: user.nickname || user.username || 'local-user',
+        has_invalid_elements: false,
+        created_at: nowISO(),
+      }
+      reactions.unshift(record)
+      writeRuntimeReactions(reactions)
+      return { status: 200, data: record }
+    }
+    if (method === 'POST' && path === '/reactions/batch') {
+      const user = authed()
+      const payload = Array.isArray(body) ? body : []
+      const reactions = readRuntimeReactions()
+      let nextId = nextNumericId(reactions)
+      const created = payload
+        .map((entry: Record<string, any>) => String(entry?.display || '').trim())
+        .filter(Boolean)
+        .map((display) => {
+          const match = display.match(/^\s*([^=+]+?)\s*\+\s*([^=+]+?)\s*=.*$/)
+          return {
+            id: nextId++,
+            r1: String(match?.[1] || 'Unknown').trim(),
+            r2: String(match?.[2] || 'Unknown').trim(),
+            display,
+            status: canModerate(user) ? 'approved' : 'pending_admin',
+            creator_uid: user.uid,
+            creator_name: user.nickname || user.username || 'local-user',
+            has_invalid_elements: false,
+            created_at: nowISO(),
+          }
+        })
+
+      created.forEach((item) => reactions.unshift(item))
+      writeRuntimeReactions(reactions)
+      return { status: 200, data: { ok: true, inserted: created.length } }
+    }
+    if (method === 'PUT' && /^\/reactions\/approve\/.+/.test(path)) {
+      requireCapability(state, 'moderate')
+      const reactionToken = String(path.split('/').pop() || '').trim()
+      const reactions = readRuntimeReactions()
+      const target = reactions.find((item) => String(item.id) === reactionToken || String(item.group_id || '') === reactionToken)
+      if (!target) {
+        throw { status: 404, data: { error: 'Reaction not found' } }
+      }
+      target.display = String(body.display || target.display)
+      target.status = body.reject ? 'rejected' : 'approved'
+      target.reviewed_at = nowISO()
+      writeRuntimeReactions(reactions)
+      return { status: 200, data: target }
+    }
+    if (method === 'PUT' && /^\/reactions\/\d+$/.test(path)) {
+      const user = authed()
+      const reactionId = Number(path.split('/').pop())
+      const reactions = readRuntimeReactions()
+      const target = reactions.find((item) => Number(item.id) === reactionId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Reaction not found' } }
+      }
+      const ownedByUser = Number(target.creator_uid) === user.uid
+      if (!ownedByUser && !canModerate(user)) {
+        throw { status: 403, data: { error: 'You cannot edit this reaction entry' } }
+      }
+      target.display = String(body.display || target.display)
+      target.status = canModerate(user) ? String(target.status || 'approved') : 'pending_admin'
+      target.updated_at = nowISO()
+      writeRuntimeReactions(reactions)
+      return { status: 200, data: target }
+    }
+    if (method === 'DELETE' && /^\/reactions\/\d+$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const reactionId = Number(path.split('/').pop())
+      const reactions = readRuntimeReactions()
+      const before = reactions.length
+      const next = reactions.filter((item) => Number(item.id) !== reactionId)
+      if (next.length === before) {
+        throw { status: 404, data: { error: 'Reaction not found' } }
+      }
+      writeRuntimeReactions(next)
+      return { status: 200, data: { ok: true } }
     }
     if (method === 'GET' && path === '/user/game-history') {
       const user = authed()
@@ -1764,7 +2306,119 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
     }
     if (method === 'GET' && path === '/user/sessions') {
       const user = authed()
-      return { status: 200, data: [{ id: 'offline-session', created_at: user.created_at, current: true, mode: 'offline' }] }
+      const currentSessionId = sessionRepository.getCurrentSessionId()
+      const sessions = sessionRepository.listActive(user.uid).map((session) => ({
+        id: session.id,
+        created_at: session.created_at,
+        last_active: session.last_active,
+        expires_at: session.expires_at,
+        user_agent: session.user_agent,
+        ip: session.ip,
+        host: session.host,
+        mode: session.mode,
+        is_current: session.id === currentSessionId,
+        current: session.id === currentSessionId,
+      }))
+      return { status: 200, data: sessions }
+    }
+    if (method === 'POST' && path === '/user/sessions/logout') {
+      const user = authed()
+      const targetSessionId = String(body.id || '').trim()
+      if (!targetSessionId) {
+        throw { status: 400, data: { error: 'Session id is required' } }
+      }
+
+      const revoked = sessionRepository.revoke(targetSessionId, nowISO(), user.uid)
+      if (!revoked) {
+        throw { status: 404, data: { error: 'Session not found' } }
+      }
+
+      const isCurrentSession = sessionRepository.getCurrentSessionId() === targetSessionId
+      if (isCurrentSession) {
+        state.session_uid = null
+        updateStoredUser(null)
+      }
+
+      return { status: 200, data: { ok: true, is_current: isCurrentSession } }
+    }
+    if (method === 'GET' && path === '/admin/capabilities') {
+      const user = authed()
+      return {
+        status: 200,
+        data: {
+          role: getUserRole(user),
+          is_admin: isAdminUser(user),
+          can_moderate: canModerate(user),
+          trust_notice: 'Frontend-only privileged flows are local capability gates and do not provide server-enforced isolation.',
+        }
+      }
+    }
+    if (method === 'GET' && path === '/admin/trust-boundary') {
+      authed()
+      return {
+        status: 200,
+        data: {
+          host: getClientRuntimeHost(),
+          trust_notice: 'Privileged workflows run under local trust assumptions in frontend-only mode. Treat this as convenience controls, not hardened security boundaries.',
+        }
+      }
+    }
+    if (method === 'GET' && path === '/admin/announcements') {
+      requireCapability(state, 'moderate')
+      return { status: 200, data: announcementRepository.read(defaultAnnouncements) }
+    }
+    if (method === 'POST' && path === '/admin/announcements') {
+      requireCapability(state, 'moderate')
+      const announcements = announcementRepository.read(defaultAnnouncements)
+      const announcement = {
+        id: nextNumericId(announcements),
+        title: String(body.title || '').trim() || 'Untitled',
+        content: String(body.content || '').trim(),
+        type: String(body.type || 'info'),
+        is_ticker: Boolean(body.is_ticker),
+        is_persistent: body.is_persistent === undefined ? true : Boolean(body.is_persistent),
+        created_at: nowISO(),
+      }
+      announcements.unshift(announcement)
+      announcementRepository.write(announcements)
+      return { status: 200, data: announcement }
+    }
+    if (method === 'PUT' && /^\/admin\/announcements\/\d+$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const announcementId = Number(path.split('/')[3])
+      const announcements = announcementRepository.read(defaultAnnouncements)
+      const target = announcements.find((item) => Number(item.id) === announcementId)
+      if (!target) {
+        throw { status: 404, data: { error: 'Announcement not found' } }
+      }
+      target.title = String(body.title || target.title)
+      target.content = String(body.content || target.content)
+      target.type = String(body.type || target.type || 'info')
+      target.is_ticker = body.is_ticker === undefined ? target.is_ticker : Boolean(body.is_ticker)
+      target.is_persistent = body.is_persistent === undefined ? target.is_persistent : Boolean(body.is_persistent)
+      target.updated_at = nowISO()
+      announcementRepository.write(announcements)
+      return { status: 200, data: target }
+    }
+    if (method === 'DELETE' && /^\/admin\/announcements\/\d+$/.test(path)) {
+      requireCapability(state, 'moderate')
+      const announcementId = Number(path.split('/')[3])
+      const announcements = announcementRepository.read(defaultAnnouncements)
+      const nextAnnouncements = announcements.filter((item) => Number(item.id) !== announcementId)
+      if (nextAnnouncements.length === announcements.length) {
+        throw { status: 404, data: { error: 'Announcement not found' } }
+      }
+      announcementRepository.write(nextAnnouncements)
+      return { status: 200, data: { ok: true } }
+    }
+    if (method === 'GET' && path === '/admin/configs') {
+      requireCapability(state, 'admin')
+      return { status: 200, data: configRepository.read(defaultLevelConfigs) }
+    }
+    if ((method === 'PUT' || method === 'POST') && path === '/admin/configs') {
+      requireCapability(state, 'admin')
+      const nextConfigs = configRepository.merge(body || {}, defaultLevelConfigs)
+      return { status: 200, data: nextConfigs }
     }
     if (method === 'GET' && (path === '/surveys/active' || path === '/surveys/all')) return { status: 200, data: [] }
     if (method === 'GET' && path === '/plugins') return { status: 200, data: [] }

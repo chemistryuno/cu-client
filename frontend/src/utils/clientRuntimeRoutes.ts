@@ -60,6 +60,8 @@ export const CLIENT_RUNTIME_ROUTE_INVENTORY: RuntimeRouteDefinition[] = [
   { module: 'data', methods: ['GET'], pattern: '/plugins', description: 'Read local plugin catalog' },
   { module: 'data', methods: ['GET'], pattern: '/plugin-cards', description: 'Read local plugin card data' },
   { module: 'data', methods: ['GET'], pattern: '/plugins/:id/*', description: 'Read local plugin assets and settings' },
+  { module: 'data', methods: ['POST'], pattern: '/runtime/export', description: 'Export local runtime data bundle' },
+  { module: 'data', methods: ['POST'], pattern: '/runtime/import', description: 'Import local runtime data bundle' },
   { module: 'data', methods: ['GET'], pattern: '/version', description: 'Read local runtime version' },
 
   { module: 'game', methods: ['GET', 'POST'], pattern: '/rooms', description: 'List and create rooms' },

@@ -7,6 +7,10 @@ export const LOCAL_STORAGE_KEYS = {
   offlineState: 'chemistry-uno-offline-state-v2',
 } as const
 
+const resolveRuntimeStateStorageKey = (keys: string[], targetKey: string) => {
+  return keys.find((key) => key === targetKey || key.endsWith(`:${targetKey}`)) || targetKey
+}
+
 export const resetRuntimeState = async (page: Page) => {
   await page.goto('/#/login')
   await page.evaluate(({ keys }) => {
@@ -64,7 +68,9 @@ export const completeLobbyTutorial = async (page: Page) => {
 
 export const seedReplayHistory = async (page: Page, nickname = 'ReplayUser') => {
   await page.evaluate(({ stateKey, replayKey, userName }) => {
-    const raw = window.localStorage.getItem(stateKey)
+    const keys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(Boolean) as string[]
+    const resolvedStateKey = keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey
+    const raw = window.localStorage.getItem(resolvedStateKey)
     if (!raw) return
     const state = JSON.parse(raw)
     const now = new Date().toISOString()
@@ -98,9 +104,45 @@ export const seedReplayHistory = async (page: Page, nickname = 'ReplayUser') => 
       },
     }
     state.histories = [replayHistory, ...(state.histories || []).filter((item: any) => item.id !== replayHistory.id)]
-    window.localStorage.setItem(stateKey, JSON.stringify(state))
+    window.localStorage.setItem(resolvedStateKey, JSON.stringify(state))
     window.localStorage.removeItem(replayKey)
   }, { stateKey: LOCAL_STORAGE_KEYS.offlineState, replayKey: LOCAL_STORAGE_KEYS.tutorialMode, userName: nickname })
+}
+
+export const setCurrentUserRole = async (page: Page, role: 'user' | 'co_worker' | 'admin') => {
+  return page.evaluate(({ stateKey, targetRole }) => {
+    const keys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(Boolean) as string[]
+    const resolvedStateKey = keys.find((key) => key === stateKey || key.endsWith(`:${stateKey}`)) || stateKey
+    const rawState = window.localStorage.getItem(resolvedStateKey)
+    if (!rawState) return false
+
+    const state = JSON.parse(rawState)
+    const sessionUid = state.session_uid
+    if (!sessionUid || !Array.isArray(state.users)) return false
+
+    const currentUser = state.users.find((user: any) => Number(user.uid) === Number(sessionUid))
+    if (!currentUser) return false
+
+    currentUser.role = targetRole
+    currentUser.is_admin = targetRole === 'admin'
+    window.localStorage.setItem(resolvedStateKey, JSON.stringify(state))
+
+    const userStorageKeys = keys.filter((key) => key === 'user' || key.endsWith(':user'))
+    userStorageKeys.forEach((key) => {
+      const rawUser = window.localStorage.getItem(key)
+      if (!rawUser) return
+      try {
+        const parsed = JSON.parse(rawUser)
+        parsed.role = targetRole
+        parsed.is_admin = targetRole === 'admin'
+        window.localStorage.setItem(key, JSON.stringify(parsed))
+      } catch {
+        // ignore malformed legacy user payloads
+      }
+    })
+
+    return true
+  }, { stateKey: LOCAL_STORAGE_KEYS.offlineState, targetRole: role })
 }
 
 export const openAiArenaAndStart = async (page: Page, roomName = 'E2E Arena') => {

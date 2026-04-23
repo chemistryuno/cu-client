@@ -209,7 +209,10 @@ export const gameAPI = {
 
 export const commonAPI = {
   getAnnouncements: () => api.get('/announcements'),
-  getHints: () => api.get('/hints')
+  getHints: () => api.get('/hints'),
+  exportLocalRuntimeData: () => api.post('/runtime/export'),
+  importLocalRuntimeData: (payload: { entries?: Record<string, string>; bundle?: { entries?: Record<string, string> }; mode?: 'merge' | 'replace' }) =>
+    api.post('/runtime/import', payload)
 }
 
 export const reactionAPI = {

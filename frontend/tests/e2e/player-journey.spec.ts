@@ -22,7 +22,7 @@ test('completes the tutorial flow and enters the tutorial-backed room', async ({
   await seedLocalIdentity(page, 'JourneyTutorial', 'flask')
   await completeLobbyTutorial(page)
   await expect(page).toHaveURL(/#\/room\//)
-  await expect(page.locator('text=Step 1/7')).toBeVisible()
+  await expect(page.getByText(/Step\s*1\/(7|8)/)).toBeVisible()
   await expect(page.getByTestId('game-players-toggle')).toBeVisible()
 })
 

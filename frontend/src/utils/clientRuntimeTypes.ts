@@ -24,14 +24,34 @@ export interface RuntimeResult<T = any> {
   module?: ClientRuntimeModule
 }
 
+export type RuntimeSessionMetadata = {
+  id: string
+  uid: number
+  user_agent: string
+  ip: string
+  host: 'browser' | 'electron' | 'capacitor'
+  mode: 'offline'
+  created_at: string
+  last_active: string
+  expires_at: string | null
+  revoked_at: string | null
+}
+
+export type RuntimeExportBundle = {
+  version: 1
+  exported_at: string
+  host: 'browser' | 'electron' | 'capacitor'
+  entries: Record<string, string>
+}
+
 export type User = {
   uid: number
   username: string
   password: string
   nickname: string
   avatar: string
-  role: 'user'
-  is_admin: false
+  role: 'user' | 'co_worker' | 'admin'
+  is_admin: boolean
   points: number
   exp: number
   level: number
