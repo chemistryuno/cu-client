@@ -294,6 +294,8 @@ onMounted(() => {
             <div class="hub-status-badge">
               <span class="hub-status-dot"></span>
               <span class="text-[8px] font-black text-blue-500 uppercase tracking-widest">{{ t('common.localMode') }}</span>
+              <span class="hub-status-divider"></span>
+              <span class="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Low Noise UI</span>
             </div>
             <h2 class="hub-title">{{ t('lobby.title') }}</h2>
             <p class="text-[11px] text-slate-500 font-medium max-w-xl leading-relaxed">
@@ -338,7 +340,7 @@ onMounted(() => {
                 <div>
                   <div class="flex items-center gap-2 mb-3">
                     <span class="hero-chip hero-chip--primary">{{ t('common.localMode') }}</span>
-                    <span class="hero-chip hero-chip--neutral">Single Device</span>
+                    <span class="hero-chip hero-chip--neutral">Compact Console</span>
                   </div>
                   <h3 class="lobby-hero-title">{{ t('lobby.aiArena') }}</h3>
                   <p class="lobby-hero-subtitle">{{ t('lobby.modal.mode') }}</p>

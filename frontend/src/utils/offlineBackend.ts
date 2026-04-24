@@ -25,7 +25,7 @@ import type {
   State,
   User,
 } from './clientRuntimeTypes'
-import { TUTORIAL_INITIAL_STATE } from './tutorialScript'
+import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tutorialScript'
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
@@ -1236,6 +1236,18 @@ const refreshCardCounts = (game: GameState) => {
   })
 }
 
+const isTutorialScriptEnabled = (room: Room) => Boolean(room.tutorial_script && room.game_state?.tutorial_script_mode)
+
+const getCurrentTutorialStep = (game: GameState): TutorialStep | undefined => {
+  if (!game.tutorial_script_mode || game.tutorial_current_step <= 0) return undefined
+  return getTutorialStep(game.tutorial_current_step)
+}
+
+const advanceTutorialStep = (game: GameState) => {
+  if (!game.tutorial_script_mode) return
+  game.tutorial_current_step += 1
+}
+
 const drawCardsForPlayer = (game: GameState, index: number, count: number) => {
   const player = game.players[index]
   for (let i = 0; i < count; i += 1) {
@@ -1255,6 +1267,64 @@ const nextActivePlayerIndex = (game: GameState) => {
     if (!game.finished_players.includes(uid)) return next
   }
   return next
+}
+
+const maybeAdvanceTutorialForHumanAction = (room: Room, playerIndex: number, action: TutorialStep['action'], substance?: string) => {
+  if (!isTutorialScriptEnabled(room)) return
+  const game = ensureGame(room)
+  const currentStep = getCurrentTutorialStep(game)
+  const player = game.players[playerIndex]
+  if (!currentStep || currentStep.player !== 'human' || player?.is_ai) return
+  if (currentStep.action !== action) return
+
+  const normalizedSubstance = normalizeFormula(substance || '')
+  const expectedSubstance = normalizeFormula(currentStep.substance || '')
+  if (action === 'play' && expectedSubstance && normalizedSubstance !== expectedSubstance) return
+
+  advanceTutorialStep(game)
+}
+
+const maybeAdvanceTutorialForAiAction = (room: Room) => {
+  if (!isTutorialScriptEnabled(room)) return
+  const game = ensureGame(room)
+  const currentStep = getCurrentTutorialStep(game)
+  if (!currentStep || currentStep.player !== 'ai') return
+  advanceTutorialStep(game)
+}
+
+const runTutorialAiTurn = (state: State, room: Room) => {
+  const game = ensureGame(room)
+  const currentStep = getCurrentTutorialStep(game)
+  const player = game.players[game.current_player]
+  if (!player?.is_ai || !currentStep || currentStep.player !== 'ai') return false
+
+  if (currentStep.action === 'draw') {
+    const drawCount = Math.max(1, game.pending_draw_count || 1)
+    drawCardsForPlayer(game, game.current_player, drawCount)
+    game.pending_draw_count = 0
+    game.pending_draw_types = []
+    maybeAdvanceTutorialForAiAction(room)
+    emit('action_toast', { type: 'action_toast', data: currentStep.aiMessage || `${player.nickname} drew cards.` })
+    advanceTurn(state, room)
+    return true
+  }
+
+  if (currentStep.action === 'play' && currentStep.substance) {
+    const scriptedSubstance = normalizeFormula(currentStep.substance)
+    applyPlay(
+      state,
+      room,
+      game.current_player,
+      scriptedSubstance,
+      game.last_card ? [game.last_card.substance, scriptedSubstance] : [scriptedSubstance],
+    )
+    maybeAdvanceTutorialForAiAction(room)
+    emit('action_toast', { type: 'action_toast', data: currentStep.aiMessage || `${player.nickname} played ${scriptedSubstance}.` })
+    advanceTurn(state, room)
+    return true
+  }
+
+  return false
 }
 
 const getPlayerSummary = (state: State, room: Room) => room.players.map((uid) => serializeUser(getPlayerInfo(state, uid) || {
@@ -1358,6 +1428,7 @@ const runAiTurn = (state: State, room: Room) => {
   const game = ensureGame(room)
   const player = game.players[game.current_player]
   if (!player?.is_ai) return
+  if (isTutorialScriptEnabled(room) && runTutorialAiTurn(state, room)) return
   const available = getAvailableSubstances(player.hand_cards)
   const playable = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula))
   if (playable.length > 0) {
@@ -1956,7 +2027,9 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       const game = ensureGame(room)
       const index = findPlayerIndexByUid(game, user.uid)
       if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
-      applyPlay(state, room, index, String(body.substance || body.card?.type || ''))
+      const playedSubstance = String(body.substance || body.card?.type || '')
+      applyPlay(state, room, index, playedSubstance)
+      maybeAdvanceTutorialForHumanAction(room, index, 'play', playedSubstance)
       advanceTurn(state, room)
       writeState(state)
       emitGameUpdate(room)
@@ -1976,6 +2049,7 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       player.double_action_available = false
       player.action_progress = 0
       if (sub2) applyPlay(state, room, index, sub2, [sub1, sub2])
+      maybeAdvanceTutorialForHumanAction(room, index, 'double', `${sub1}+${sub2}`)
       advanceTurn(state, room)
       writeState(state)
       emitGameUpdate(room)
@@ -1991,6 +2065,7 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       drawCardsForPlayer(game, index, drawCount)
       game.pending_draw_count = 0
       game.pending_draw_types = []
+      maybeAdvanceTutorialForHumanAction(room, index, 'draw')
       advanceTurn(state, room)
       writeState(state)
       emitGameUpdate(room)

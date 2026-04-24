@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test'
 import {
+  callOfflineApi,
   completeLobbyTutorial,
+  getCurrentRoomId,
   openAiArenaAndStart,
   resetRuntimeState,
   seedLocalIdentity,
   seedReplayHistory,
   skipLobbyTutorial,
+  waitForOfflineRoomState,
   waitForGameRoomReady,
 } from './helpers/playerJourney'
 
@@ -26,6 +29,39 @@ test('completes the tutorial flow and enters the tutorial-backed room', async ({
   await expect(page.getByTestId('game-players-toggle')).toBeVisible()
 })
 
+test('tutorial room AI follows the scripted HCl, Br2, and draw sequence', async ({ page }) => {
+  await seedLocalIdentity(page, 'JourneyScriptedAI', 'flask')
+  await completeLobbyTutorial(page)
+  await waitForGameRoomReady(page)
+
+  const roomId = await getCurrentRoomId(page)
+  expect(roomId).toBeTruthy()
+
+  const roomStateStep1 = await callOfflineApi(page, `/rooms/${roomId}`, 'GET')
+  expect(roomStateStep1.status).toBe(200)
+  expect(roomStateStep1.data.game_state.tutorial_script_mode).toBe(true)
+  expect(roomStateStep1.data.game_state.tutorial_current_step).toBe(1)
+
+  await callOfflineApi(page, `/rooms/${roomId}/play`, 'POST', { substance: 'Mg' })
+  const roomStateStep3 = await waitForOfflineRoomState(page, roomId!, (data: any) => {
+    return data.game_state?.tutorial_current_step === 3 && data.game_state?.last_card?.substance === 'HCl'
+  })
+  expect(roomStateStep3.game_state.current_reaction).toContain('HCl')
+
+  await callOfflineApi(page, `/rooms/${roomId}/play`, 'POST', { substance: 'NaOH' })
+  const roomStateStep5 = await waitForOfflineRoomState(page, roomId!, (data: any) => {
+    return data.game_state?.tutorial_current_step === 5 && data.game_state?.last_card?.substance === 'Br2'
+  })
+  expect(roomStateStep5.game_state.current_reaction).toContain('Br2')
+
+  const aiHandBeforeDraw = roomStateStep5.game_state.players[1].card_count
+  await callOfflineApi(page, `/rooms/${roomId}/play`, 'POST', { substance: 'Ar' })
+  const roomStateStep7 = await waitForOfflineRoomState(page, roomId!, (data: any) => {
+    return data.game_state?.tutorial_current_step === 7 && data.game_state?.last_card?.substance === 'Ar'
+  })
+  expect(roomStateStep7.game_state.players[1].card_count).toBeGreaterThan(aiHandBeforeDraw)
+})
+
 test('starts a real playable match from the lobby and exposes core controls', async ({ page }) => {
   await seedLocalIdentity(page, 'JourneyArena', 'flask')
   await skipLobbyTutorial(page)
@@ -36,6 +72,29 @@ test('starts a real playable match from the lobby and exposes core controls', as
   await expect(page.getByTestId('game-hints-toggle')).toBeVisible()
   await page.getByTestId('game-hints-toggle').click()
   await page.getByTestId('game-draw-button').click()
+})
+
+test('normal offline PvE still uses non-tutorial AI flow', async ({ page }) => {
+  await seedLocalIdentity(page, 'JourneyGenericAI', 'flask')
+  await skipLobbyTutorial(page)
+  await openAiArenaAndStart(page, 'Generic AI Arena')
+  await waitForGameRoomReady(page)
+
+  const roomId = await getCurrentRoomId(page)
+  expect(roomId).toBeTruthy()
+
+  const beforeDraw = await callOfflineApi(page, `/rooms/${roomId}`, 'GET')
+  expect(beforeDraw.status).toBe(200)
+  expect(beforeDraw.data.game_state.tutorial_script_mode).toBe(false)
+  expect(beforeDraw.data.game_state.tutorial_current_step).toBe(0)
+
+  await callOfflineApi(page, `/rooms/${roomId}/draw`, 'POST')
+  const afterAiTurn = await waitForOfflineRoomState(page, roomId!, (data: any) => {
+    return data.game_state?.tutorial_script_mode === false && data.game_state?.tutorial_current_step === 0 && data.game_state?.current_player === 0
+  })
+
+  expect(afterAiTurn.game_state.tutorial_script_mode).toBe(false)
+  expect(afterAiTurn.game_state.tutorial_current_step).toBe(0)
 })
 
 test('covers related profile, replay, reactions, and substances flows', async ({ page }) => {

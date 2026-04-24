@@ -7,7 +7,7 @@ import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/a
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
-import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary } from 'lucide-vue-next'
+import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary, Radar, Orbit } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
@@ -72,6 +72,8 @@ const secondDoubleSubstance = ref<string | null>(null)
 const substanceInput = ref('')
 const randomHints = ref<any[]>([])
 const reactionHints = ref<any[]>([])
+
+type RoomNoticeTone = 'info' | 'success' | 'warning' | 'error'
 
 // 回放模拟播放状态
 const replayEvents = ref<any[]>([])
@@ -262,10 +264,6 @@ const hasNewMessage = ref(false)
 const showQrModal = ref(false)
 const showInviteFriendsModal = ref(false)
 
-// PvE Toasts
-const pveToasts = ref<{ id: number, text: string }[]>([])
-let toastIdCounter = 0
-
 // 动画状态管理
 const drawAnimatingUIDs = ref<Set<number>>(new Set())
 const playerCardCounts = ref<Record<number, number>>({})
@@ -291,16 +289,13 @@ watch(playersCardState, (newState) => {
   })
 })
 
-const addPvEToast = (text: string) => {
-  const id = ++toastIdCounter
-  pveToasts.value.push({ id, text })
-  // 保持最多3个显示
-  if (pveToasts.value.length > 3) {
-    pveToasts.value.shift()
-  }
-  setTimeout(() => {
-    pveToasts.value = pveToasts.value.filter(t => t.id !== id)
-  }, 4000)
+const pushRoomNotice = (
+  message: string,
+  title = '实验动态',
+  type: RoomNoticeTone = 'info',
+  duration = 3200,
+) => {
+  gameToastRef.value?.showToast(message, title, type, duration)
 }
 
 // startPrivateChat 已被弃用，实验室内禁止私聊
@@ -442,6 +437,45 @@ const hasTurnLimit = computed(() => {
 })
 const tutorialStepDisplay = computed(() => Math.min(tutorialCurrentStep.value, TUTORIAL_TOTAL_STEPS))
 const tutorialProgressPercent = computed(() => Math.round((tutorialStepDisplay.value / TUTORIAL_TOTAL_STEPS) * 100))
+const roomStatusLabel = computed(() => {
+  if (isReplayBridgeMode.value) return '回放监看'
+  if (roomInfo.value?.status === 'waiting') return '等待开场'
+  if (gameState.value?.status === 'finished') return '实验结算'
+  if (isSpectator.value) return '观战模式'
+  if (isMyTurn.value) return '你的操作窗口'
+  if (currentPlayerObj.value) return `${getPlayerDisplayName(currentPlayerObj.value)} 行动中`
+  return '实验同步中'
+})
+const roomStatusMessage = computed(() => {
+  if (isReplayBridgeMode.value) {
+    return `当前视角：${replayPerspectiveName.value}`
+  }
+  if (roomInfo.value?.status === 'waiting') {
+    const readyCount = roomInfo.value?.ready_uids?.length || 0
+    const total = roomInfo.value?.max_players || allPlayers.value.length || 1
+    return `已就绪 ${readyCount}/${total}，保持界面清爽等待主持人开始`
+  }
+  if (gameState.value?.status === 'finished') {
+    return winner.value ? `本局已结束，${getPlayerDisplayName(winner.value)} 获胜` : '本局已结束，可查看结算并安全离开'
+  }
+  if (isSpectator.value) {
+    return '仅观察关键信息，不遮挡主战场'
+  }
+  if (isMyTurn.value) {
+    return hasTurnLimit.value ? `请在 ${timeRemaining.value}s 内完成本轮操作` : '已为你展开输入与操作区'
+  }
+  if (currentPlayerObj.value) {
+    return `当前由 ${getPlayerDisplayName(currentPlayerObj.value)} 推进回合`
+  }
+  return '正在同步房间状态'
+})
+const roomStatusTone = computed<RoomNoticeTone>(() => {
+  if (gameState.value?.status === 'finished') return 'success'
+  if (roomInfo.value?.status === 'waiting') return 'warning'
+  if (isMyTurn.value) return 'info'
+  return 'info'
+})
+const tutorialAssistiveTitle = computed(() => tutorialScriptMode.value ? `教学步骤 ${tutorialStepDisplay.value}/${TUTORIAL_TOTAL_STEPS}` : '回合引导')
 const replayPerspectivePlayer = computed(() => {
   if (!isReplayBridgeMode.value || replayPerspectiveUID.value == null || !gameState.value?.players) {
     return null
@@ -848,11 +882,7 @@ const handleLevelUp = (data: any) => {
 const handleActionToast = (msg: any) => {
   const content = msg.data || msg.message
   if (content) {
-    if (roomInfo.value?.is_pve) {
-      addPvEToast(content)
-    } else {
-      showToast(content, '实验动态', 'info')
-    }
+    pushRoomNotice(content, roomInfo.value?.is_pve ? 'AI 动态' : '实验动态', 'info')
   }
 }
 
@@ -2271,8 +2301,27 @@ watch(() => gameState.value?.current_player, () => {
         <div class="absolute top-0 left-0 w-full h-px bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-scan"></div>
       </div>
 
+      <div class="room-status-safe-area pointer-events-none">
+        <div :class="cn('room-status-banner', `room-status-banner--${roomStatusTone}`)">
+          <div class="room-status-banner__eyebrow">
+            <Radar class="w-3.5 h-3.5" />
+            ROOM STATUS
+          </div>
+          <div class="room-status-banner__body">
+            <div class="room-status-banner__copy">
+              <p class="room-status-banner__title">{{ roomStatusLabel }}</p>
+              <p class="room-status-banner__text">{{ roomStatusMessage }}</p>
+            </div>
+            <div v-if="gameState?.status === 'playing'" class="room-status-banner__meta">
+              <span v-if="hasTurnLimit">{{ timeRemaining }}S</span>
+              <span v-else>{{ gameState?.direction === 1 ? 'CW' : 'CCW' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Compressed Header - 移动端优化 -->
-      <header class="h-11 sm:h-16 bg-white/80 dark:bg-[#071019]/88 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-6 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
+      <header class="h-10 sm:h-14 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
         <div class="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
             @click="handleLeaveRoom"
@@ -2283,17 +2332,17 @@ watch(() => gameState.value?.current_player, () => {
             <span class="text-[10px] font-black uppercase tracking-widest">{{ isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '') }}</span>
           </button>
           <div class="hidden xs:block">
-            <h2 class="text-xs-mobile font-black tracking-widest uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
+            <h2 class="text-[10px] sm:text-xs font-black tracking-[0.22em] uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
             <div class="flex items-center gap-1.5">
             </div>
           </div>
         </div>
 
-        <!-- Center Area: Reaction Display & Turn Indicator -->
+        <!-- Center Area: Reaction Display -->
         <div class="flex-1 flex justify-center items-center gap-1.5 sm:gap-4 overflow-hidden">
             <!-- Reaction Widget - 反应记录监控 -->
             <transition name="reaction-slide">
-              <div v-if="gameState?.current_reaction" class="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-400/20 shadow-sm backdrop-blur-md shrink-0 max-w-[120px] xs:max-w-[180px] sm:max-w-none group hover:border-emerald-500/40 transition-colors">
+              <div v-if="gameState?.current_reaction" class="flex items-center gap-1.5 sm:gap-3 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-400/20 shadow-sm backdrop-blur-md shrink-0 max-w-[150px] xs:max-w-[220px] sm:max-w-none group hover:border-emerald-500/40 transition-colors">
                   <div class="flex flex-col items-start leading-none gap-0.5 min-w-0">
                     <span class="text-[5px] sm:text-[7px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 opacity-80 flex items-center gap-1">
                       <Binary class="w-1.5 h-1.5 sm:w-2 sm:h-2" />
@@ -2306,47 +2355,6 @@ watch(() => gameState.value?.current_player, () => {
                   <div class="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
               </div>
             </transition>
-
-            <!-- Top Turn Indicator Inline -->
-            <div v-if="gameState?.status === 'playing'" class="animate-in fade-in zoom-in duration-500">
-              <div :class="cn(
-                'flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl border shadow-sm backdrop-blur-xl transition-all duration-500 relative overflow-hidden',
-                isMyTurn 
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400 text-white ring-4 ring-blue-500/10' 
-                  : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200'
-              )">
-                <!-- Time Progress Bar -->
-                <div 
-                  v-if="hasTurnLimit"
-                  class="absolute bottom-0 left-0 h-[3px] transition-all duration-100 ease-linear"
-                  :class="[
-                    isMyTurn ? 'bg-white/30' : 'bg-blue-500/30',
-                    timeRemaining <= 5 && 'bg-rose-500/50'
-                  ]"
-                  :style="{ width: `${timePercent}%` }"
-                ></div>
-
-                <div class="relative flex items-center justify-center shrink-0">
-                  <div v-if="isMyTurn" class="absolute inset-0 bg-white rounded-full blur-sm animate-pulse"></div>
-                  <Zap v-if="isMyTurn" class="w-3 sm:w-3.5 h-3 sm:h-3.5 fill-current relative z-10" />
-                  <Timer v-else class="w-2.5 sm:w-3 h-2.5 sm:h-3 relative z-10" :class="hasTurnLimit && timeRemaining <= 10 && 'text-rose-500 animate-spin-slow'" />
-                </div>
-                <div class="flex flex-col items-start leading-none gap-0.5 min-w-0">
-                  <span class="text-[7px] sm:text-[9px] font-black uppercase tracking-widest opacity-70">{{ isMyTurn ? 'Your Operation' : 'Active' }}</span>
-                  <span class="text-[9px] sm:text-xs font-black uppercase tracking-tight truncate max-w-[80px] sm:max-w-[120px]" :class="!isMyTurn && shouldShowInBlue(currentPlayerObj) ? 'text-blue-600 dark:text-blue-400' : ''">
-                    {{ isMyTurn ? '轮到你了' : getPlayerDisplayName(currentPlayerObj) }}
-                  </span>
-                </div>
-                <div v-if="isMyTurn" class="pl-2 border-l border-white/20">
-                  <span v-if="hasTurnLimit" class="text-[10px] font-mono font-black">{{ timeRemaining }}S</span>
-                  <span v-else class="text-[10px] font-mono font-black">∞</span>
-                </div>
-                <!-- Mini Direction indicator -->
-                <div v-if="!isMyTurn" class="pl-2 ml-1 border-l border-slate-200 dark:border-white/10 shrink-0">
-                   <div class="w-1.5 h-1.5 rounded-full" :class="gameState?.direction === 1 ? 'bg-blue-500' : 'bg-amber-500'"></div>
-                </div>
-              </div>
-            </div>
         </div>
 
         <!-- Global Status -->
@@ -2412,22 +2420,10 @@ watch(() => gameState.value?.current_player, () => {
         </div>
       </div>
 
-      <!-- PvE Experimental Dynamics Floating Window -->
-      <div v-if="roomInfo?.is_pve && pveToasts.length > 0" class="fixed top-14 sm:top-20 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-2 pointer-events-none">
-        <div 
-          v-for="toast in pveToasts" 
-          :key="toast.id"
-          class="bg-blue-600/90 backdrop-blur-md text-white px-4 py-2 rounded-xl shadow-lg border border-white/20 text-[10px] sm:text-xs font-bold animate-in slide-in-from-top-2 fade-in duration-300 flex items-center gap-2"
-        >
-          <Activity class="w-3.5 h-3.5 text-blue-200" />
-          {{ toast.text }}
-        </div>
-      </div>
-
       <!-- Input box and Timer - 顶栏下方7px -->
-      <div v-if="isMyTurn" class="relative w-full flex justify-center px-4 z-[60]" style="margin-top: 7px;">
-        <div class="flex flex-col items-center gap-2 sm:gap-2 animate-in slide-in-from-top-4">
-          <div class="flex items-center bg-white/90 dark:bg-black/80 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl sm:rounded-lg p-1 sm:p-0.5 shadow-xl">
+      <div v-if="isMyTurn" class="relative w-full flex justify-center px-4 z-[60] mt-2">
+        <div class="flex flex-col items-center gap-2 animate-in slide-in-from-top-2">
+          <div class="flex items-center bg-white/88 dark:bg-black/72 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 rounded-xl p-1 shadow-lg">
             <input
               v-model="substanceInput"
               data-testid="game-substance-input"
@@ -2437,7 +2433,7 @@ watch(() => gameState.value?.current_player, () => {
               placeholder="手动注入化学式"
               :inputmode="isMobile || user.enable_element_input ? 'none' : 'text'"
               autocomplete="off"
-              class="bg-transparent border-none outline-none text-sm sm:text-xs-mobile px-3 sm:px-2 py-1.5 sm:py-0.5 w-32 sm:w-40 font-black tracking-widest placeholder:text-slate-400 text-slate-900 dark:text-white"
+              class="bg-transparent border-none outline-none text-sm sm:text-xs-mobile px-3 sm:px-2 py-1.5 sm:py-1 w-32 sm:w-40 font-black tracking-widest placeholder:text-slate-400 text-slate-900 dark:text-white"
             />
 
             <div class="flex items-center gap-1">
@@ -2848,40 +2844,19 @@ watch(() => gameState.value?.current_player, () => {
 
       <!-- Hand / Deck Area -->
       <div class="fixed bottom-0 left-0 right-0 z-[70] bg-white/70 dark:bg-black/60 backdrop-blur-2xl border-t border-slate-200 dark:border-white/5 flex flex-col items-center">
-        <!-- 教学模式提示 - 手牌栏上方，紧凑样式 -->
-        <div v-if="isTutorialMode && tutorialHintText && isMyTurn" class="absolute bottom-full mb-4 left-0 right-0 flex justify-center px-4 animate-in slide-in-from-bottom-4 z-50 pointer-events-none">
-          <div class="bg-gradient-to-br from-amber-500 to-orange-500 backdrop-blur-xl border border-amber-300 rounded-xl shadow-lg px-4 py-2 max-w-md mx-auto relative overflow-hidden pointer-events-none">
-            <!-- 背景装饰 -->
-            <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent_50%)]"></div>
-
-            <!-- 脚本进度指示器 -->
-            <div v-if="tutorialScriptMode" class="relative mb-2 flex items-center justify-between">
-              <div class="text-[9px] font-black text-white/80 uppercase tracking-wider">
-                Step {{ tutorialStepDisplay }}/{{ TUTORIAL_TOTAL_STEPS }}
+        <div v-if="isTutorialMode && tutorialHintText && isMyTurn" class="absolute bottom-full mb-3 right-4 sm:right-6 max-w-sm z-50 pointer-events-none animate-in slide-in-from-bottom-2">
+          <div class="room-assistive-card">
+            <div class="room-assistive-card__header">
+              <div class="room-assistive-card__badge">
+                <Orbit class="w-3.5 h-3.5" />
+                {{ tutorialAssistiveTitle }}
               </div>
-              <div class="flex-1 mx-2 h-1 bg-white/20 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-white/60 rounded-full transition-all duration-500"
-                  :style="{ width: `${tutorialProgressPercent}%` }"
-                ></div>
-              </div>
-              <div class="text-[9px] font-bold text-white/60">
-                {{ tutorialProgressPercent }}%
-              </div>
+              <span v-if="tutorialScriptMode" class="room-assistive-card__progress">{{ tutorialProgressPercent }}%</span>
             </div>
-
-            <!-- 内容 -->
-            <div class="relative flex items-center gap-2">
-              <div class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <Sparkles class="w-4 h-4 text-white" />
-              </div>
-              <div class="flex-1">
-                <p class="text-white text-xs sm:text-sm font-bold leading-snug" v-html="tutorialHintText"></p>
-              </div>
+            <div v-if="tutorialScriptMode" class="room-assistive-card__track">
+              <div class="room-assistive-card__bar" :style="{ width: `${tutorialProgressPercent}%` }"></div>
             </div>
-
-            <!-- 装饰条 -->
-            <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            <p class="room-assistive-card__text" v-html="tutorialHintText"></p>
           </div>
         </div>
 

@@ -6,7 +6,7 @@
 export interface TutorialStep {
   stepNumber: number
   player: 'human' | 'ai'
-  action: 'play' | 'double'
+  action: 'play' | 'double' | 'draw'
   substance?: string
   substances?: string[] // 用于双元素
   hint: string
@@ -54,8 +54,7 @@ export const TUTORIAL_SCRIPT: TutorialStep[] = [
   {
     stepNumber: 6,
     player: 'ai',
-    action: 'play',
-    substance: '',
+    action: 'draw',
     hint: '⚗️ AI 无法响应，正在摸牌...',
     aiMessage: 'AI 选择摸牌'
   },

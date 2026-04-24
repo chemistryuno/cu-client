@@ -1,485 +1,385 @@
 <template>
   <Teleport to="body">
-    <div class="game-toast-container">
-      <TransitionGroup name="toast" tag="div">
-        <div
-          v-for="toast in toasts"
-          :key="toast.id"
-          :class="['game-toast', `toast-${toast.type}`]"
-          @click="dismissToast(toast.id)"
-        >
-          <!-- 背景粒子效果 -->
-          <div class="particles-bg">
-            <div v-for="i in 8" :key="i" class="particle" :style="{ '--i': i }"></div>
+    <div class="game-notification-layer">
+      <div v-if="statusNotice" class="notice-status-shell">
+        <div :class="['notice-status-card', `tone-${statusNotice.type}`]">
+          <div class="notice-status-icon">{{ iconMap[statusNotice.type] }}</div>
+          <div class="notice-status-copy">
+            <p v-if="statusNotice.title" class="notice-status-label">{{ statusNotice.title }}</p>
+            <p class="notice-status-text">{{ statusNotice.message }}</p>
           </div>
-
-          <!-- 发光边框 -->
-          <div class="glow-border"></div>
-
-          <!-- 内容区域 -->
-          <div class="toast-content">
-            <!-- 图标 -->
-            <div class="toast-icon">
-              <div v-if="toast.type === 'success'" class="icon-svg">✓</div>
-              <div v-else-if="toast.type === 'error'" class="icon-svg">✕</div>
-              <div v-else-if="toast.type === 'warning'" class="icon-svg">!</div>
-              <div v-else class="icon-svg">ℹ</div>
-            </div>
-
-            <!-- 信息 -->
-            <div class="toast-text">
-              <div v-if="toast.title" class="toast-title">{{ toast.title }}</div>
-              <div class="toast-message">{{ toast.message }}</div>
-            </div>
-          </div>
-
-          <!-- 进度条 -->
-          <div class="progress-bar" :style="{ animationDuration: `${toast.duration}ms` }"></div>
-
-          <!-- 波纹效果 -->
-          <div class="ripple"></div>
         </div>
-      </TransitionGroup>
+      </div>
+
+      <div ref="eventStackRef" class="notice-event-stack">
+        <TransitionGroup name="notice-event" tag="div" class="notice-event-group">
+          <div
+            v-for="toast in eventToasts"
+            :key="toast.id"
+            :class="['notice-event-card', `tone-${toast.type}`]"
+            @click="dismissToast(toast.id)"
+          >
+            <div class="notice-event-mark">{{ iconMap[toast.type] }}</div>
+            <div class="notice-event-copy">
+              <div v-if="toast.title" class="notice-event-title">{{ toast.title }}</div>
+              <div class="notice-event-message">{{ toast.message }}</div>
+            </div>
+            <div class="notice-event-timer" :style="{ animationDuration: `${toast.duration}ms` }"></div>
+          </div>
+        </TransitionGroup>
+      </div>
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
+import gsap from 'gsap'
 
-interface GameToast {
+type ToastTone = 'info' | 'success' | 'warning' | 'error'
+
+interface EventToast {
   id: number
-  type: 'info' | 'success' | 'warning' | 'error'
+  type: ToastTone
   title?: string
   message: string
   duration: number
 }
 
-const toasts = ref<GameToast[]>([])
+interface StatusNotice {
+  type: ToastTone
+  title?: string
+  message: string
+}
+
+const eventToasts = ref<EventToast[]>([])
+const statusNotice = ref<StatusNotice | null>(null)
+const eventStackRef = ref<HTMLElement | null>(null)
+const iconMap: Record<ToastTone, string> = {
+  info: 'i',
+  success: '+',
+  warning: '!',
+  error: 'x',
+}
+
 let toastId = 0
+
+const animateStack = () => {
+  if (!eventStackRef.value) return
+  const cards = Array.from(eventStackRef.value.querySelectorAll('.notice-event-card'))
+  if (!cards.length) return
+
+  gsap.fromTo(
+    cards,
+    { y: -10, opacity: 0, scale: 0.98 },
+    {
+      y: 0,
+      opacity: 1,
+      scale: 1,
+      duration: 0.22,
+      ease: 'power2.out',
+      stagger: 0.035,
+      overwrite: 'auto',
+    },
+  )
+}
 
 const showToast = (
   message: string,
   title?: string,
-  type: GameToast['type'] = 'info',
-  duration: number = 4000
+  type: ToastTone = 'info',
+  duration: number = 3600,
 ) => {
-  const id = toastId++
+  const id = ++toastId
 
-  toasts.value.push({
+  eventToasts.value.unshift({
     id,
     type,
     title,
     message,
-    duration
+    duration,
   })
 
-  setTimeout(() => {
+  if (eventToasts.value.length > 4) {
+    eventToasts.value = eventToasts.value.slice(0, 4)
+  }
+
+  void nextTick(() => animateStack())
+
+  window.setTimeout(() => {
     dismissToast(id)
   }, duration)
 }
 
 const dismissToast = (id: number) => {
-  const idx = toasts.value.findIndex(t => t.id === id)
-  if (idx !== -1) {
-    toasts.value.splice(idx, 1)
-  }
+  eventToasts.value = eventToasts.value.filter((toast) => toast.id !== id)
 }
 
-// 暴露方法供父组件调用
+const setStatus = (
+  message: string,
+  title?: string,
+  type: ToastTone = 'info',
+) => {
+  statusNotice.value = { message, title, type }
+}
+
+const clearStatus = () => {
+  statusNotice.value = null
+}
+
 defineExpose({
-  showToast
+  showToast,
+  dismissToast,
+  setStatus,
+  clearStatus,
 })
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap');
-
-.game-toast-container {
+.game-notification-layer {
   position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  pointer-events: none;
-}
-
-@media (max-width: 640px) {
-  .game-toast-container {
-    top: 60px;
-    right: 12px;
-    left: 12px;
-  }
-}
-
-/* ==================== Toast 基础样式 ==================== */
-.game-toast {
-  position: relative;
-  width: 380px;
-  max-width: calc(100vw - 24px);
-  padding: 16px 18px;
-  border-radius: 12px;
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  overflow: hidden;
-  pointer-events: none;
-  animation: toast-slide-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition: transform 0.2s ease;
-}
-
-.game-toast:hover {
-  transform: translateX(-4px);
-}
-
-/* ==================== 类型配色 ==================== */
-/* 信息提示 - 蓝色 */
-.toast-info {
-  background: linear-gradient(135deg,
-    rgba(59, 130, 246, 0.12) 0%,
-    rgba(37, 99, 235, 0.18) 100%);
-  box-shadow:
-    0 4px 24px rgba(59, 130, 246, 0.25),
-    0 0 0 1px rgba(59, 130, 246, 0.15),
-    inset 0 0 40px rgba(59, 130, 246, 0.08);
-}
-
-.toast-info .glow-border {
-  background: linear-gradient(45deg,
-    #3b82f6 0%,
-    #2563eb 50%,
-    #3b82f6 100%);
-}
-
-.toast-info .progress-bar {
-  background: linear-gradient(90deg, #3b82f6, #2563eb);
-}
-
-.toast-info .icon-svg {
-  color: #3b82f6;
-}
-
-/* 成功提示 - 绿色 */
-.toast-success {
-  background: linear-gradient(135deg,
-    rgba(34, 197, 94, 0.12) 0%,
-    rgba(22, 163, 74, 0.18) 100%);
-  box-shadow:
-    0 4px 24px rgba(34, 197, 94, 0.25),
-    0 0 0 1px rgba(34, 197, 94, 0.15),
-    inset 0 0 40px rgba(34, 197, 94, 0.08);
-}
-
-.toast-success .glow-border {
-  background: linear-gradient(45deg,
-    #22c55e 0%,
-    #16a34a 50%,
-    #22c55e 100%);
-}
-
-.toast-success .progress-bar {
-  background: linear-gradient(90deg, #22c55e, #16a34a);
-}
-
-.toast-success .icon-svg {
-  color: #22c55e;
-}
-
-/* 警告提示 - 橙色 */
-.toast-warning {
-  background: linear-gradient(135deg,
-    rgba(249, 115, 22, 0.12) 0%,
-    rgba(234, 88, 12, 0.18) 100%);
-  box-shadow:
-    0 4px 24px rgba(249, 115, 22, 0.25),
-    0 0 0 1px rgba(249, 115, 22, 0.15),
-    inset 0 0 40px rgba(249, 115, 22, 0.08);
-}
-
-.toast-warning .glow-border {
-  background: linear-gradient(45deg,
-    #f97316 0%,
-    #ea580c 50%,
-    #f97316 100%);
-}
-
-.toast-warning .progress-bar {
-  background: linear-gradient(90deg, #f97316, #ea580c);
-}
-
-.toast-warning .icon-svg {
-  color: #f97316;
-}
-
-/* 错误提示 - 红色 */
-.toast-error {
-  background: linear-gradient(135deg,
-    rgba(239, 68, 68, 0.12) 0%,
-    rgba(220, 38, 38, 0.18) 100%);
-  box-shadow:
-    0 4px 24px rgba(239, 68, 68, 0.25),
-    0 0 0 1px rgba(239, 68, 68, 0.15),
-    inset 0 0 40px rgba(239, 68, 68, 0.08);
-}
-
-.toast-error .glow-border {
-  background: linear-gradient(45deg,
-    #ef4444 0%,
-    #dc2626 50%,
-    #ef4444 100%);
-}
-
-.toast-error .progress-bar {
-  background: linear-gradient(90deg, #ef4444, #dc2626);
-}
-
-.toast-error .icon-svg {
-  color: #ef4444;
-}
-
-/* ==================== 发光边框动画 ==================== */
-.glow-border {
-  position: absolute;
-  inset: -1.5px;
-  border-radius: 12px;
-  padding: 1.5px;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: glow-pulse 2.5s ease-in-out infinite;
-  opacity: 0.6;
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-}
-
-/* ==================== 粒子背景 ==================== */
-.particles-bg {
-  position: absolute;
   inset: 0;
-  overflow: hidden;
-  border-radius: 12px;
-  opacity: 0.6;
+  pointer-events: none;
+  z-index: 140;
 }
 
-.particle {
+.notice-status-shell {
   position: absolute;
-  width: 3px;
-  height: 3px;
-  background: currentColor;
-  border-radius: 50%;
-  opacity: 0;
-  animation: particle-rise 2.5s ease-out infinite;
-  animation-delay: calc(var(--i) * 0.25s);
+  top: 0.9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(42rem, calc(100vw - 2rem));
 }
 
-.particle:nth-child(odd) {
-  left: calc(var(--i) * 12%);
-}
-
-.particle:nth-child(even) {
-  right: calc(var(--i) * 12%);
-}
-
-@keyframes particle-rise {
-  0% {
-    transform: translateY(0) scale(0);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.8;
-    transform: translateY(-15px) scale(1);
-  }
-  80% {
-    opacity: 0.2;
-    transform: translateY(-50px) scale(0.5);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-60px) scale(0);
-  }
-}
-
-/* ==================== 内容区域 ==================== */
-.toast-content {
-  position: relative;
+.notice-status-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  z-index: 1;
+  gap: 0.8rem;
+  min-height: 3.25rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 22px 48px -34px rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 
-/* ==================== 图标 ==================== */
-.toast-icon {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  display: flex;
+.notice-status-icon,
+.notice-event-mark {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
+  width: 1.8rem;
+  height: 1.8rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.icon-svg {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-  animation: icon-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes icon-bounce {
-  0% {
-    transform: scale(0) rotate(-180deg);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.2) rotate(10deg);
-  }
-  100% {
-    transform: scale(1) rotate(0);
-    opacity: 1;
-  }
-}
-
-/* ==================== 信息文本 ==================== */
-.toast-text {
-  flex: 1;
+.notice-status-copy,
+.notice-event-copy {
   min-width: 0;
+  flex: 1;
 }
 
-.toast-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
+.notice-status-label,
+.notice-event-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.62rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.92);
+}
+
+.notice-status-text,
+.notice-event-message {
+  margin: 0;
+  color: #0f172a;
   font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  margin-bottom: 4px;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
-.toast-message {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.4;
-  overflow-wrap: break-word;
+.notice-status-text {
+  font-size: 0.92rem;
 }
 
-/* ==================== 进度条 ==================== */
-.progress-bar {
+.notice-event-message {
+  font-size: 0.82rem;
+}
+
+.notice-event-stack {
   position: absolute;
+  top: 4.8rem;
+  right: 1rem;
+  width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.notice-event-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.notice-event-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.8rem 0.9rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: 0 18px 38px -30px rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(18px) saturate(145%);
+  overflow: hidden;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.notice-event-timer {
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
   bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2.5px;
-  box-shadow: 0 0 8px currentColor;
-  animation: progress-shrink linear forwards;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.22;
+  transform-origin: left center;
+  animation: notice-timer linear forwards;
 }
 
-@keyframes progress-shrink {
-  from { width: 100%; }
-  to { width: 0%; }
+.tone-info {
+  color: #0369a1;
 }
 
-/* ==================== 波纹效果 ==================== */
-.ripple {
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  background: radial-gradient(circle at center,
-    rgba(255, 255, 255, 0.2) 0%,
-    transparent 70%);
+.tone-success {
+  color: #15803d;
+}
+
+.tone-warning {
+  color: #c2410c;
+}
+
+.tone-error {
+  color: #b91c1c;
+}
+
+.tone-info.notice-status-card,
+.tone-info.notice-event-card {
+  border-color: rgba(14, 165, 233, 0.24);
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.92), rgba(239, 246, 255, 0.82));
+}
+
+.tone-success.notice-status-card,
+.tone-success.notice-event-card {
+  border-color: rgba(34, 197, 94, 0.22);
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.92), rgba(236, 253, 245, 0.82));
+}
+
+.tone-warning.notice-status-card,
+.tone-warning.notice-event-card {
+  border-color: rgba(249, 115, 22, 0.24);
+  background: linear-gradient(180deg, rgba(255, 247, 237, 0.94), rgba(255, 237, 213, 0.82));
+}
+
+.tone-error.notice-status-card,
+.tone-error.notice-event-card {
+  border-color: rgba(248, 113, 113, 0.26);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.94), rgba(254, 226, 226, 0.84));
+}
+
+.notice-event-enter-active,
+.notice-event-leave-active {
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.notice-event-enter-from,
+.notice-event-leave-to {
   opacity: 0;
-  animation: ripple-fade 0.6s ease-out;
+  transform: translateY(-0.45rem);
 }
 
-@keyframes ripple-fade {
-  0% {
-    opacity: 1;
-    transform: scale(0.9);
+@keyframes notice-timer {
+  from {
+    transform: scaleX(1);
   }
-  100% {
-    opacity: 0;
-    transform: scale(1.3);
-  }
-}
 
-/* ==================== Toast 动画 ==================== */
-@keyframes toast-slide-in {
-  0% {
-    transform: translateX(400px) scale(0.9);
-    opacity: 0;
-  }
-  60% {
-    transform: translateX(-8px) scale(1.02);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(0) scale(1);
-    opacity: 1;
+  to {
+    transform: scaleX(0);
   }
 }
 
-/* Vue Transition */
-.toast-enter-active {
-  animation: toast-slide-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+.dark .notice-status-card {
+  background: rgba(11, 20, 32, 0.9);
+  border-color: rgba(148, 163, 184, 0.16);
 }
 
-.toast-leave-active {
-  animation: toast-slide-out 0.35s ease-in forwards;
+.dark .notice-event-card {
+  background: rgba(10, 19, 29, 0.92);
+  border-color: rgba(148, 163, 184, 0.14);
 }
 
-@keyframes toast-slide-out {
-  0% {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(400px) scale(0.85);
-    opacity: 0;
-  }
+.dark .notice-status-icon,
+.dark .notice-event-mark {
+  background: rgba(15, 23, 42, 0.74);
 }
 
-.toast-move {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+.dark .notice-status-label,
+.dark .notice-event-title {
+  color: rgba(148, 163, 184, 0.88);
 }
 
-/* 响应式优化 */
+.dark .notice-status-text,
+.dark .notice-event-message {
+  color: #e2e8f0;
+}
+
+.dark .tone-info.notice-status-card,
+.dark .tone-info.notice-event-card {
+  background: linear-gradient(180deg, rgba(8, 47, 73, 0.9), rgba(12, 74, 110, 0.64));
+}
+
+.dark .tone-success.notice-status-card,
+.dark .tone-success.notice-event-card {
+  background: linear-gradient(180deg, rgba(20, 83, 45, 0.9), rgba(6, 78, 59, 0.62));
+}
+
+.dark .tone-warning.notice-status-card,
+.dark .tone-warning.notice-event-card {
+  background: linear-gradient(180deg, rgba(124, 45, 18, 0.92), rgba(154, 52, 18, 0.66));
+}
+
+.dark .tone-error.notice-status-card,
+.dark .tone-error.notice-event-card {
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.92), rgba(153, 27, 27, 0.66));
+}
+
 @media (max-width: 640px) {
-  .game-toast {
-    padding: 14px 16px;
+  .notice-status-shell {
+    top: 0.65rem;
+    width: calc(100vw - 1rem);
   }
 
-  .toast-icon {
-    width: 36px;
-    height: 36px;
+  .notice-status-card {
+    min-height: 3rem;
+    padding: 0.72rem 0.85rem;
+    border-radius: 1rem;
   }
 
-  .icon-svg {
-    font-size: 20px;
+  .notice-event-stack {
+    top: 4.35rem;
+    right: 0.5rem;
+    width: min(18rem, calc(100vw - 1rem));
   }
 
-  .toast-title {
-    font-size: 13px;
-  }
-
-  .toast-message {
-    font-size: 12px;
-  }
-}
-
-/* 暗色模式优化 */
-@media (prefers-color-scheme: dark) {
-  .game-toast {
-    border-color: rgba(255, 255, 255, 0.12);
+  .notice-event-card {
+    padding: 0.72rem 0.78rem 0.85rem;
   }
 }
 </style>

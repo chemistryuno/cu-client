@@ -71,6 +71,32 @@ export const callOfflineApi = async (page: Page, path: string, method: 'GET' | '
   })
 }
 
+export const getCurrentRoomId = async (page: Page) => {
+  return page.evaluate(() => {
+    const match = window.location.hash.match(/#\/room\/([^/?]+)/)
+    return match?.[1] || null
+  })
+}
+
+export const waitForOfflineRoomState = async <T = any>(
+  page: Page,
+  roomId: string,
+  predicate: (data: T) => boolean,
+  timeoutMs = 5000,
+) => {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await callOfflineApi(page, `/rooms/${roomId}`, 'GET')
+    if (response.status === 200 && predicate(response.data as T)) {
+      return response.data as T
+    }
+    await page.waitForTimeout(150)
+  }
+
+  throw new Error(`Timed out waiting for room state predicate for room ${roomId}`)
+}
+
 export const resetRuntimeState = async (page: Page) => {
   await page.goto('/#/login')
   await page.evaluate(({ keys }) => {

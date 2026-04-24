@@ -95,7 +95,7 @@ const previewUser = computed(() => ({
         <div class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="console-eyebrow">Local Profile Setup</p>
+              <p class="console-notice-chip">Local Profile Setup</p>
               <h1 class="console-section-title text-2xl mt-2">
                 Chemistry UNO
               </h1>
@@ -137,7 +137,7 @@ const previewUser = computed(() => ({
             </div>
           </div>
 
-          <div :class="cn(consolePanel({ tone: 'inset', radius: 'lg', padding: 'sm' }), 'mb-4 flex items-center gap-4')">
+          <div :class="cn(consolePanel({ tone: 'inset', radius: 'lg', padding: 'sm' }), 'mb-4 flex items-center gap-4 border-sky-500/10')">
             <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-[#0b1420] border border-slate-200 dark:border-white/10 flex items-center justify-center text-2xl overflow-hidden">
               <UserAvatar :avatar="previewUser.avatar" />
             </div>
