@@ -1,7 +1,7 @@
-/* 遮罩动画 */
+/* Overlay */
 .tutorial-fade-enter-active,
 .tutorial-fade-leave-active {
-  transition: opacity 0.4s ease;
+  transition: opacity 0.36s ease;
 }
 
 .tutorial-fade-enter-from,
@@ -9,186 +9,171 @@
   opacity: 0;
 }
 
-/* 聚光灯动画 */
+.tutorial-overlay {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.tutorial-tooltip {
+  top: 0;
+  left: 0;
+  will-change: left, top, transform, opacity;
+}
+
+.tutorial-card {
+  transform-origin: center center;
+  backface-visibility: hidden;
+  contain: layout paint;
+}
+
 .spotlight-enter-active,
 .spotlight-leave-active {
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.24s ease, transform 0.24s ease;
 }
 
 .spotlight-enter-from,
 .spotlight-leave-to {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.8);
+  transform: translate(-50%, -50%) scale(0.975);
 }
 
-/* 扫描线动画 */
-@keyframes scan {
-  0% {
-    top: 0;
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
+.tutorial-focus-box {
+  position: absolute;
+  isolation: isolate;
+}
+
+.focus-box-ring,
+.focus-box-ring-secondary,
+.focus-box-glint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.focus-box-ring {
+  border: 2px solid rgba(15, 23, 42, 0.75);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 8px 24px -16px rgba(15, 23, 42, 0.45);
+  will-change: transform, opacity;
+  animation: focus-box-breathe 2.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.focus-box-ring-secondary {
+  inset: 3px;
+  border: 1px dashed rgba(15, 23, 42, 0.38);
+  opacity: 0.65;
+  animation: focus-box-secondary-breathe 2.8s ease-in-out infinite;
+}
+
+.focus-box-glint {
+  overflow: hidden;
+}
+
+.focus-box-glint::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 34%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 55%, transparent 100%);
+  will-change: transform;
+  transform: translateX(-150%) skewX(-16deg);
+  animation: focus-box-glint 2.4s linear infinite;
+}
+
+:global(.dark) .focus-box-ring {
+  border-color: rgba(226, 232, 240, 0.92);
+  box-shadow: 0 0 0 1px rgba(226, 232, 240, 0.14), 0 8px 24px -16px rgba(226, 232, 240, 0.35);
+}
+
+:global(.dark) .focus-box-ring-secondary {
+  border-color: rgba(226, 232, 240, 0.45);
+}
+
+:global(.dark) .focus-box-glint::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(226, 232, 240, 0.58) 55%, transparent 100%);
+}
+
+@keyframes focus-box-breathe {
+  0%,
   100% {
-    top: 100%;
-    opacity: 0;
-  }
-}
-
-.scan-line {
-  animation: scan 3s ease-in-out infinite;
-}
-
-/* 角落装饰动画 */
-.corner-tl,
-.corner-tr,
-.corner-bl,
-.corner-br {
-  animation: corner-pulse 2s ease-in-out infinite;
-}
-
-@keyframes corner-pulse {
-  0%, 100% {
-    opacity: 0.4;
+    transform: scale(1);
+    opacity: 0.86;
   }
   50% {
+    transform: scale(1.012);
     opacity: 1;
   }
 }
 
-/* 提示卡片动画 - 居中缩放 */
-.tooltip-scale-enter-active,
-.tooltip-scale-leave-active {
-  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.tooltip-scale-enter-from,
-.tooltip-scale-leave-to {
-  opacity: 0;
-  transform: scale(0.7) translateY(-20px);
-}
-
-.tooltip-center {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* 提示卡片动画 - 滑入 */
-.tooltip-slide-enter-active,
-.tooltip-slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.tooltip-slide-enter-from,
-.tooltip-slide-leave-to {
-  opacity: 0;
-  transform: var(--slide-transform, translate(-50%, -100%)) scale(0.9);
-}
-
-/* 箭头样式 */
-.arrow-top {
-  left: calc(50% + var(--arrow-offset-x, 0px));
-  top: -8px;
-  transform: translateX(-50%);
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-bottom: 12px solid white;
-}
-:global(.dark) .arrow-top {
-  border-bottom-color: rgba(15, 23, 42, 0.95);
-}
-
-.arrow-bottom {
-  left: calc(50% + var(--arrow-offset-x, 0px));
-  bottom: -8px;
-  transform: translateX(-50%);
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-top: 12px solid white;
-}
-:global(.dark) .arrow-bottom {
-  border-top-color: rgba(15, 23, 42, 0.95);
-}
-
-.arrow-left {
-  left: -8px;
-  top: calc(50% + var(--arrow-offset-y, 0px));
-  transform: translateY(-50%);
-  border-top: 12px solid transparent;
-  border-bottom: 12px solid transparent;
-  border-right: 12px solid white;
-}
-:global(.dark) .arrow-left {
-  border-right-color: rgba(15, 23, 42, 0.95);
-}
-
-.arrow-right {
-  right: -8px;
-  top: calc(50% + var(--arrow-offset-y, 0px));
-  transform: translateY(-50%);
-  border-top: 12px solid transparent;
-  border-bottom: 12px solid transparent;
-  border-left: 12px solid white;
-}
-:global(.dark) .arrow-right {
-  border-left-color: rgba(15, 23, 42, 0.95);
-}
-
-/* 粒子效果 */
-.particle {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background: rgba(59, 130, 246, 0.4);
-  border-radius: 50%;
-  animation: particle-float 8s ease-in-out infinite;
-}
-:global(.dark) .particle {
-  background: rgba(34, 211, 238, 0.6);
-}
-
-@keyframes particle-float {
+@keyframes focus-box-secondary-breathe {
   0% {
-    transform: translate(0, 100vh) scale(0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(calc(100vw * (var(--random, 0.5) - 0.5)), -100px) scale(1);
-    opacity: 0;
-  }
-}
-
-.particle:nth-child(odd) {
-  --random: 0.3;
-}
-
-.particle:nth-child(even) {
-  --random: 0.7;
-}
-
-/* 脉冲动画 */
-@keyframes pulse-slow {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
+    opacity: 0.48;
   }
   50% {
     opacity: 0.8;
-    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.48;
   }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
+@keyframes focus-box-glint {
+  0% {
+    transform: translateX(-150%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-16deg);
+  }
+}
+
+:global(.tutorial-target-highlight) {
+  --tutorial-target-glow: rgba(15, 23, 42, 0.14);
+  filter: brightness(1.03) saturate(1.02);
+  transition: filter 0.25s ease;
+  animation: tutorial-target-breathe 2.4s ease-in-out infinite;
+  will-change: filter;
+}
+
+:global(.dark .tutorial-target-highlight) {
+  --tutorial-target-glow: rgba(226, 232, 240, 0.22);
+  filter: brightness(1.08) saturate(1.03);
+}
+
+@keyframes tutorial-target-breathe {
+  0%,
+  100% {
+    filter: brightness(1.03) saturate(1.02);
+  }
+  50% {
+    filter: brightness(1.08) saturate(1.08) drop-shadow(0 0 10px var(--tutorial-target-glow));
+  }
+}
+
+@media (max-width: 640px) {
+  .tutorial-tooltip {
+    width: calc(100vw - 18px);
+    max-width: calc(100vw - 18px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-box-ring,
+  .focus-box-ring-secondary,
+  .focus-box-glint::before {
+    animation: none !important;
+  }
+
+  .focus-box-glint::before {
+    opacity: 0;
+  }
+
+  :global(.tutorial-target-highlight) {
+    animation: none;
+    filter: brightness(1.04) saturate(1.02);
+  }
+
+  .tutorial-fade-enter-active,
+  .tutorial-fade-leave-active {
+    transition-duration: 0.01ms;
+  }
 }
