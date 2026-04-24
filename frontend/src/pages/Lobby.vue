@@ -9,6 +9,7 @@ import TutorialGuide from '../components/TutorialGuide.vue'
 import { Beaker, Bot, BookOpen, Database, Loader2, Play, RotateCcw, Settings, Swords, UserRound, X } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { useI18n } from '../utils/i18n'
+import { consoleButton } from '../utils/ui'
 import '../styles/lobby.css'
 
 const router = useRouter()
@@ -312,11 +313,11 @@ onMounted(() => {
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <button @click="handleLeaveRoom(activeRoom.id)" class="px-4 py-2.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+            <button @click="handleLeaveRoom(activeRoom.id)" :class="cn(consoleButton({ tone: 'danger', size: 'sm' }), 'px-4 tracking-widest')">
               <X class="w-4 h-4" />
               {{ t('lobby.end') }}
             </button>
-            <button @click="handleResumeActiveRoom" class="px-6 py-2.5 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+            <button @click="handleResumeActiveRoom" :class="cn(consoleButton({ tone: 'secondary', size: 'sm' }), 'px-5 tracking-[0.2em] text-sky-700 dark:text-sky-300')">
               <Play class="w-4 h-4" />
               {{ t('lobby.continue') }}
             </button>
@@ -546,8 +547,8 @@ onMounted(() => {
           </div>
 
           <div class="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex gap-3 shrink-0">
-            <button type="button" @click="showAIArenaModal = false" class="flex-1 px-4 py-3 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-500">{{ t('common.cancel') }}</button>
-            <button type="submit" data-testid="ai-room-start-button" :disabled="loading" class="flex-[2] px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button type="button" @click="showAIArenaModal = false" :class="cn(consoleButton({ tone: 'secondary', size: 'md', block: true }), 'flex-1 text-slate-500')">{{ t('common.cancel') }}</button>
+            <button type="submit" data-testid="ai-room-start-button" :disabled="loading" :class="cn(consoleButton({ tone: 'primary', size: 'md' }), 'flex-[2]')">
               <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
               <span>{{ t('lobby.modal.start') }}</span>
             </button>

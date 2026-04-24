@@ -7,6 +7,8 @@ import { completeAuthSuccess } from '../utils/authSession'
 import UserAvatar from '../components/UserAvatar.vue'
 import { AVATAR_PRESETS } from '../utils/avatarPresets'
 import { useI18n } from '../utils/i18n'
+import { cn } from '../utils/cn'
+import { consoleButton, consolePanel } from '../utils/ui'
 
 const router = useRouter()
 const { locale, t, setLocale } = useI18n()
@@ -61,7 +63,7 @@ const handleSubmit = async () => {
 const randomizeNickname = () => {
   if (locale.value === 'zh-CN') {
     const prefixes = ['元素', '量子', '轨道', '催化', '离子', '星焰', '裂变', '晶格', '燃素', '极光', '反应', '分子']
-    const suffixes = ['旅人', '术士', '猎手', '行者', '学徒', '骑士', '使者', '工匠', '指挥官', '观测者', '调和者', '先驱']
+    const suffixes = ['旅人', '术士', '猎手', '行者', '学徒', '骑士', '使者', '工匠', '指挥官', '观察者', '调和者', '先驱']
     const extra = ['甲', '乙', '零', 'X', 'Z', 'Nova', 'Prime']
     const useExtra = Math.random() > 0.55
     nickname.value = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${suffixes[Math.floor(Math.random() * suffixes.length)]}${useExtra ? extra[Math.floor(Math.random() * extra.length)] : ''}${Math.floor(Math.random() * 90 + 10)}`
@@ -83,22 +85,41 @@ const previewUser = computed(() => ({
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-[#1a1a1e] relative overflow-hidden font-sans">
-    <div class="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]"></div>
-    <div class="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]"></div>
+  <div class="console-app-shell flex items-center justify-center p-4 relative overflow-hidden">
+    <div class="console-grid-overlay"></div>
+    <div class="absolute top-[-12%] right-[-8%] w-[36%] h-[36%] bg-sky-500/10 rounded-full blur-[120px]"></div>
+    <div class="absolute bottom-[-12%] left-[-8%] w-[34%] h-[34%] bg-orange-500/8 rounded-full blur-[120px]"></div>
 
     <div class="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
-      <div class="glass-panel-light rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden">
-        <div class="p-5 sm:p-6 md:p-7">
-          <div class="flex items-center justify-end mb-3">
-            <div class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 p-1">
+      <div :class="cn(consolePanel({ tone: 'base', radius: 'xl', padding: 'none' }), 'overflow-hidden')">
+        <div class="px-5 pt-5 sm:px-6 sm:pt-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="console-eyebrow">Local Profile Setup</p>
+              <h1 class="console-section-title text-2xl mt-2">
+                Chemistry UNO
+              </h1>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium tracking-[0.08em] uppercase">
+                {{ t('login.setup') }}
+              </p>
+            </div>
+
+            <div class="w-11 h-11 rounded-2xl bg-sky-700 text-white flex items-center justify-center shadow-lg shadow-sky-900/15">
+              <Beaker class="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        <div class="px-5 sm:px-6 pt-4 pb-6">
+          <div class="flex items-center justify-end mb-4">
+            <div class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-[#0f1720] p-1">
               <button
                 type="button"
                 @click="setLocale('zh-CN')"
-                :class="[
-                  'px-3 py-1.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5',
-                  locale === 'zh-CN' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400'
-                ]"
+                :class="cn(
+                  consoleButton({ tone: locale === 'zh-CN' ? 'primary' : 'ghost', size: 'sm' }),
+                  'px-3 min-h-8 tracking-[0.12em]'
+                )"
               >
                 <Globe class="w-3.5 h-3.5" />
                 {{ t('common.zh') }}
@@ -106,32 +127,22 @@ const previewUser = computed(() => ({
               <button
                 type="button"
                 @click="setLocale('en-US')"
-                :class="[
-                  'px-3 py-1.5 rounded-xl text-[11px] font-black transition-all',
-                  locale === 'en-US' ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400'
-                ]"
+                :class="cn(
+                  consoleButton({ tone: locale === 'en-US' ? 'primary' : 'ghost', size: 'sm' }),
+                  'px-3 min-h-8 tracking-[0.12em]'
+                )"
               >
                 {{ t('common.en') }}
               </button>
             </div>
           </div>
 
-          <div class="flex flex-col items-center mb-5">
-            <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mb-2 shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-500">
-              <Beaker class="w-6 h-6 text-white" />
-            </div>
-            <h1 class="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tighter">
-              Chemistry <span class="text-blue-600">UNO</span>
-            </h1>
-            <p class="text-slate-400 dark:text-slate-500 text-xs font-black uppercase tracking-[0.2em] mt-1 font-mono">{{ t('login.setup') }}</p>
-          </div>
-
-          <div class="mb-5 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 p-4 flex items-center gap-4">
-            <div class="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-2xl overflow-hidden">
+          <div :class="cn(consolePanel({ tone: 'inset', radius: 'lg', padding: 'sm' }), 'mb-4 flex items-center gap-4')">
+            <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-[#0b1420] border border-slate-200 dark:border-white/10 flex items-center justify-center text-2xl overflow-hidden">
               <UserAvatar :avatar="previewUser.avatar" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-1">{{ t('login.preview') }}</p>
+              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] mb-1">{{ t('login.preview') }}</p>
               <p class="text-lg font-black text-slate-900 dark:text-white truncate">{{ previewUser.nickname }}</p>
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('login.previewDesc') }}</p>
             </div>
@@ -141,7 +152,7 @@ const previewUser = computed(() => ({
             {{ error }}
           </div>
 
-          <form @submit.prevent="handleSubmit" class="space-y-5" data-testid="login-form">
+          <form @submit.prevent="handleSubmit" class="space-y-4" data-testid="login-form">
             <div class="space-y-2">
               <div class="flex items-center justify-between px-1">
                 <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.nickname') }}</label>
@@ -149,13 +160,13 @@ const previewUser = computed(() => ({
                   type="button"
                   data-testid="login-randomize-button"
                   @click="randomizeNickname"
-                  class="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest"
+                  class="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest"
                 >
                   {{ t('login.random') }}
                 </button>
               </div>
               <div class="relative group">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-700 dark:group-focus-within:text-sky-400 transition-colors">
                   <PencilLine class="w-4 h-4" />
                 </div>
                 <input
@@ -164,7 +175,7 @@ const previewUser = computed(() => ({
                   type="text"
                   maxlength="20"
                   required
-                  class="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 pl-10 pr-3 py-3 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-500/50 text-sm font-bold"
+                  class="w-full bg-slate-50 dark:bg-[#0b1420] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 pl-10 pr-3 py-3 rounded-2xl focus:ring-2 focus:ring-sky-700/20 focus:border-sky-700 dark:focus:border-sky-400 outline-none transition-all placeholder:text-slate-500/50 text-sm font-bold"
                   :placeholder="t('login.nicknamePlaceholder')"
                 />
               </div>
@@ -181,12 +192,12 @@ const previewUser = computed(() => ({
                   :data-testid="`avatar-option-${item}`"
                   type="button"
                   @click="avatar = item"
-                  :class="[
-                    'h-14 rounded-2xl border transition-all flex items-center justify-center bg-slate-50 dark:bg-white/5',
+                  :class="cn(
+                    'h-14 rounded-2xl border transition-all flex items-center justify-center',
                     avatar === item
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]'
-                      : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-500/40'
-                  ]"
+                      ? 'border-sky-700 dark:border-sky-400 bg-sky-700/10 text-sky-700 dark:text-sky-400 shadow-[0_0_0_1px_rgba(3,105,161,0.18)]'
+                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0f1720] text-slate-500 dark:text-slate-400 hover:border-sky-300 dark:hover:border-sky-500/40'
+                  )"
                 >
                   <div class="w-8 h-8 flex items-center justify-center text-lg overflow-hidden">
                     <UserAvatar :avatar="item" />
@@ -195,7 +206,7 @@ const previewUser = computed(() => ({
               </div>
             </div>
 
-            <div class="rounded-2xl bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-4 py-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <div :class="cn(consolePanel({ tone: 'soft', radius: 'lg', padding: 'sm' }), 'text-xs text-slate-500 dark:text-slate-400 leading-relaxed')">
               {{ t('login.intro') }}
             </div>
 
@@ -203,7 +214,7 @@ const previewUser = computed(() => ({
               type="submit"
               data-testid="login-submit-button"
               :disabled="loading"
-              class="w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-2xl font-black transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm"
+              :class="cn(consoleButton({ tone: 'primary', size: 'md', block: true }), 'text-sm rounded-2xl')"
             >
               <template v-if="loading">
                 <Loader2 class="w-4 h-4 animate-spin" />

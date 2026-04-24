@@ -9,6 +9,7 @@ import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
 import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
+import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
 import LevelUpAnimation from '../components/LevelUpAnimation.vue'
 import GameToast from '../components/GameToast.vue'
@@ -2198,9 +2199,10 @@ watch(() => gameState.value?.current_player, () => {
 </script>
 
 <template>
-  <div class="h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30">
+  <div class="console-app-shell h-screen w-full text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
+    <div class="console-grid-overlay"></div>
     <!-- Loading State -->
-    <div v-if="loading" class="h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div v-if="loading" class="h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <!-- Background Elements -->
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 dark:bg-blue-500/30 rounded-full blur-[120px] animate-pulse"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 dark:bg-purple-500/30 rounded-full blur-[120px]"></div>
@@ -2208,10 +2210,10 @@ watch(() => gameState.value?.current_player, () => {
 
       <div class="relative z-10 flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-700">
         <div class="relative group">
-          <div class="w-24 h-24 bg-blue-500/20 dark:bg-blue-500/30 border-2 border-blue-500/50 dark:border-blue-400/50 rounded-[32px] flex items-center justify-center transform rotate-12 group-hover:rotate-0 transition-all duration-700 shadow-lg shadow-blue-500/20">
+          <div class="w-24 h-24 bg-sky-700/15 dark:bg-sky-500/20 border border-sky-700/30 dark:border-sky-400/30 rounded-[28px] flex items-center justify-center transition-all duration-500 shadow-lg shadow-sky-900/10">
             <FlaskConical class="w-12 h-12 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform drop-shadow-lg" />
           </div>
-          <div class="absolute -top-2 -right-2 w-8 h-8 bg-blue-500 dark:bg-blue-400 rounded-xl flex items-center justify-center animate-bounce shadow-[0_0_20px_rgba(59,130,246,0.5)]">
+          <div class="absolute -top-2 -right-2 w-8 h-8 bg-sky-700 dark:bg-sky-500 rounded-xl flex items-center justify-center animate-bounce shadow-[0_0_20px_rgba(3,105,161,0.35)]">
              <Zap class="w-4 h-4 text-white fill-current" />
           </div>
         </div>
@@ -2228,7 +2230,7 @@ watch(() => gameState.value?.current_player, () => {
     </div>
 
     <!-- Error / No Data State - 防止黑屏 -->
-    <div v-else-if="!roomInfo" class="h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div v-else-if="!roomInfo" class="h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-600/10 dark:bg-red-500/20 rounded-full blur-[120px]"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 dark:bg-purple-500/20 rounded-full blur-[120px]"></div>
 
@@ -2243,14 +2245,14 @@ watch(() => gameState.value?.current_player, () => {
         <div class="flex items-center gap-3 mt-4">
           <button
             @click="loadError = null; loading = true; isReplayBridgeMode ? loadReplaySimulationState() : loadGameState()"
-            class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+            :class="cn(consoleButton({ tone: 'primary', size: 'md' }), 'text-xs')"
           >
             <RefreshCw class="w-4 h-4" />
             重新连接
           </button>
           <button
             @click="router.push('/')"
-            class="px-6 py-3 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white font-black rounded-xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs flex items-center gap-2"
+            :class="cn(consoleButton({ tone: 'secondary', size: 'md' }), 'text-xs')"
           >
             <ArrowLeft class="w-4 h-4" />
             返回大厅
@@ -2270,7 +2272,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Compressed Header - 移动端优化 -->
-      <header class="h-11 sm:h-16 bg-white/70 dark:bg-black/60 backdrop-blur-3xl border-b border-slate-200 dark:border-white/5 px-2 sm:px-6 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
+      <header class="h-11 sm:h-16 bg-white/80 dark:bg-[#071019]/88 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-6 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
         <div class="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
             @click="handleLeaveRoom"
@@ -3161,7 +3163,7 @@ watch(() => gameState.value?.current_player, () => {
     <!-- Players Floating Panel -->
     <div
       v-if="showPlayers"
-      class="fixed right-0 top-0 bottom-0 w-[85%] sm:w-80 z-[110] bg-white dark:bg-slate-900 border-l lg:border border-slate-200 dark:border-white/10 lg:rounded-[40px] lg:top-6 lg:bottom-52 lg:right-6 shadow-2xl flex flex-col overflow-hidden"
+      class="fixed right-0 top-0 bottom-0 w-[85%] sm:w-80 z-[110] bg-white/95 dark:bg-[#09131d]/96 border-l lg:border border-slate-300/60 dark:border-white/10 lg:rounded-[28px] lg:top-6 lg:bottom-52 lg:right-6 shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
     >
       <div class="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between sticky top-0 z-20 bg-inherit pb-6 lg:pb-4">
         <div class="flex items-center gap-3">
@@ -3321,7 +3323,7 @@ watch(() => gameState.value?.current_player, () => {
         :roomId="id"
         title="实验内通信线程"
         maxHeight="100%"
-        class="h-full !bg-white/95 dark:!bg-slate-900/60 backdrop-blur-3xl shadow-3xl lg:rounded-[40px] border-l lg:border border-slate-200 dark:border-white/10"
+        class="h-full !bg-white/95 dark:!bg-[#09131d]/96 backdrop-blur-2xl shadow-3xl lg:rounded-[28px] border-l lg:border border-slate-300/60 dark:border-white/10"
         @close="showChat = false"
         @input-focus="handleInputFocus"
         @input-blur="handleInputBlur"
@@ -3348,8 +3350,8 @@ watch(() => gameState.value?.current_player, () => {
     <!-- 牌组详情查看模态框 -->
     <div v-if="showDeckDetailModal && roomInfo?.deck_config" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md clickable" @click="showDeckDetailModal = false" />
-      <div class="relative w-full max-w-2xl bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[32px] shadow-2xl overflow-hidden">
-         <div class="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+      <div class="relative w-full max-w-2xl bg-white/95 dark:bg-[#09131d]/96 border border-slate-300/60 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-xl">
+         <div class="px-5 py-4 border-b border-slate-200/70 dark:border-white/8 flex items-center justify-between bg-sky-700/[0.04]">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-500">
                 <FlaskConical class="w-4 h-4" />
