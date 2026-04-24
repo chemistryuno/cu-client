@@ -6,7 +6,7 @@ import { clearClientAuthState, getStoredUser, sanitizeStoredUser } from '../util
 import { useDialog } from '../utils/dialog'
 import UserAvatar from '../components/UserAvatar.vue'
 import TutorialGuide from '../components/TutorialGuide.vue'
-import { Beaker, Bot, Database, Loader2, LogOut, Play, Settings, Swords, X, FileText } from 'lucide-vue-next'
+import { Beaker, Bot, BookOpen, Database, Loader2, Play, RotateCcw, Settings, Swords, UserRound, X } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { useI18n } from '../utils/i18n'
 import '../styles/lobby.css'
@@ -54,6 +54,14 @@ const pveUsingCustomDeck = computed(() => {
   const selected = decks.value.find((deck: any) => deck.id === deckID.value)
   return selected ? !selected.is_global : false
 })
+
+const selectedDeck = computed(() => decks.value.find((deck: any) => deck.id === deckID.value) || null)
+const quickActions = computed(() => [
+  { icon: UserRound, label: t('common.localProfile'), action: () => router.push('/profile') },
+  { icon: Database, label: t('lobby.nav.decks'), action: () => router.push('/data') },
+  { icon: Settings, label: t('profile.categories.settings'), action: () => router.push('/profile/settings') },
+  { icon: RotateCcw, label: t('lobby.resetProfile'), action: handleResetLocalPlayer, danger: true },
+])
 
 const loadUserInfo = async () => {
   try {
@@ -161,7 +169,7 @@ const handleCreateAIRoom = async () => {
   loading.value = true
   try {
     const response = await gameAPI.createRoom(
-      roomName.value || `AI · ${pveDifficulty.value}`,
+      roomName.value || `AI 路 ${pveDifficulty.value}`,
       1 + aiCount.value,
       deckID.value,
       isPointsMode.value,
@@ -224,7 +232,6 @@ const handleResetLocalPlayer = async () => {
   }
 }
 
-
 onMounted(() => {
   user.value = getStoredUser() || {}
 
@@ -247,10 +254,13 @@ onMounted(() => {
     <div class="relative z-10 flex flex-col min-h-screen">
       <header class="lobby-header">
         <div class="lobby-header-container">
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-3">
-              <Beaker class="w-6 h-6 text-blue-500" />
-              <h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tighter">CHEMISTRY <span class="text-blue-500">UNO</span></h1>
+          <div class="lobby-brand">
+            <div class="lobby-brand-mark">
+              <Beaker class="w-5 h-5" />
+            </div>
+            <div class="lobby-brand-copy">
+              <h1 class="lobby-brand-title">CHEMISTRY UNO</h1>
+              <p class="lobby-brand-subtitle">LOCAL REACTION CONSOLE</p>
             </div>
           </div>
 
@@ -266,7 +276,7 @@ onMounted(() => {
             </div>
 
             <div data-tutorial="desktop-nav" class="hidden md:flex items-center gap-2">
-              <button data-testid="lobby-data-button" @click="router.push('/data')" class="lobby-nav-link" title="数据库查看">
+              <button data-testid="lobby-data-button" @click="router.push('/data')" class="lobby-nav-link" title="数据库">
                 <Database class="w-4 h-4" />
               </button>
               <button data-testid="lobby-settings-button" @click="router.push('/profile/settings')" class="lobby-nav-link" :title="t('profile.categories.settings')">
@@ -277,11 +287,11 @@ onMounted(() => {
         </div>
       </header>
 
-      <main class="flex-1 max-w-[1200px] mx-auto w-full px-4 sm:px-5 py-6 flex flex-col gap-6">
+      <main class="flex-1 max-w-[1200px] mx-auto w-full px-4 sm:px-5 py-5 flex flex-col gap-5">
         <div class="hub-header-section">
           <div class="hub-title-group">
             <div class="hub-status-badge">
-              <span class="w-1 h-1 bg-blue-500 rounded-full animate-ping"></span>
+              <span class="hub-status-dot"></span>
               <span class="text-[8px] font-black text-blue-500 uppercase tracking-widest">{{ t('common.localMode') }}</span>
             </div>
             <h2 class="hub-title">{{ t('lobby.title') }}</h2>
@@ -292,72 +302,85 @@ onMounted(() => {
         </div>
 
         <div v-if="activeRoom" class="rejoin-banner">
-          <div class="flex items-center gap-5">
-            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center animate-[pulse_2s_infinite]">
-              <Swords class="w-6 h-6 text-white" />
+          <div class="flex items-center gap-4">
+            <div class="rejoin-banner__icon">
+              <Swords class="w-5 h-5 text-white" />
             </div>
             <div class="flex flex-col">
               <span class="text-[9px] font-black uppercase text-blue-200 tracking-widest leading-none mb-1">{{ t('lobby.resume') }}</span>
-              <h3 class="text-lg font-black text-white uppercase tracking-wider">{{ activeRoom.name }}</h3>
+              <h3 class="text-base font-black text-white uppercase tracking-wider">{{ activeRoom.name }}</h3>
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <button @click="handleLeaveRoom(activeRoom.id)" class="px-5 py-3 bg-red-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest border border-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+            <button @click="handleLeaveRoom(activeRoom.id)" class="px-4 py-2.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
               <X class="w-4 h-4" />
               {{ t('lobby.end') }}
             </button>
-            <button @click="handleResumeActiveRoom" class="px-8 py-3 bg-white text-blue-600 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
+            <button @click="handleResumeActiveRoom" class="px-6 py-2.5 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2">
               <Play class="w-4 h-4" />
               {{ t('lobby.continue') }}
             </button>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <section class="lg:col-span-8 bg-white/70 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-[40px] p-8 sm:p-10 shadow-xl backdrop-blur-md relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Bot class="w-48 h-48" />
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <section class="lobby-panel lobby-hero-panel lg:col-span-8 group">
+            <div class="lobby-hero-panel__mesh" aria-hidden="true"></div>
+            <div class="absolute top-0 right-0 p-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-500">
+              <Bot class="w-40 h-40" />
             </div>
-            
+            <div class="lobby-hero-orb lobby-hero-orb--a" aria-hidden="true"></div>
+            <div class="lobby-hero-orb lobby-hero-orb--b" aria-hidden="true"></div>
+
             <div class="relative z-10">
-              <div class="flex items-start justify-between gap-4 mb-8">
+              <div class="lobby-hero-head">
                 <div>
                   <div class="flex items-center gap-2 mb-3">
-                    <span class="px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[9px] font-black uppercase tracking-widest rounded-md border border-purple-500/20">
-                      {{ t('common.localMode') }}
-                    </span>
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Offline Edition</span>
+                    <span class="hero-chip hero-chip--primary">{{ t('common.localMode') }}</span>
+                    <span class="hero-chip hero-chip--neutral">Single Device</span>
                   </div>
-                  <h3 class="text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-4">{{ t('lobby.aiArena') }}</h3>
-                  <p class="text-base text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
-                    {{ t('lobby.modal.mode') }}
-                  </p>
+                  <h3 class="lobby-hero-title">{{ t('lobby.aiArena') }}</h3>
+                  <p class="lobby-hero-subtitle">{{ t('lobby.modal.mode') }}</p>
                 </div>
-                <div class="w-20 h-20 rounded-3xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shadow-inner shrink-0">
-                  <Bot class="w-10 h-10" />
+                <div class="lobby-hero-icon">
+                  <Bot class="w-8 h-8" />
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
-                <div class="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 p-6 hover:border-purple-400/50 transition-all group/card">
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{{ t('lobby.currentPlayer') }}</p>
-                  <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-2xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden text-2xl shadow-sm group-hover/card:scale-105 transition-transform">
+              <div class="lobby-hero-summary">
+                <div class="lobby-summary-stat">
+                  <span class="lobby-summary-stat__label">{{ t('lobby.deck') }}</span>
+                  <span class="lobby-summary-stat__value">{{ selectedDeck?.name || t('lobby.deck') }}</span>
+                </div>
+                <div class="lobby-summary-stat">
+                  <span class="lobby-summary-stat__label">AI</span>
+                  <span class="lobby-summary-stat__value">{{ aiCount }}</span>
+                </div>
+                <div class="lobby-summary-stat">
+                  <span class="lobby-summary-stat__label">Difficulty</span>
+                  <span class="lobby-summary-stat__value">{{ pveDifficulty }}%</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                <div class="lobby-detail-card group/card">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">{{ t('lobby.currentPlayer') }}</p>
+                  <div class="flex items-center gap-3">
+                    <div class="lobby-avatar-shell">
                       <UserAvatar :avatar="user.avatar" />
                     </div>
                     <div>
-                      <p class="text-xl font-black text-slate-900 dark:text-white">{{ user.nickname || t('common.localPlayer') }}</p>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider font-mono">{{ t('lobby.localSave') }}</p>
+                      <p class="text-lg font-black text-slate-900 dark:text-white">{{ user.nickname || t('common.localPlayer') }}</p>
+                      <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider font-mono">{{ t('lobby.localSave') }}</p>
                     </div>
                   </div>
                 </div>
 
-                <div class="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 p-6 hover:border-blue-400/50 transition-all group/card">
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{{ t('lobby.deck') }}</p>
-                  <button @click="handleOpenDeckDetail" class="w-full text-left rounded-2xl bg-white/80 dark:bg-black/20 border border-slate-200 dark:border-white/10 px-5 py-4 hover:border-blue-400 transition-all shadow-sm hover:shadow-md">
-                    <p class="text-lg font-black text-slate-900 dark:text-white">{{ decks.find((deck: any) => deck.id === deckID)?.name || t('lobby.deck') }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-2">
+                <div class="lobby-detail-card group/card">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">{{ t('lobby.deck') }}</p>
+                  <button @click="handleOpenDeckDetail" class="lobby-deck-preview-button">
+                    <p class="text-base font-black text-slate-900 dark:text-white">{{ selectedDeck?.name || t('lobby.deck') }}</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-2">
                       <Beaker class="w-3.5 h-3.5" />
                       {{ t('lobby.deckDesc') }}
                     </p>
@@ -365,31 +388,51 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div class="flex flex-wrap gap-4">
-                <button @click="showAIArenaModal = true" data-tutorial="ai-arena" data-testid="lobby-ai-arena-button" class="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
-                  <Play class="w-5 h-5 fill-current" />
+              <div class="hero-action-row">
+                <button @click="showAIArenaModal = true" data-tutorial="ai-arena" data-testid="lobby-ai-arena-button" class="hero-cta hero-cta--primary">
+                  <Play class="w-4 h-4 fill-current" />
                   <span>{{ t('lobby.aiArena') }}</span>
                 </button>
-                <button @click="createTutorialMatch" data-testid="lobby-tutorial-button" class="px-8 py-4 bg-slate-800 dark:bg-white/10 hover:bg-slate-700 dark:hover:bg-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-3 border border-white/5">
-                  <BookOpen class="w-5 h-5" />
+                <button @click="createTutorialMatch" data-testid="lobby-tutorial-button" class="hero-cta hero-cta--secondary">
+                  <BookOpen class="w-4 h-4" />
                   <span>{{ t('lobby.tutorial') }}</span>
                 </button>
               </div>
             </div>
           </section>
 
-          <section class="lg:col-span-4 flex flex-col gap-6">
-            
+          <section class="lg:col-span-4 flex flex-col gap-5">
+            <div class="lobby-panel lobby-side-panel">
+              <div class="lobby-side-panel__header">
+                <div>
+                  <p class="lobby-side-panel__eyebrow">Quick Access</p>
+                  <h3 class="lobby-side-panel__title">Control Deck</h3>
+                </div>
+              </div>
+              <p class="lobby-side-panel__copy">进入资料、牌组和设置，维持本地实验环境整洁、快速、可控。</p>
+              <div class="quick-access-grid">
+                <button
+                  v-for="item in quickActions"
+                  :key="item.label"
+                  class="quick-access-card"
+                  :class="{ 'quick-access-card--danger': item.danger }"
+                  @click="item.action"
+                >
+                  <component :is="item.icon" class="w-4 h-4" />
+                  <span>{{ item.label }}</span>
+                </button>
+              </div>
+            </div>
           </section>
         </div>
       </main>
 
-      <footer class="lobby-footer bg-black/40 backdrop-blur-md p-4 shrink-0">
-        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-slate-500 uppercase tracking-[0.15em] gap-4">
+      <footer class="lobby-footer p-4 shrink-0">
+        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-mono uppercase tracking-[0.15em] gap-4">
           <div class="flex items-center gap-4 order-2 md:order-1">
-            <span class="text-blue-500/50 font-black tracking-widest">Chemistry UNO · Mendeleef Protocol v{{ appVersion }}</span>
+            <span class="lobby-footer-meta">Chemistry UNO / Mendeleef Protocol v{{ appVersion }}</span>
           </div>
-          <div class="text-center md:text-right order-1 md:order-2 opacity-40 hover:opacity-100 transition-opacity">
+          <div class="lobby-footer-copy text-center md:text-right order-1 md:order-2">
             &copy; 2026 MENDELEEF PROTOCOL. LOCAL EDITION.
           </div>
         </div>
@@ -398,15 +441,15 @@ onMounted(() => {
 
     <div v-if="showAIArenaModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showAIArenaModal = false" />
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-purple-500/30 rounded-[40px] shadow-2xl shadow-purple-500/10 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-        <div class="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-purple-500/5">
+      <div class="lobby-modal-shell relative w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+        <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center justify-center text-purple-600 dark:text-purple-400">
+            <div class="lobby-modal-badge w-10 h-10 rounded-xl flex items-center justify-center">
               <Bot class="w-5 h-5" />
             </div>
             <div>
               <h2 class="text-lg font-black text-slate-800 dark:text-white tracking-tight leading-none">{{ t('lobby.modal.title') }}</h2>
-              <p class="text-[9px] text-purple-500/60 font-mono uppercase tracking-widest mt-1">{{ t('lobby.modal.mode') }}</p>
+              <p class="lobby-modal-subtitle text-[9px] font-mono uppercase tracking-widest mt-1">{{ t('lobby.modal.mode') }}</p>
             </div>
           </div>
           <button @click="showAIArenaModal = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white">
@@ -423,7 +466,7 @@ onMounted(() => {
                 data-testid="ai-room-name-input"
                 type="text"
                 :placeholder="t('lobby.modal.roomNamePlaceholder')"
-                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500/20"
+                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40"
               />
             </div>
 
@@ -433,15 +476,15 @@ onMounted(() => {
                   <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">{{ t('lobby.modal.difficulty') }}</label>
                   <h3 class="text-2xl font-black text-slate-800 dark:text-white">{{ pveDifficulty }}<span class="text-sm text-slate-400 ml-1">%</span></h3>
                 </div>
-                <span class="text-[8px] text-purple-500/40 font-mono">DIFFICULTY</span>
+                <span class="text-[8px] text-slate-400 font-mono">DIFFICULTY</span>
               </div>
-              <input v-model.number="pveDifficulty" type="range" min="1" max="100" class="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-600" />
+              <input v-model.number="pveDifficulty" type="range" min="1" max="100" class="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-600" />
             </div>
 
             <div class="space-y-3">
               <div class="flex justify-between items-center px-1">
                 <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('lobby.modal.opponents') }}</label>
-                <span class="text-[8px] text-purple-500/40 font-mono">OPPONENTS</span>
+                <span class="text-[8px] text-slate-400 font-mono">OPPONENTS</span>
               </div>
               <div class="grid grid-cols-4 gap-3">
                 <button
@@ -450,9 +493,9 @@ onMounted(() => {
                   type="button"
                   @click="aiCount = num"
                   :class="cn(
-                    'h-12 rounded-xl text-sm font-black border transition-all flex items-center justify-center',
+                    'h-11 rounded-xl text-sm font-black border transition-all flex items-center justify-center',
                     aiCount === num
-                      ? 'bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400'
+                      ? 'bg-blue-600/10 border-blue-500/40 text-blue-600 dark:text-blue-400'
                       : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400'
                   )"
                 >
@@ -464,7 +507,7 @@ onMounted(() => {
             <div class="space-y-3">
               <div class="flex justify-between items-center px-1">
                 <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('lobby.modal.deck') }}</label>
-                <span class="text-[8px] text-purple-500/40 font-mono">DECK</span>
+                <span class="text-[8px] text-slate-400 font-mono">DECK</span>
               </div>
               <div class="space-y-2">
                 <button
@@ -473,17 +516,17 @@ onMounted(() => {
                   type="button"
                   @click="deckID = deck.id; if (!deck.is_global) isPointsMode = false"
                   :class="cn(
-                    'w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left',
+                    'w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left',
                     deckID === deck.id
-                      ? 'bg-purple-600/5 dark:bg-purple-600/10 border-purple-500/50'
+                      ? 'bg-blue-600/5 dark:bg-blue-600/10 border-blue-500/40'
                       : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10'
                   )"
                 >
-                  <div :class="cn('w-9 h-9 rounded-lg flex items-center justify-center', deckID === deck.id ? 'bg-purple-500 text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-400')">
+                  <div :class="cn('w-9 h-9 rounded-lg flex items-center justify-center', deckID === deck.id ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-white/5 text-slate-400')">
                     <Beaker class="w-4 h-4" />
                   </div>
                   <div class="flex-1">
-                    <p :class="cn('text-[11px] font-black uppercase tracking-wider', deckID === deck.id ? 'text-purple-600 dark:text-purple-400' : 'text-slate-700 dark:text-white')">{{ deck.name }}</p>
+                    <p :class="cn('text-[11px] font-black uppercase tracking-wider', deckID === deck.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-white')">{{ deck.name }}</p>
                     <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono uppercase tracking-tighter">{{ Object.keys(deck.cards || {}).length }} Elements</p>
                   </div>
                 </button>
@@ -491,11 +534,11 @@ onMounted(() => {
             </div>
 
             <div class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl transition-all" :class="pveUsingCustomDeck ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'" @click="!pveUsingCustomDeck && (isPointsMode = !isPointsMode)">
-              <div :class="cn('w-10 h-6 rounded-full relative transition-colors duration-300', isPointsMode ? 'bg-purple-600' : 'bg-slate-300 dark:bg-slate-700')">
+              <div :class="cn('w-10 h-6 rounded-full relative transition-colors duration-300', isPointsMode ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700')">
                 <div :class="cn('absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300', isPointsMode ? 'translate-x-4' : 'translate-x-0')"></div>
               </div>
               <div class="flex flex-col">
-                <span :class="cn('text-[10px] font-black uppercase tracking-wider', isPointsMode ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-slate-400')">{{ t('lobby.modal.points') }}</span>
+                <span :class="cn('text-[10px] font-black uppercase tracking-wider', isPointsMode ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400')">{{ t('lobby.modal.points') }}</span>
                 <span v-if="pveUsingCustomDeck" class="text-[9px] text-amber-500/80 mt-0.5 leading-tight">{{ t('lobby.modal.customDeckDesc') }}</span>
                 <span v-else class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 leading-tight">{{ t('lobby.modal.pointsDesc') }}</span>
               </div>
@@ -504,7 +547,7 @@ onMounted(() => {
 
           <div class="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02] flex gap-3 shrink-0">
             <button type="button" @click="showAIArenaModal = false" class="flex-1 px-4 py-3 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-slate-500">{{ t('common.cancel') }}</button>
-            <button type="submit" data-testid="ai-room-start-button" :disabled="loading" class="flex-[2] px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button type="submit" data-testid="ai-room-start-button" :disabled="loading" class="flex-[2] px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
               <span>{{ t('lobby.modal.start') }}</span>
             </button>
@@ -515,15 +558,15 @@ onMounted(() => {
 
     <div v-if="showDeckDetailModal && selectedDeckConfig" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showDeckDetailModal = false" />
-      <div class="relative w-full max-w-2xl bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
-        <div class="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+      <div class="lobby-modal-shell relative w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+        <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-500 dark:text-blue-400">
+            <div class="lobby-modal-badge lobby-modal-badge--deck w-10 h-10 rounded-xl flex items-center justify-center">
               <Beaker class="w-5 h-5" />
             </div>
             <div>
               <h2 class="text-lg font-black text-slate-800 dark:text-white tracking-tight leading-none">{{ selectedDeckConfig.name }}</h2>
-              <p class="text-[9px] text-slate-400 dark:text-slate-500 font-mono uppercase tracking-widest mt-1">{{ t('lobby.deck') }}</p>
+              <p class="lobby-modal-subtitle text-[9px] font-mono uppercase tracking-widest mt-1">{{ t('lobby.deck') }}</p>
             </div>
           </div>
           <button @click="showDeckDetailModal = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white">
@@ -551,7 +594,7 @@ onMounted(() => {
                 <div v-for="(count, formula) in selectedDeckConfig.cards" :key="formula" class="p-2.5 bg-white dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/10">
                   <div class="flex items-center justify-between">
                     <span class="text-[10px] font-black text-slate-900 dark:text-white font-mono" v-html="String(formula).replace(/(\d+)/g, '<sub>$1</sub>')"></span>
-                    <span class="text-[9px] font-black text-blue-600 dark:text-blue-400">×{{ count }}</span>
+                    <span class="text-[9px] font-black text-blue-600 dark:text-blue-400">x{{ count }}</span>
                   </div>
                 </div>
               </div>
@@ -562,6 +605,5 @@ onMounted(() => {
     </div>
 
     <TutorialGuide :show="showTutorial" :steps="lobbyTutorialSteps" @close="handleTutorialClose" @complete="handleTutorialComplete" />
-
   </div>
 </template>
