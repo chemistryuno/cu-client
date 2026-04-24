@@ -113,119 +113,112 @@ const handleResetLocalPlayer = async () => {
 }
 
 onMounted(() => {
-  fetchLatestUserInfo()
+  void fetchLatestUserInfo()
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-white selection:bg-blue-500/30" data-testid="profile-page">
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[120px]" />
-      <div class="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[120px]" />
-    </div>
+  <div class="console-page-shell min-h-screen" data-testid="profile-page">
+    <div class="console-grid-overlay" />
 
-    <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] lg:hidden" />
+    <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-sm lg:hidden" />
 
     <aside
       :class="[
-        'fixed top-0 left-0 bottom-0 w-64 bg-white dark:bg-[#0d0d10] border-r border-slate-200 dark:border-white/5 z-[70] transition-transform duration-300 lg:hidden',
+        'fixed bottom-0 left-0 top-0 z-[70] w-64 border-r border-slate-200/80 bg-white/92 backdrop-blur transition-transform duration-300 dark:border-white/10 dark:bg-[#0c141e]/94 lg:hidden',
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       ]"
     >
-      <div class="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-        <span class="font-black text-xs tracking-[0.2em] text-slate-400">{{ t('profile.title') }}</span>
-        <button @click="isSidebarOpen = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg">
-          <CloseIcon class="w-4 h-4" />
+      <div class="flex items-center justify-between border-b border-slate-200/70 p-5 dark:border-white/10">
+        <div>
+          <p class="console-eyebrow">Profile</p>
+          <p class="text-sm font-black text-slate-900 dark:text-white">{{ t('profile.title') }}</p>
+        </div>
+        <button @click="isSidebarOpen = false" class="console-button console-button-ghost p-2">
+          <CloseIcon class="h-4 w-4" />
         </button>
       </div>
-      <nav class="p-3 space-y-1">
+      <nav class="space-y-1 p-3">
         <button
           v-for="cat in categories"
           :key="cat.id"
           :data-testid="`profile-nav-${cat.id}`"
           @click="switchCategory(cat.id, true)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm"
           :class="[
+            'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold transition-all',
             currentCategory === cat.id
-              ? 'bg-blue-600/10 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'
+              ? 'border border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/[0.05]'
           ]"
         >
-          <component :is="cat.icon" class="w-4 h-4" />
-          <span class="text-sm">{{ t(cat.name) }}</span>
+          <component :is="cat.icon" class="h-4 w-4" />
+          <span>{{ t(cat.name) }}</span>
         </button>
 
-        <div class="pt-4 mt-4 border-t border-slate-100 dark:border-white/5">
+        <div class="mt-4 border-t border-slate-200/70 pt-4 dark:border-white/10">
           <button
             @click="handleResetLocalPlayer"
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm text-red-500 hover:bg-red-500/10"
+            class="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold text-rose-600 transition-all hover:bg-rose-500/10 dark:text-rose-300"
           >
-            <LogOut class="w-4 h-4" />
+            <LogOut class="h-4 w-4" />
             <span>{{ t('profile.resetProfile') }}</span>
           </button>
         </div>
       </nav>
     </aside>
 
-    <div class="max-w-[1400px] mx-auto relative z-10 px-4 pt-6 pb-12 md:px-6">
-      <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button @click="router.push('/')" class="p-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl hover:scale-105 transition-all text-slate-400 hover:text-slate-900 dark:hover:text-white">
-            <ArrowLeft class="w-4 h-4" />
+    <div class="console-page-container max-w-[1400px]">
+      <header class="console-page-header animate-in fade-in slide-in-from-top-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <button @click="router.push('/')" class="console-button group">
+            <ArrowLeft class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            返回
           </button>
-          <div class="lg:hidden">
-            <button @click="isSidebarOpen = true" class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500">
-              <Menu class="w-3.5 h-3.5" /> {{ t('common.localProfile') }}
-            </button>
-          </div>
-          <div class="hidden md:block">
-            <h1 class="text-2xl font-black tracking-tighter uppercase italic text-slate-800 dark:text-white">{{ t('profile.title') }} <span class="text-blue-500 font-mono text-[10px] not-italic ml-2 opacity-50">/ LOCAL_PROFILE</span></h1>
+          <button @click="isSidebarOpen = true" class="console-button lg:hidden">
+            <Menu class="h-4 w-4" />
+            {{ t('common.localProfile') }}
+          </button>
+          <div>
+            <p class="console-eyebrow">Local Profile</p>
+            <h1 class="console-page-title">{{ t('profile.title') }}</h1>
           </div>
         </div>
 
-        <div class="hidden lg:flex items-center gap-1 p-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl backdrop-blur-xl shrink-0 overflow-hidden">
+        <div class="console-tab-strip hidden lg:flex">
           <button
             v-for="cat in categories"
             :key="cat.id"
             :data-testid="`profile-tab-${cat.id}`"
             @click="switchCategory(cat.id)"
-            class="flex flex-col items-center justify-center min-w-[90px] py-2 px-4 rounded-xl transition-all"
-            :class="[
-              currentCategory === cat.id
-                ? 'bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'
-            ]"
+            :class="['console-tab-button flex items-center gap-2', currentCategory === cat.id && 'console-tab-button--active']"
           >
-            <component :is="cat.icon" class="w-3.5 h-3.5" />
-            <span class="text-[9px] font-black uppercase tracking-tight mt-0.5">{{ t(cat.name) }}</span>
+            <component :is="cat.icon" class="h-4 w-4" />
+            <span>{{ t(cat.name) }}</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <div class="flex flex-col lg:flex-row gap-6 items-start">
-        <div class="w-full lg:w-[320px] space-y-5 shrink-0 lg:sticky lg:top-6">
-          <ProfileHeader :user="user" @change-avatar="showChangeAvatar = true" />
+      <div class="flex flex-col items-start gap-5 lg:flex-row">
+        <div class="w-full shrink-0 lg:sticky lg:top-6 lg:w-[320px]">
+          <div class="animate-in fade-in slide-in-from-bottom-2">
+            <ProfileHeader :user="user" @change-avatar="showChangeAvatar = true" />
+          </div>
         </div>
 
-        <div class="flex-1 w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-          <div v-if="currentCategory === 'research'">
-            <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-              <CustomDecks />
-            </div>
+        <div class="w-full flex-1 space-y-5 animate-in fade-in slide-in-from-bottom-2 [--enter-duration:380ms]">
+          <div v-if="currentCategory === 'research'" class="console-panel">
+            <CustomDecks />
           </div>
 
-          <div v-if="currentCategory === 'history'" class="space-y-6">
-            <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-8 shadow-sm">
-              <MatchHistory />
-            </div>
+          <div v-if="currentCategory === 'history'" class="console-panel">
+            <MatchHistory />
           </div>
 
-          <div v-if="currentCategory === 'settings'" class="space-y-6">
+          <div v-if="currentCategory === 'settings'" class="space-y-5">
             <SettingsPanel :user="user" @update="fetchLatestUserInfo" />
-            <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
-              <button @click="handleResetLocalPlayer" class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border border-red-500/20">
-                <LogOut class="w-4 h-4" />
+            <div class="console-panel">
+              <button @click="handleResetLocalPlayer" class="console-button w-full justify-center border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/15 dark:text-rose-300">
+                <LogOut class="h-4 w-4" />
                 {{ t('profile.resetProfile') }}
               </button>
             </div>

@@ -124,6 +124,8 @@ export type GameState = {
   points_changes: Record<number, number>
   xp_changes: Record<number, number>
   current_reaction: string
+  last_effect_type: string
+  effect_target_uid: number | null
   tutorial_script_mode: boolean
   tutorial_current_step: number
   pending_forced_plays: number

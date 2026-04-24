@@ -28,7 +28,6 @@ watch(() => state.show, (newVal) => {
 })
 
 const handleInputKeyDown = (e: KeyboardEvent) => {
-  // 只有在非 composition 状态且计时器完成后，按 Enter 才确认
   if (e.key === 'Enter' && !isComposing.value && countdown.value <= 0) {
     handleConfirm()
   }
@@ -41,39 +40,51 @@ const handleCompositionStart = () => {
 const handleCompositionEnd = () => {
   isComposing.value = false
 }
+
+const iconClassByType: Record<string, string> = {
+  alert: 'text-sky-600 dark:text-sky-300',
+  confirm: 'text-amber-600 dark:text-amber-300',
+  prompt: 'text-cyan-600 dark:text-cyan-300'
+}
+
+const iconShellClassByType: Record<string, string> = {
+  alert: 'border-sky-500/20 bg-sky-500/10',
+  confirm: 'border-amber-500/20 bg-amber-500/10',
+  prompt: 'border-cyan-500/20 bg-cyan-500/10'
+}
+
+const confirmButtonClassByType: Record<string, string> = {
+  alert: 'console-button-primary',
+  confirm: 'border-amber-500/20 bg-amber-500/90 text-white hover:bg-amber-500 dark:bg-amber-500 dark:text-slate-950',
+  prompt: 'border-cyan-500/20 bg-cyan-500/90 text-white hover:bg-cyan-500 dark:bg-cyan-500 dark:text-slate-950'
+}
 </script>
 
 <template>
   <Transition name="fade">
-    <div v-if="state.show" class="fixed inset-0 bg-slate-900/40 dark:bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-[2rem] p-8 max-w-md w-full shadow-2xl overflow-hidden relative">
-        <!-- 装饰背景 -->
-        <div class="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
-        
-        <div class="flex items-center gap-4 mb-6 relative z-10">
-          <div v-if="state.type === 'alert'" class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-            <AlertCircle class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+    <div v-if="state.show" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div class="console-card animate-in zoom-in-95 flex w-full max-w-md flex-col overflow-hidden border p-6 sm:p-7">
+        <div class="mb-6 flex items-center gap-4">
+          <div :class="['flex h-12 w-12 items-center justify-center rounded-2xl border', iconShellClassByType[state.type]]">
+            <AlertCircle v-if="state.type === 'alert'" :class="['h-6 w-6', iconClassByType[state.type]]" />
+            <HelpCircle v-else-if="state.type === 'confirm'" :class="['h-6 w-6', iconClassByType[state.type]]" />
+            <MessageSquare v-else-if="state.type === 'prompt'" :class="['h-6 w-6', iconClassByType[state.type]]" />
           </div>
-          <div v-else-if="state.type === 'confirm'" class="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
-            <HelpCircle class="w-6 h-6 text-orange-600 dark:text-orange-400" />
+          <div class="space-y-1">
+            <p class="console-eyebrow">System Notice</p>
+            <h3 class="text-xl font-black tracking-tight text-slate-900 dark:text-white">{{ state.title }}</h3>
           </div>
-          <div v-else-if="state.type === 'prompt'" class="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
-            <MessageSquare class="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          </div>
-          <h3 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tight">{{ state.title }}</h3>
         </div>
-        
-        <div class="mb-8 relative z-10">
-          <p class="text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-line font-medium">{{ state.message }}</p>
-          
-          <!-- 输入框（仅prompt类型显示） -->
-          <div v-if="state.type === 'prompt'" class="mt-6 relative">
-            <input 
+
+        <div class="space-y-4">
+          <p class="whitespace-pre-line text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ state.message }}</p>
+
+          <div v-if="state.type === 'prompt'" class="console-subcard p-3">
+            <input
               v-model="state.inputValue"
-              type="text" 
+              type="text"
               :placeholder="state.inputPlaceholder"
-              class="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-4 text-slate-900 dark:text-white focus:outline-none focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/5 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium"
+              class="console-input w-full rounded-xl border border-slate-200/80 bg-white px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]"
               @keydown="handleInputKeyDown"
               @compositionstart="handleCompositionStart"
               @compositionend="handleCompositionEnd"
@@ -81,24 +92,19 @@ const handleCompositionEnd = () => {
             />
           </div>
         </div>
-        
-        <div class="flex gap-4 relative z-10">
-          <button 
+
+        <div class="mt-6 flex gap-3">
+          <button
             v-if="state.type === 'confirm' || state.type === 'prompt'"
             @click="handleCancel"
-            class="flex-1 px-6 py-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all border border-slate-200 dark:border-white/5"
+            class="console-button flex-1 justify-center"
           >
             {{ state.cancelText }}
           </button>
-          <button 
+          <button
             @click="handleConfirm"
             :disabled="countdown > 0"
-            :class="[
-              'flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all text-white shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale',
-              state.type === 'alert' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20 dark:shadow-blue-900/20' :
-              state.type === 'confirm' ? 'bg-orange-600 hover:bg-orange-500 shadow-orange-500/20 dark:shadow-orange-900/20' :
-              'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20 dark:shadow-purple-900/20'
-            ]"
+            :class="['console-button flex-1 justify-center disabled:opacity-50 disabled:grayscale', confirmButtonClassByType[state.type]]"
           >
             {{ countdown > 0 ? `${state.confirmText} (${countdown}s)` : state.confirmText }}
           </button>

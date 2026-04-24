@@ -57,6 +57,8 @@ const pveUsingCustomDeck = computed(() => {
 })
 
 const selectedDeck = computed(() => decks.value.find((deck: any) => deck.id === deckID.value) || null)
+const selectedDeckElementCount = computed(() => Object.keys(selectedDeck.value?.cards || {}).length)
+const playerPhlogiston = computed(() => Math.floor(Number(user.value?.points || 0)))
 const quickActions = computed(() => [
   { icon: UserRound, label: t('common.localProfile'), action: () => router.push('/profile') },
   { icon: Database, label: t('lobby.nav.decks'), action: () => router.push('/data') },
@@ -356,12 +358,12 @@ onMounted(() => {
                   <span class="lobby-summary-stat__value">{{ selectedDeck?.name || t('lobby.deck') }}</span>
                 </div>
                 <div class="lobby-summary-stat">
-                  <span class="lobby-summary-stat__label">AI</span>
-                  <span class="lobby-summary-stat__value">{{ aiCount }}</span>
+                  <span class="lobby-summary-stat__label">{{ t('lobby.points') }}</span>
+                  <span class="lobby-summary-stat__value">{{ playerPhlogiston }}</span>
                 </div>
                 <div class="lobby-summary-stat">
-                  <span class="lobby-summary-stat__label">Difficulty</span>
-                  <span class="lobby-summary-stat__value">{{ pveDifficulty }}%</span>
+                  <span class="lobby-summary-stat__label">Protocol</span>
+                  <span class="lobby-summary-stat__value">{{ selectedDeckElementCount }} Elements</span>
                 </div>
               </div>
 

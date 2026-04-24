@@ -8,7 +8,7 @@ export interface TutorialStep {
   player: 'human' | 'ai'
   action: 'play' | 'double' | 'draw'
   substance?: string
-  substances?: string[] // 用于双元素
+  substances?: string[]
   hint: string
   aiMessage?: string
 }
@@ -19,14 +19,14 @@ export const TUTORIAL_SCRIPT: TutorialStep[] = [
     player: 'human',
     action: 'play',
     substance: 'Mg',
-    hint: '💡 第一步：从手牌中选择 <strong>Mg</strong>（镁）打出，它可以和场上的 Cl₂ 反应生成 MgCl₂'
+    hint: '💡 第一步：从手牌中选择 <strong>Mg</strong>（镁）打出，它可以和场上的 <strong>Cl2</strong> 反应生成 MgCl2。'
   },
   {
     stepNumber: 2,
     player: 'ai',
     action: 'play',
     substance: 'HCl',
-    hint: '⚗️ AI 的回合',
+    hint: '⏳ 现在轮到 AI，它会打出 <strong>HCl</strong>（盐酸）作为下一步演示。',
     aiMessage: 'AI 打出了 HCl（盐酸）'
   },
   {
@@ -34,28 +34,28 @@ export const TUTORIAL_SCRIPT: TutorialStep[] = [
     player: 'human',
     action: 'play',
     substance: 'NaOH',
-    hint: '💡 第二步：使用 <strong>Na</strong>、<strong>O</strong>、<strong>H</strong> 组合打出 <strong>NaOH</strong>（氢氧化钠），中和 AI 的 HCl'
+    hint: '💡 第二步：使用 <strong>Na</strong>、<strong>O</strong>、<strong>H</strong> 组合成 <strong>NaOH</strong>（氢氧化钠），与 AI 的 HCl 中和。'
   },
   {
     stepNumber: 4,
     player: 'ai',
     action: 'play',
     substance: 'Br2',
-    hint: '⚗️ AI 的回合',
-    aiMessage: 'AI 打出了 Br₂（溴单质）'
+    hint: '⏳ AI 会继续打出 <strong>Br2</strong>（溴单质），观察战场变化。',
+    aiMessage: 'AI 打出了 Br2（溴单质）'
   },
   {
     stepNumber: 5,
     player: 'human',
     action: 'play',
     substance: 'Ar',
-    hint: '💡 第三步：打出 <strong>Ar</strong>（氩气），触发稳定性效果跳过 AI'
+    hint: '💡 第三步：打出 <strong>Ar</strong>（氩气），触发稀有气体的稳定效果并跳过 AI。'
   },
   {
     stepNumber: 6,
     player: 'ai',
     action: 'draw',
-    hint: '⚗️ AI 无法响应，正在摸牌...',
+    hint: '⏳ AI 无法响应当前局面，将执行摸牌。',
     aiMessage: 'AI 选择摸牌'
   },
   {
@@ -63,7 +63,7 @@ export const TUTORIAL_SCRIPT: TutorialStep[] = [
     player: 'human',
     action: 'play',
     substance: 'Au',
-    hint: '💡 第四步：打出 <strong>Au</strong>（金），金属性稳定，可接在任何牌之后'
+    hint: '💡 第四步：打出 <strong>Au</strong>（金），它会触发跳过效果，帮助你掌握特殊牌。'
   },
   {
     stepNumber: 8,
@@ -88,28 +88,19 @@ export const TUTORIAL_INITIAL_STATE: TutorialInitialState = {
   discardTop: 'Cl2'
 }
 
-/**
- * 获取当前步骤
- */
 export const getTutorialStep = (stepNumber: number): TutorialStep | undefined => {
-  return TUTORIAL_SCRIPT.find(step => step.stepNumber === stepNumber)
+  return TUTORIAL_SCRIPT.find((step) => step.stepNumber === stepNumber)
 }
 
-/**
- * 检查玩家是否可以打出指定物质
- */
 export const canPlaySubstance = (substance: string, currentStep: number): boolean => {
   const step = getTutorialStep(currentStep)
   if (!step || step.player !== 'human') return false
   return step.substance === substance
 }
 
-/**
- * 获取教学进度描述
- */
 export const getTutorialProgress = (currentStep: number): string => {
-  const totalSteps = TUTORIAL_SCRIPT.filter(s => s.player === 'human').length
-  const completedSteps = TUTORIAL_SCRIPT.filter(s =>
+  const totalSteps = TUTORIAL_SCRIPT.filter((s) => s.player === 'human').length
+  const completedSteps = TUTORIAL_SCRIPT.filter((s) =>
     s.player === 'human' && s.stepNumber < currentStep
   ).length
   return `${completedSteps}/${totalSteps}`

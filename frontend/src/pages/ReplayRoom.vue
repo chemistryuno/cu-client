@@ -2,13 +2,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { gameAPI } from '../utils/api'
-import { useDialog } from '../utils/dialog'
-import { ArrowLeft, Ban, Eye, UserMinus } from 'lucide-vue-next'
+import { ArrowLeft, Eye } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 
 const route = useRoute()
 const router = useRouter()
-const { showAlert, showPrompt } = useDialog()
 
 const replayData = ref<any>(null)
 const loading = ref(true)
@@ -31,7 +29,6 @@ try {
   currentUser.value = {}
 }
 
-const isAdmin = computed(() => false)
 const useAdminScope = computed(() => false)
 const replayReturnPath = computed(() => {
   const raw = String(route.query.from || '').trim()
@@ -226,20 +223,17 @@ const events = computed(() => {
   return sortedEvents.map((evt: any, sortedIndex: number) => {
     const isAIActor = aiParticipantUIDSet.value.has(Number(evt.actorUID || 0))
     let operationMs: number | null = null
-    let operationSource: 'payload' | 'delta' | null = null
 
     if (!isAIActor) {
       const payloadFastMs = Number(evt.payload?.fast_reaction_ms)
       if (Number.isFinite(payloadFastMs) && payloadFastMs > 0) {
         operationMs = payloadFastMs
-        operationSource = 'payload'
       } else if (operationEventTypes.has(evt.eventType) && evt.atMs != null) {
         const previousMs = previousTimedByUID.get(Number(evt.actorUID || 0))
         if (previousMs != null) {
           const delta = evt.atMs - previousMs
           if (delta >= 0 && delta <= 10 * 60 * 1000) {
             operationMs = delta
-            operationSource = 'delta'
           }
         }
       }
@@ -253,7 +247,6 @@ const events = computed(() => {
       ...evt,
       __sortedIndex: sortedIndex,
       operationMs,
-      operationSource,
       isFastOperation: operationMs != null && operationMs < OPERATION_FAST_THRESHOLD_MS
     }
   })
@@ -365,7 +358,7 @@ const describeEvent = (evt: any) => {
     : ''
 
   if (evt.eventType === 'play_card') {
-    const symbol = payload.card_symbol || payload.card_type || '未知卡'
+    const symbol = payload.card_symbol || payload.card_type || '未知卡牌'
     const substance = payload.substance || '未知物质'
     return `${actor} 使用 ${symbol} -> ${substance}${operationHint}`
   }
@@ -423,13 +416,7 @@ const loadReplay = async () => {
   }
 
   try {
-    let response
-    if (useAdminScope.value) {
-      response = await adminAPI.getGameReplay(historyId.value)
-    } else {
-      response = await gameAPI.getMyGameReplay(historyId.value)
-    }
-
+    const response = await gameAPI.getMyGameReplay(historyId.value)
     replayData.value = response.data
     chooseDefaultPerspective()
   } catch (error: any) {
@@ -445,11 +432,9 @@ const enterLiveRoomAsSpectator = () => {
   router.push(`/room/${roomID}?spectator=true`)
 }
 
-// Admin functions removed
-
 onMounted(() => {
   lockPageScroll()
-  loadReplay()
+  void loadReplay()
 })
 
 onUnmounted(() => {
@@ -458,248 +443,218 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30" data-testid="replay-page">
-    <header class="px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-white/90 dark:bg-black/30 backdrop-blur-md flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <button @click="goBackToEntryPage" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest">
-          <ArrowLeft class="w-4 h-4" />
-          返回
-        </button>
-        <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Replay Room</p>
-          <h1 class="text-sm md:text-base font-black uppercase tracking-wide">对局回放 #{{ String(historyId).padStart(4, '0') }}</h1>
-        </div>
-      </div>
+  <div class="console-page-shell h-screen overflow-hidden" data-testid="replay-page">
+    <div class="console-grid-overlay" />
 
-      <div class="flex items-center gap-2">
-        <div class="inline-flex items-center gap-1 p-1 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5">
-          <button
-            @click="switchToGameView()"
-            :class="cn('px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all', replayViewMode === 'game' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')"
-          >
-            游戏视角
-          </button>
-          <button
-            @click="switchToTimelineView"
-            :class="cn('px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all', replayViewMode === 'timeline' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white')"
-          >
-            时间线
-          </button>
-        </div>
-
-        <button
-          v-if="replayData?.room_id"
-          @click="enterLiveRoomAsSpectator"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 text-xs font-black uppercase tracking-widest hover:bg-cyan-500/20 transition-all"
-        >
-          <Eye class="w-4 h-4" />
-          旁观当前房间
-        </button>
-      </div>
-    </header>
-
-    <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-0">
-      <aside class="border-r border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 p-4 overflow-y-auto space-y-4">
-        <div class="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">回放状态</p>
-          <div class="flex flex-wrap gap-2">
-            <span v-if="replayData?.cheat_detected" class="px-2 py-1 rounded-md text-[10px] font-black bg-rose-500/10 text-rose-500">CHEAT</span>
-            <span v-if="replayData?.replay_permanent" class="px-2 py-1 rounded-md text-[10px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400">PERMANENT</span>
-            <span v-else-if="replayData?.replay_expires_at" class="px-2 py-1 rounded-md text-[10px] font-black bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
-              {{ formatDate(replayData.replay_expires_at) }} 到期
-            </span>
-          </div>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">视角切换</p>
-            <button
-              @click="focusPerspectiveOnly = !focusPerspectiveOnly"
-              :class="cn('px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider', focusPerspectiveOnly ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-white/10 text-slate-500')"
-            >
-              {{ focusPerspectiveOnly ? '仅本视角' : '全局事件' }}
+    <div class="relative z-10 flex h-full flex-col">
+      <header class="border-b border-slate-200/70 bg-white/75 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-[#08111a]/82">
+        <div class="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <button @click="goBackToEntryPage" class="console-button group">
+              <ArrowLeft class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+              返回
             </button>
-          </div>
-          <div class="space-y-2">
-            <button
-              v-for="profile in participants"
-              :key="profile.uid"
-              @click="selectedPerspectiveUID = Number(profile.uid)"
-              :class="cn(
-                'w-full text-left rounded-xl border px-3 py-2 transition-all',
-                selectedPerspectiveUID === Number(profile.uid)
-                  ? 'border-blue-500/40 bg-blue-500/10'
-                  : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:border-blue-500/30'
-              )"
-            >
-              <p class="text-xs font-black text-slate-900 dark:text-white">{{ profile.nickname || profile.username || `UID ${profile.uid}` }}</p>
-              <p class="text-[10px] text-slate-400 font-mono">UID: {{ profile.uid }}</p>
-            </button>
-          </div>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-          <div class="flex items-center justify-between gap-2 mb-2">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">操作时间检测</p>
-            <span class="px-2 py-1 rounded-md text-[10px] font-black bg-rose-500/10 text-rose-500">阈值 &lt; 3.00s</span>
-          </div>
-          <div class="space-y-2">
-            <div
-              v-for="stat in operationStats"
-              :key="`op-stat-${stat.uid}`"
-              class="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-2 py-2"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-[11px] font-semibold truncate">{{ stat.nickname }}</p>
-                <span
-                  :class="cn('px-2 py-0.5 rounded text-[10px] font-black', stat.fastCount > 0 ? 'bg-rose-500/15 text-rose-500' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')"
-                >
-                  FAST {{ stat.fastCount }}
-                </span>
-              </div>
-              <p class="text-[10px] text-slate-500 mt-1">
-                平均 {{ formatOperationDuration(stat.avgMs) }} / 最快 {{ formatOperationDuration(stat.minMs) }} / 样本 {{ stat.totalCount }}
-              </p>
+            <div>
+              <p class="console-eyebrow">Replay Room</p>
+              <h1 class="text-base font-black tracking-tight text-slate-900 dark:text-white">对局回放 #{{ String(historyId).padStart(4, '0') }}</h1>
             </div>
           </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="console-tab-strip">
+              <button
+                @click="switchToGameView()"
+                :class="['console-tab-button', replayViewMode === 'game' && 'console-tab-button--active']"
+              >
+                游戏视角
+              </button>
+              <button
+                @click="switchToTimelineView"
+                :class="['console-tab-button', replayViewMode === 'timeline' && 'console-tab-button--active']"
+              >
+                时间线
+              </button>
+            </div>
+
+            <button
+              v-if="replayData?.room_id"
+              @click="enterLiveRoomAsSpectator"
+              class="console-button text-cyan-700 dark:text-cyan-300"
+            >
+              <Eye class="h-4 w-4" />
+              旁观当前房间
+            </button>
+          </div>
         </div>
+      </header>
 
-        <!-- Admin actions removed -->
-      </aside>
+      <div class="mx-auto grid h-full w-full max-w-[1600px] min-h-0 grid-cols-1 gap-0 lg:grid-cols-[300px_1fr]">
+        <aside class="overflow-y-auto border-b border-slate-200/70 bg-white/70 p-4 backdrop-blur lg:border-b-0 lg:border-r dark:border-white/10 dark:bg-[#09131d]/78">
+          <div class="space-y-4">
+            <section class="console-subcard p-3">
+              <p class="console-eyebrow">Replay Status</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <span v-if="replayData?.cheat_detected" class="console-notice-chip border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300">CHEAT</span>
+                <span v-if="replayData?.replay_permanent" class="console-notice-chip border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300">PERMANENT</span>
+                <span v-else-if="replayData?.replay_expires_at" class="console-notice-chip">
+                  {{ formatDate(replayData.replay_expires_at) }} 到期
+                </span>
+              </div>
+            </section>
 
-      <main class="min-h-0 overflow-y-auto p-4 md:p-6 bg-slate-100/70 dark:bg-black/30">
-        <div v-if="loading" class="h-full flex items-center justify-center">
-          <div class="w-9 h-9 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-        </div>
-
-        <div v-else-if="loadError" class="max-w-2xl mx-auto rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-5 text-rose-600 dark:text-rose-300">
-          {{ loadError }}
-        </div>
-
-        <div v-else class="space-y-3">
-          <template v-if="replayViewMode === 'game'">
-            <div class="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 p-4">
-              <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div>
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">游戏界面方式</p>
-                  <p class="text-sm font-black">当前视角：{{ currentPerspectiveName }}</p>
-                </div>
-                <div class="text-right">
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">事件总量</p>
-                  <p class="text-sm font-black text-blue-600 dark:text-blue-300">{{ visibleEvents.length }}</p>
-                </div>
+            <section class="console-subcard p-3">
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <p class="console-eyebrow">Perspective</p>
+                <button
+                  @click="focusPerspectiveOnly = !focusPerspectiveOnly"
+                  :class="['console-filter-pill', focusPerspectiveOnly && 'console-filter-pill--active']"
+                >
+                  {{ focusPerspectiveOnly ? '仅本视角' : '全局事件' }}
+                </button>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                <div
+              <div class="space-y-2">
+                <button
                   v-for="profile in participants"
-                  :key="`player-overview-${profile.uid}`"
+                  :key="profile.uid"
+                  @click="selectedPerspectiveUID = Number(profile.uid)"
                   :class="cn(
-                    'rounded-xl border px-3 py-2',
-                    Number(profile.uid) === selectedPerspectiveUID
-                      ? 'border-blue-500/40 bg-blue-500/10'
-                      : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5'
+                    'w-full rounded-2xl border px-3 py-2 text-left transition-all',
+                    selectedPerspectiveUID === Number(profile.uid)
+                      ? 'border-sky-500/30 bg-sky-500/10'
+                      : 'border-slate-200/80 bg-white/80 hover:border-sky-500/20 dark:border-white/10 dark:bg-white/[0.03]'
                   )"
                 >
-                  <p class="text-xs font-black text-slate-900 dark:text-white">{{ profile.nickname || profile.username || `UID ${profile.uid}` }}</p>
-                  <p class="text-[10px] text-slate-400 font-mono">UID {{ profile.uid }}</p>
-                  <p class="text-[10px] text-slate-500 mt-1">
-                    快速操作 {{ operationStats.find((s: any) => s.uid === Number(profile.uid))?.fastCount || 0 }} 次
+                  <p class="text-sm font-bold text-slate-900 dark:text-white">{{ profile.nickname || profile.username || `UID ${profile.uid}` }}</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">UID {{ profile.uid }}</p>
+                </button>
+              </div>
+            </section>
+
+            <section class="console-subcard p-3">
+              <div class="mb-3 flex items-center justify-between gap-2">
+                <p class="console-eyebrow">Operation Scan</p>
+                <span class="console-notice-chip border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300">阈值 &lt; 3.00s</span>
+              </div>
+
+              <div class="space-y-2">
+                <div
+                  v-for="stat in operationStats"
+                  :key="`op-stat-${stat.uid}`"
+                  class="rounded-2xl border border-slate-200/80 bg-white/78 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{{ stat.nickname }}</p>
+                    <span :class="['console-notice-chip', stat.fastCount > 0 ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300']">
+                      FAST {{ stat.fastCount }}
+                    </span>
+                  </div>
+                  <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    平均 {{ formatOperationDuration(stat.avgMs) }} / 最快 {{ formatOperationDuration(stat.minMs) }} / 样本 {{ stat.totalCount }}
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
+          </div>
+        </aside>
 
-            <div class="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 p-4">
-              <div class="flex items-center justify-between gap-2 mb-3">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">操作流</p>
-                <p class="text-[10px] text-slate-500">按游戏节奏展示操作，并检测时长</p>
+        <main class="min-h-0 overflow-y-auto p-4 md:p-5">
+          <div v-if="loading" class="flex h-full items-center justify-center">
+            <div class="h-9 w-9 rounded-full border-4 border-sky-500/20 border-t-sky-500 animate-spin" />
+          </div>
+
+          <div v-else-if="loadError" class="console-empty-state border-rose-300/70 text-rose-600 dark:border-rose-500/20 dark:text-rose-300">
+            {{ loadError }}
+          </div>
+
+          <div v-else class="space-y-3">
+            <section class="console-panel">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="console-eyebrow">Current Perspective</p>
+                  <p class="text-base font-black text-slate-900 dark:text-white">{{ currentPerspectiveName }}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="console-metric-chip">事件 {{ visibleEvents.length }}</span>
+                  <span class="console-metric-chip">参与者 {{ participants.length }}</span>
+                </div>
               </div>
+            </section>
 
-              <div class="space-y-2 max-h-[62vh] overflow-y-auto pr-1">
-                <div
-                  v-for="(evt, idx) in visibleEvents"
-                  :key="`game-mode-${evt.at || idx}-${idx}`"
-                  :class="cn(
-                    'rounded-xl border px-3 py-2',
-                    evt.isFastOperation ? 'border-rose-400/40 bg-rose-500/10' : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5'
-                  )"
-                >
-                  <div class="flex items-center justify-between gap-2 mb-1">
-                    <span class="text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-white/10 text-slate-500 uppercase font-black tracking-wider">{{ formatEventType(evt.eventType) }}</span>
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        @click="startReplayFromEvent(evt)"
-                        class="px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20 transition-all"
-                      >
-                        从此处开始
-                      </button>
-                      <span
-                        v-if="evt.operationMs != null"
-                        :class="cn('text-[10px] px-2 py-1 rounded-md font-black', evt.isFastOperation ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')"
-                      >
-                        {{ formatOperationDuration(evt.operationMs) }}
-                      </span>
-                      <span class="text-[10px] font-mono text-slate-400">{{ formatDate(evt.at) }}</span>
-                    </div>
+            <template v-if="replayViewMode === 'game'">
+              <section class="console-panel">
+                <div class="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  <div
+                    v-for="profile in participants"
+                    :key="`player-overview-${profile.uid}`"
+                    :class="cn(
+                      'rounded-2xl border px-3 py-2',
+                      Number(profile.uid) === selectedPerspectiveUID
+                        ? 'border-sky-500/30 bg-sky-500/10'
+                        : 'border-slate-200/80 bg-white/80 dark:border-white/10 dark:bg-white/[0.03]'
+                    )"
+                  >
+                    <p class="text-sm font-bold text-slate-900 dark:text-white">{{ profile.nickname || profile.username || `UID ${profile.uid}` }}</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">UID {{ profile.uid }}</p>
+                    <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      快速操作 {{ operationStats.find((s: any) => s.uid === Number(profile.uid))?.fastCount || 0 }} 次
+                    </p>
                   </div>
-                  <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ idx + 1 }}. {{ describeEvent(evt) }}</p>
                 </div>
 
-                <div v-if="visibleEvents.length === 0" class="rounded-2xl border border-dashed border-slate-300 dark:border-white/20 bg-white/70 dark:bg-white/[0.03] p-8 text-center">
-                  <p class="text-sm font-black text-slate-400 uppercase tracking-widest">NO EVENTS IN CURRENT PERSPECTIVE</p>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template v-else>
-            <div class="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 p-4 flex items-center justify-between">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">当前视角</p>
-                <p class="text-sm font-black">{{ currentPerspectiveName }}</p>
-              </div>
-              <div class="text-right">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">事件数</p>
-                <p class="text-sm font-black text-blue-600 dark:text-blue-300">{{ visibleEvents.length }}</p>
-              </div>
-            </div>
-
-            <div
-              v-for="(evt, idx) in visibleEvents"
-              :key="`${evt.at || idx}-${idx}`"
-              class="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-black/20 px-4 py-3"
-            >
-              <div class="flex items-center justify-between gap-3 mb-1">
-                <span class="text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-white/10 text-slate-500 uppercase font-black tracking-wider">{{ formatEventType(evt.eventType) }}</span>
-                <div class="flex items-center gap-2">
-                  <button
-                    type="button"
-                    @click="startReplayFromEvent(evt)"
-                    class="px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-cyan-500/20 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/20 transition-all"
+                <div class="space-y-2">
+                  <div
+                    v-for="(evt, idx) in visibleEvents"
+                    :key="`game-mode-${evt.at || idx}-${idx}`"
+                    :class="cn(
+                      'rounded-2xl border px-3 py-3',
+                      evt.isFastOperation
+                        ? 'border-rose-500/20 bg-rose-500/10'
+                        : 'border-slate-200/80 bg-white/78 dark:border-white/10 dark:bg-white/[0.03]'
+                    )"
                   >
-                    从此处开始
-                  </button>
-                  <span
-                    v-if="evt.operationMs != null"
-                    :class="cn('text-[10px] px-2 py-1 rounded-md font-black', evt.isFastOperation ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')"
-                  >
-                    {{ formatOperationDuration(evt.operationMs) }}
-                  </span>
-                  <span class="text-[10px] font-mono text-slate-400">{{ formatDate(evt.at) }}</span>
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <span class="console-notice-chip">{{ formatEventType(evt.eventType) }}</span>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <button @click="startReplayFromEvent(evt)" class="console-button text-cyan-700 dark:text-cyan-300">从此处开始</button>
+                        <span v-if="evt.operationMs != null" :class="['console-notice-chip', evt.isFastOperation ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300']">
+                          {{ formatOperationDuration(evt.operationMs) }}
+                        </span>
+                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ formatDate(evt.at) }}</span>
+                      </div>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ idx + 1 }}. {{ describeEvent(evt) }}</p>
+                  </div>
                 </div>
-              </div>
-              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ idx + 1 }}. {{ describeEvent(evt) }}</p>
-            </div>
+              </section>
+            </template>
 
-            <div v-if="visibleEvents.length === 0" class="rounded-2xl border border-dashed border-slate-300 dark:border-white/20 bg-white/70 dark:bg-white/[0.03] p-8 text-center">
-              <p class="text-sm font-black text-slate-400 uppercase tracking-widest">NO EVENTS IN CURRENT PERSPECTIVE</p>
+            <template v-else>
+              <section
+                v-for="(evt, idx) in visibleEvents"
+                :key="`${evt.at || idx}-${idx}`"
+                class="console-panel"
+              >
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <span class="console-notice-chip">{{ formatEventType(evt.eventType) }}</span>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button @click="startReplayFromEvent(evt)" class="console-button text-cyan-700 dark:text-cyan-300">从此处开始</button>
+                    <span v-if="evt.operationMs != null" :class="['console-notice-chip', evt.isFastOperation ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300']">
+                      {{ formatOperationDuration(evt.operationMs) }}
+                    </span>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ formatDate(evt.at) }}</span>
+                  </div>
+                </div>
+                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ idx + 1 }}. {{ describeEvent(evt) }}</p>
+              </section>
+            </template>
+
+            <div v-if="visibleEvents.length === 0" class="console-empty-state">
+              <p class="text-sm font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">No Events In Current Perspective</p>
             </div>
-          </template>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   </div>
 </template>

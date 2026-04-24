@@ -1,113 +1,97 @@
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-200 p-4 lg:p-6 font-sans selection:bg-blue-500/30">
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[120px]" />
-      <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-500/5 rounded-full blur-[120px]" />
-      <div class="absolute inset-0 bg-[url('/noise.svg')] opacity-20 brightness-50 contrast-150" />
-    </div>
+  <div class="console-page-shell min-h-screen">
+    <div class="console-grid-overlay" />
 
-    <div class="max-w-6xl mx-auto relative z-10" data-testid="data-config-page">
-      <!-- 头部 -->
-      <header class="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8">
-        <div class="flex items-center gap-6">
-          <div class="relative group">
-            <div class="absolute inset-x-0 inset-y-0 bg-emerald-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity" />
-            <div class="w-12 h-12 rounded-xl bg-white dark:bg-[#111114] border border-slate-200 dark:border-emerald-500/40 flex items-center justify-center relative z-10 shadow-2xl">
-              <Database class="w-6 h-6 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-            </div>
+    <div class="console-page-container max-w-6xl" data-testid="data-config-page">
+      <header class="console-page-header animate-in fade-in slide-in-from-top-2">
+        <div class="console-page-heading">
+          <div class="console-page-icon text-emerald-600 dark:text-emerald-300">
+            <Database class="h-5 w-5" />
           </div>
           <div>
-            <h1 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase flex items-center gap-3">
-              Data Hub
-            </h1>
-            <p class="text-slate-400 dark:text-slate-500 text-[10px] font-bold tracking-widest uppercase mt-0.5">
-              核心数据配置与管理中心 / Core configuration center
-            </p>
+            <p class="console-eyebrow">Control Center</p>
+            <h1 class="console-page-title">Data Hub</h1>
+            <p class="console-page-subtitle">核心数据配置与管理中心 / Core configuration center</p>
           </div>
         </div>
 
-        <div class="flex items-center gap-4">
-          <button 
-            @click="router.push('/')"
-            class="px-5 py-2 bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 rounded-xl flex items-center gap-3 shadow-xl transition-all group"
-          >
-            <ArrowLeft class="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:-translate-x-1 transition-transform" />
-            <span class="text-[10px] font-black text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white uppercase tracking-widest">返回实验室</span>
+        <div class="console-toolbar">
+          <div class="console-metric-chip">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {{ userRole }}
+          </div>
+          <button @click="router.push('/')" class="console-button group">
+            <ArrowLeft class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            返回实验室
           </button>
         </div>
       </header>
 
-      <!-- 导航卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- 反应方程式 -->
+      <section class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <router-link
           to="/data/reactions"
           data-testid="data-nav-reactions"
-          class="group relative overflow-hidden bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-2xl hover:border-emerald-500/30 transition-all duration-500"
+          class="console-panel animate-in fade-in slide-in-from-bottom-2 group relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-500/30"
         >
-          <div class="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
-            <FlaskConical class="w-48 h-48 text-emerald-500 italic" />
-          </div>
-          <div class="relative z-10 space-y-4">
-            <div class="flex items-center gap-3 text-emerald-600 dark:text-emerald-500">
-              <span class="text-[8px] font-black uppercase tracking-[0.3em] px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">Module 01</span>
-              <div class="h-[1px] flex-1 bg-emerald-500/10"></div>
+          <div class="absolute right-0 top-0 h-28 w-28 translate-x-6 -translate-y-6 rounded-full bg-emerald-500/10 blur-2xl" />
+          <div class="relative flex h-full flex-col gap-4">
+            <div class="flex items-center justify-between gap-3">
+              <span class="console-notice-chip border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Module 01</span>
+              <FlaskConical class="h-5 w-5 text-emerald-500/70 transition-transform duration-300 group-hover:scale-110" />
             </div>
-            <h2 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase">反应方程式库</h2>
-            <p class="text-slate-500 dark:text-slate-500 text-xs leading-relaxed font-medium">
-              查看游戏中允许的所有化学反应。当前玩家模式仅提供只读浏览，不提供审核、编辑或提交流程。
-            </p>
-            <div class="pt-4 flex items-center gap-2 group-hover:translate-x-3 transition-transform duration-500 text-emerald-600 dark:text-emerald-400">
-              <span class="text-[10px] font-black uppercase tracking-widest">进入查看界面</span>
-              <ArrowRight class="w-4 h-4" />
+            <div class="space-y-2">
+              <h2 class="console-section-title text-xl">反应方程式库</h2>
+              <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                查看游戏中允许的化学反应。当前玩家模式仅提供只读浏览，不提供审核、编辑或提交流程。
+              </p>
+            </div>
+            <div class="mt-auto flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+              进入查看界面
+              <ArrowRight class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
             </div>
           </div>
         </router-link>
 
-        <!-- 物质百科 -->
         <router-link
           to="/data/substances"
           data-testid="data-nav-substances"
-          class="group relative overflow-hidden bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-2xl hover:border-blue-500/30 transition-all duration-500"
+          class="console-panel animate-in fade-in slide-in-from-bottom-2 [--enter-duration:380ms] group relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-500/30"
         >
-          <div class="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
-            <Beaker class="w-48 h-48 text-blue-500 italic" />
-          </div>
-          <div class="relative z-10 space-y-4">
-            <div class="flex items-center gap-3 text-blue-600 dark:text-blue-500">
-              <span class="text-[8px] font-black uppercase tracking-[0.3em] px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-full">Module 02</span>
-              <div class="h-[1px] flex-1 bg-blue-500/10"></div>
+          <div class="absolute right-0 top-0 h-28 w-28 translate-x-6 -translate-y-6 rounded-full bg-sky-500/10 blur-2xl" />
+          <div class="relative flex h-full flex-col gap-4">
+            <div class="flex items-center justify-between gap-3">
+              <span class="console-notice-chip">Module 02</span>
+              <Beaker class="h-5 w-5 text-sky-500/70 transition-transform duration-300 group-hover:scale-110" />
             </div>
-            <h2 class="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter uppercase">物质百科全书</h2>
-            <p class="text-slate-500 dark:text-slate-500 text-xs leading-relaxed font-medium">
-              查阅游戏中的化学物质与名称映射。当前玩家模式仅提供只读浏览，不提供提交流程。
-            </p>
-            <div class="pt-4 flex items-center gap-2 group-hover:translate-x-3 transition-transform duration-500 text-blue-600 dark:text-blue-400">
-              <span class="text-[10px] font-black uppercase tracking-widest">进入查看界面</span>
-              <ArrowRight class="w-4 h-4" />
+            <div class="space-y-2">
+              <h2 class="console-section-title text-xl">物质百科全书</h2>
+              <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                查阅游戏中的化学物质与名称映射。当前玩家模式仅提供只读浏览，不提供提交流程。
+              </p>
+            </div>
+            <div class="mt-auto flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+              进入查看界面
+              <ArrowRight class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
             </div>
           </div>
         </router-link>
-      </div>
+      </section>
 
-      <!-- Footer -->
-      <footer class="mt-10 pt-5 border-t border-slate-200 dark:border-white/5 flex items-center justify-between opacity-40">
-        <div class="flex items-center gap-4 text-[8px] font-black uppercase tracking-[0.4em] text-slate-500">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <footer class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:border-white/10 dark:text-slate-400">
+        <div class="flex items-center gap-2">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           Data Sync Active
         </div>
-        <div class="text-[8px] font-black uppercase tracking-[0.4em] text-slate-500">
-          Experimental Phase 0.1.4
-        </div>
+        <div>Experimental Phase 0.1.4</div>
       </footer>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import { computed } from 'vue'
-import { Database, ArrowLeft, ArrowRight, FlaskConical, Beaker } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { ArrowLeft, ArrowRight, Beaker, Database, FlaskConical } from 'lucide-vue-next'
 
 const router = useRouter()
 let user: any = {}
@@ -117,5 +101,5 @@ try {
   console.error('Failed to parse user in DataConfig:', e)
 }
 
-const userRole = computed(() => 'WIKI_READER')
+const userRole = computed(() => user?.role || 'WIKI_READER')
 </script>

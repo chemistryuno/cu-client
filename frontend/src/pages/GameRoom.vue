@@ -72,6 +72,8 @@ const secondDoubleSubstance = ref<string | null>(null)
 const substanceInput = ref('')
 const randomHints = ref<any[]>([])
 const reactionHints = ref<any[]>([])
+const centerEffectAnimation = ref<'reverse' | 'ban' | ''>('')
+let centerEffectTimer: number | null = null
 
 type RoomNoticeTone = 'info' | 'success' | 'warning' | 'error'
 
@@ -525,6 +527,10 @@ const isFunctionalLastCard = computed(() => {
   if (!gameState.value?.last_card) return false
   return specialCards.has(gameState.value.last_card.substance)
 })
+const isAnyPlayWindow = computed(() => gameState.value?.status === 'playing' && Number(gameState.value?.allowed_any_player) >= 0)
+const centerCard = computed(() => gameState.value?.last_card || null)
+const centerCardSubstance = computed(() => centerCard.value?.substance || '')
+const shouldHideCenterCardForEffect = computed(() => centerEffectAnimation.value === 'reverse' && ['He', 'Ne', 'Ar', 'Kr'].includes(centerCardSubstance.value))
 
 const isManualSettlement = ref(false)
 
@@ -826,6 +832,37 @@ watch(() => gameState.value?.current_reaction, (newReaction, oldReaction) => {
     feedback.reaction()
   }
 })
+
+watch(
+  () => `${gameState.value?.last_effect_type || ''}:${gameState.value?.effect_target_uid ?? ''}:${gameState.value?.discard_pile?.length || 0}`,
+  () => {
+    const effectType = String(gameState.value?.last_effect_type || '')
+    const targetUID = gameState.value?.effect_target_uid ?? null
+    const myUID = Number(isReplayBridgeMode.value ? replayPerspectiveUID.value : user.value?.uid)
+
+    let nextEffect: 'reverse' | 'ban' | '' = ''
+    if (effectType === 'reverse') {
+      nextEffect = 'reverse'
+    } else if (effectType === 'ban' && targetUID != null && Number(targetUID) === myUID) {
+      nextEffect = 'ban'
+    }
+
+    centerEffectAnimation.value = ''
+    if (centerEffectTimer != null) {
+      window.clearTimeout(centerEffectTimer)
+    }
+
+    if (!nextEffect) return
+
+    requestAnimationFrame(() => {
+      centerEffectAnimation.value = nextEffect
+      centerEffectTimer = window.setTimeout(() => {
+        centerEffectAnimation.value = ''
+        centerEffectTimer = null
+      }, 1750)
+    })
+  }
+)
 
 // 监听游戏结束 - 播放胜利/失败音效并标记教学完成
 watch(() => gameState.value?.status, (newStatus) => {
@@ -1719,6 +1756,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearReplayTimer()
+  if (centerEffectTimer != null) {
+    window.clearTimeout(centerEffectTimer)
+  }
 
   // 清除教学模式标记，并记录已完成
   if (isTutorialMode.value) {
@@ -2301,27 +2341,8 @@ watch(() => gameState.value?.current_player, () => {
         <div class="absolute top-0 left-0 w-full h-px bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-scan"></div>
       </div>
 
-      <div class="room-status-safe-area pointer-events-none">
-        <div :class="cn('room-status-banner', `room-status-banner--${roomStatusTone}`)">
-          <div class="room-status-banner__eyebrow">
-            <Radar class="w-3.5 h-3.5" />
-            ROOM STATUS
-          </div>
-          <div class="room-status-banner__body">
-            <div class="room-status-banner__copy">
-              <p class="room-status-banner__title">{{ roomStatusLabel }}</p>
-              <p class="room-status-banner__text">{{ roomStatusMessage }}</p>
-            </div>
-            <div v-if="gameState?.status === 'playing'" class="room-status-banner__meta">
-              <span v-if="hasTurnLimit">{{ timeRemaining }}S</span>
-              <span v-else>{{ gameState?.direction === 1 ? 'CW' : 'CCW' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Compressed Header - 移动端优化 -->
-      <header class="h-10 sm:h-14 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
+      <header class="h-11 sm:h-16 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
         <div class="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
             @click="handleLeaveRoom"
@@ -2338,7 +2359,7 @@ watch(() => gameState.value?.current_player, () => {
           </div>
         </div>
 
-        <!-- Center Area: Reaction Display -->
+        <!-- Center Area: Reaction Display & Turn Indicator -->
         <div class="flex-1 flex justify-center items-center gap-1.5 sm:gap-4 overflow-hidden">
             <!-- Reaction Widget - 反应记录监控 -->
             <transition name="reaction-slide">
@@ -2355,6 +2376,25 @@ watch(() => gameState.value?.current_player, () => {
                   <div class="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
               </div>
             </transition>
+
+            <div v-if="gameState?.status === 'playing'" class="animate-in fade-in zoom-in duration-500 max-w-[240px] sm:max-w-[320px]">
+              <div :class="cn('room-status-banner room-status-banner--inline', `room-status-banner--${roomStatusTone}`)">
+                <div class="room-status-banner__eyebrow">
+                  <Radar class="w-3.5 h-3.5" />
+                  ROOM STATUS
+                </div>
+                <div class="room-status-banner__body">
+                  <div class="room-status-banner__copy">
+                    <p class="room-status-banner__title truncate">{{ roomStatusLabel }}</p>
+                    <p class="room-status-banner__text truncate">{{ roomStatusMessage }}</p>
+                  </div>
+                  <div class="room-status-banner__meta">
+                    <span v-if="hasTurnLimit">{{ timeRemaining }}S</span>
+                    <span v-else>{{ gameState?.direction === 1 ? 'CW' : 'CCW' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
 
         <!-- Global Status -->
@@ -2685,71 +2725,57 @@ watch(() => gameState.value?.current_player, () => {
            </div>
           </Teleport>
 
-          <!-- Latest Reaction Display -->
-          <div v-if="gameState?.last_card && !isFunctionalLastCard"
-               :key="gameState?.last_card?.substance + (gameState?.discard_pile?.length || 0)"
+          <!-- Latest Card Display -->
+          <div v-if="centerCard && !shouldHideCenterCardForEffect"
+               :key="centerCardSubstance + (gameState?.discard_pile?.length || 0)"
                class="relative group scale-75 sm:scale-85 flex flex-col items-center justify-center animate-stamp">
              <div class="absolute -inset-16 bg-blue-600/10 rounded-full blur-[100px] opacity-50 group-hover:opacity-80 transition-opacity animate-pulse"></div>
-             
-             <!-- Double Play Display (Side by Side) -->
-             <div v-if="gameState?.last_card?.reactants?.length > 0" class="flex items-center gap-6 sm:gap-10 relative z-10">
-                <div v-for="(sub, idx) in gameState.last_card.reactants" :key="idx" class="relative group/card">
-                   <div :class="cn(
-                      'uno-card h-32 sm:h-40 rounded-[32px] flex flex-col items-center justify-center gap-4 hover:scale-105 transition-all duration-500',
-                      getDynamicWidthClass(sub, 'double'),
-                      getDynamicCardClass(gameState?.last_card?.card, sub)
-                   )">
-                      <span :class="cn('font-black font-mono italic drop-shadow-lg', getFormulaFontSize(sub, 'double'))" v-html="formatFormula(sub)"></span>
-                      <div class="px-3 py-1 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 max-w-[85%]">
-                         <span class="text-[8px] font-black tracking-widest truncate block text-center">{{ getSubstanceName(sub) }}</span>
-                      </div>
-                   </div>
-                </div>
-                <!-- Plus Operator -->
-                <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg">
-                   <Plus class="w-4 h-4 stroke-[4px]" />
-                </div>
-             </div>
-
-             <!-- Single Play Display -->
-             <div v-else :class="cn(
+             <div :class="cn(
                 'uno-card h-44 sm:h-52 rounded-[32px] flex flex-col items-center justify-center gap-4 sm:gap-6 hover:scale-105 transition-all duration-500',
-                getDynamicWidthClass(gameState?.last_card?.substance, 'single'),
-                getDynamicCardClass(gameState?.last_card?.card, gameState?.last_card?.substance)
+                getDynamicWidthClass(centerCardSubstance, 'single'),
+                getDynamicCardClass(centerCard?.card, centerCardSubstance)
               )">
-                <div class="absolute top-4 left-4 opacity-20 text-[8px] uppercase font-black tracking-widest leading-none">Result</div>
-                <span :class="cn('font-black font-mono italic drop-shadow-lg leading-none', getFormulaFontSize(gameState?.last_card?.substance, 'single'))" v-html="formatFormula(gameState?.last_card?.substance)"></span>
+                <div class="absolute top-4 left-4 opacity-20 text-[8px] uppercase font-black tracking-widest leading-none">Current</div>
+                <span :class="cn('font-black font-mono italic drop-shadow-lg leading-none', getFormulaFontSize(centerCardSubstance, 'single'))" v-html="formatFormula(centerCardSubstance)"></span>
                 <div class="px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 max-w-[85%]">
-                   <span class="text-[9px] sm:text-[10px] font-black tracking-widest text-center block leading-tight">{{ getSubstanceName(gameState?.last_card?.substance) }}</span>
+                   <span class="text-[9px] sm:text-[10px] font-black tracking-widest text-center block leading-tight">{{ getSubstanceName(centerCardSubstance) }}</span>
                 </div>
                 <div class="absolute bottom-4 right-4 opacity-30">
                    <FlaskConical class="w-4 h-4 fill-current" />
                 </div>
-             </div>
-
-             <!-- Direction Ring -->
-             <div class="absolute -inset-12 pointer-events-none">
-                <div :class="cn(
-                   'absolute -inset-12 pointer-events-none border-2 border-blue-500/10 rounded-full',
-                   gameState?.direction === 1 ? 'animate-spin-slow' : 'animate-reverse-spin-slow'
-                )"></div>
+                <Transition name="reaction-slide">
+                  <div v-if="centerEffectAnimation" :class="['reverse-effect-overlay', centerEffectAnimation === 'ban' && 'reverse-effect-overlay--ban']">
+                    <div :class="['reverse-effect-overlay__glyph', centerEffectAnimation === 'ban' && 'reverse-effect-overlay__glyph--ban']">
+                      <Orbit v-if="centerEffectAnimation === 'reverse'" class="w-20 h-20 sm:w-24 sm:h-24" />
+                      <Ban v-else class="w-20 h-20 sm:w-24 sm:h-24" />
+                    </div>
+                  </div>
+                </Transition>
              </div>
           </div>
 
-          <!-- Waiting for play state (Au triggered or Initial or Functional card played) -->
-          <div v-else-if="gameState?.status === 'playing' && (!gameState?.last_card || isFunctionalLastCard)" class="flex flex-col items-center gap-4 sm:gap-6 animate-in fade-in zoom-in duration-700">
+          <!-- Waiting for play state -->
+          <div v-else-if="gameState?.status === 'playing' && (!centerCard || isAnyPlayWindow || shouldHideCenterCardForEffect)" class="flex flex-col items-center gap-4 sm:gap-6 animate-in fade-in zoom-in duration-700">
              <div class="relative group">
                 <div class="absolute -inset-8 bg-emerald-500/10 rounded-full blur-[60px] group-hover:bg-emerald-500/20 transition-all animate-pulse"></div>
                 <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-[32px] sm:rounded-[40px] border-2 border-emerald-500/30 flex items-center justify-center relative z-10 backdrop-blur-md bg-emerald-500/5">
                    <Zap class="w-10 h-10 sm:w-14 sm:h-14 text-emerald-500/40" />
                 </div>
+                <Transition name="reaction-slide">
+                  <div v-if="centerEffectAnimation" :class="['reverse-effect-overlay', centerEffectAnimation === 'ban' && 'reverse-effect-overlay--ban']">
+                    <div :class="['reverse-effect-overlay__glyph', centerEffectAnimation === 'ban' && 'reverse-effect-overlay__glyph--ban']">
+                      <Orbit v-if="centerEffectAnimation === 'reverse'" class="w-20 h-20 sm:w-24 sm:h-24" />
+                      <Ban v-else class="w-20 h-20 sm:w-24 sm:h-24" />
+                    </div>
+                  </div>
+                </Transition>
              </div>
              <div class="text-center relative z-10">
                 <h3 class="text-lg sm:text-xl font-black uppercase tracking-[0.2em]" :class="shouldShowInBlue(allPlayers[gameState?.current_player]) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-800 dark:text-white'">
                    等待 <span>{{ getPlayerDisplayName(allPlayers[gameState?.current_player]) }}</span> 出牌
                 </h3>
                 <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase italic tracking-tighter">
-                   Reaction Reactor Reseted _ New Deployment Window Open
+                   {{ isAnyPlayWindow ? 'Field Cleared _ Free Deployment Window Open' : 'Reaction Reactor Reseted _ New Deployment Window Open' }}
                 </p>
              </div>
           </div>
@@ -2844,8 +2870,8 @@ watch(() => gameState.value?.current_player, () => {
 
       <!-- Hand / Deck Area -->
       <div class="fixed bottom-0 left-0 right-0 z-[70] bg-white/70 dark:bg-black/60 backdrop-blur-2xl border-t border-slate-200 dark:border-white/5 flex flex-col items-center">
-        <div v-if="isTutorialMode && tutorialHintText && isMyTurn" class="absolute bottom-full mb-3 right-4 sm:right-6 max-w-sm z-50 pointer-events-none animate-in slide-in-from-bottom-2">
-          <div class="room-assistive-card">
+        <div v-if="isTutorialMode && tutorialHintText && isMyTurn" class="absolute bottom-full mb-4 left-0 right-0 flex justify-center px-4 z-50 pointer-events-none animate-in slide-in-from-bottom-2">
+          <div class="room-assistive-card max-w-md w-full">
             <div class="room-assistive-card__header">
               <div class="room-assistive-card__badge">
                 <Orbit class="w-3.5 h-3.5" />

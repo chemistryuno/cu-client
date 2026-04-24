@@ -87,6 +87,150 @@ body {
   .console-notice-chip {
     @apply inline-flex items-center gap-2 rounded-full border border-sky-500/15 bg-sky-500/7 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700 dark:border-sky-400/18 dark:bg-sky-400/8 dark:text-sky-300;
   }
+
+  .console-page-shell {
+    min-height: var(--app-height);
+    position: relative;
+    overflow-x: hidden;
+    color: rgb(15 23 42);
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 26%),
+      linear-gradient(180deg, #f3f7fb 0%, #edf3f8 45%, #e9f0f6 100%);
+  }
+
+  .dark .console-page-shell {
+    color: rgb(226 232 240);
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.05), transparent 24%),
+      linear-gradient(180deg, #071019 0%, #09131d 52%, #0b1620 100%);
+  }
+
+  .console-page-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 14% 12%, rgba(14, 165, 233, 0.12), transparent 24%),
+      radial-gradient(circle at 86% 18%, rgba(249, 115, 22, 0.08), transparent 18%),
+      radial-gradient(circle at 72% 82%, rgba(16, 185, 129, 0.08), transparent 18%);
+    opacity: 0.9;
+  }
+
+  .console-page-container {
+    @apply relative z-10 mx-auto w-full max-w-7xl px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6;
+  }
+
+  .console-page-header {
+    @apply mb-5 flex flex-col gap-4 md:mb-6 md:flex-row md:items-center md:justify-between;
+  }
+
+  .console-page-heading {
+    @apply flex items-start gap-3 sm:gap-4;
+  }
+
+  .console-page-icon {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-sky-700 shadow-lg shadow-slate-900/5 dark:border-white/10 dark:bg-[#0f1824]/90 dark:text-sky-300;
+  }
+
+  .console-page-title {
+    @apply text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-xl;
+  }
+
+  .console-page-subtitle {
+    @apply mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400;
+  }
+
+  .console-toolbar {
+    @apply flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-white/10 dark:bg-[#0f1824]/80;
+  }
+
+  .console-toolbar-group {
+    @apply flex items-center gap-2;
+  }
+
+  .console-tab-strip {
+    @apply flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/75 p-1 dark:border-white/10 dark:bg-white/[0.05];
+  }
+
+  .console-tab-button {
+    @apply rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 transition-all hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
+  }
+
+  .console-tab-button--active {
+    @apply bg-white text-sky-700 shadow-sm dark:bg-sky-500/18 dark:text-sky-200;
+  }
+
+  .console-panel {
+    @apply border border-slate-300/60 bg-white/90 rounded-[28px] p-4 dark:border-white/10 dark:bg-[#0b1420]/90 sm:p-5;
+    box-shadow: 0 24px 60px -40px rgba(15, 23, 42, 0.45);
+  }
+
+  .console-panel-header {
+    @apply mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between;
+  }
+
+  .console-metric-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-slate-100/75 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300;
+  }
+
+  .console-filter-bar {
+    @apply mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-slate-100/70 p-2 dark:border-white/10 dark:bg-white/[0.04];
+  }
+
+  .console-filter-pill {
+    @apply rounded-xl border border-transparent px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:border-sky-500/20 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
+  }
+
+  .console-filter-pill--active {
+    @apply border-sky-500/25 bg-white text-sky-700 shadow-sm dark:bg-sky-500/18 dark:text-sky-200;
+  }
+
+  .console-input-shell {
+    @apply flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/88 px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/[0.05];
+  }
+
+  .console-input {
+    @apply w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+
+  .console-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white/85 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition-all hover:border-sky-500/30 hover:text-sky-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300 dark:hover:text-sky-200;
+  }
+
+  .console-button-primary {
+    @apply border-sky-500/15 bg-sky-600 text-white shadow-lg shadow-sky-900/15 hover:border-sky-500/15 hover:bg-sky-500 hover:text-white dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400;
+  }
+
+  .console-button-ghost {
+    @apply border-transparent bg-transparent shadow-none;
+  }
+
+  .console-data-table {
+    @apply min-w-full overflow-hidden rounded-2xl border border-slate-200/70 bg-white/80 dark:border-white/10 dark:bg-[#0d1520]/75;
+  }
+
+  .console-data-table thead {
+    @apply bg-slate-100/80 dark:bg-white/[0.04];
+  }
+
+  .console-data-table th {
+    @apply px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400;
+  }
+
+  .console-data-table td {
+    @apply px-4 py-3 align-top text-sm text-slate-700 dark:text-slate-200;
+  }
+
+  .console-data-table tbody tr {
+    @apply border-t border-slate-200/70 transition-colors hover:bg-slate-50/80 dark:border-white/6 dark:hover:bg-white/[0.035];
+  }
+
+  .console-empty-state {
+    @apply rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center dark:border-white/15 dark:bg-white/[0.03];
+  }
 }
 
 @keyframes app-enter {

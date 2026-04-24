@@ -13,6 +13,65 @@
   transform: translateY(10px) scale(0.95);
 }
 
+.reverse-effect-overlay {
+  position: absolute;
+  inset: -24%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  perspective: 1000px;
+}
+
+.reverse-effect-overlay__glyph {
+  color: rgba(255, 255, 255, 0.38);
+  filter: drop-shadow(0 14px 34px rgba(14, 165, 233, 0.24));
+  transform-origin: center center;
+  will-change: transform, opacity;
+  animation: reverse-pop 1.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.reverse-effect-overlay--ban {
+  inset: -18%;
+}
+
+.reverse-effect-overlay__glyph--ban {
+  color: rgba(251, 191, 36, 0.38);
+  filter: drop-shadow(0 14px 32px rgba(245, 158, 11, 0.28));
+}
+
+@keyframes reverse-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 56px, 0) rotate(0deg) rotateY(0deg) scale(0.92);
+  }
+
+  16% {
+    opacity: 0.92;
+    transform: translate3d(0, -16px, 0) rotate(48deg) rotateY(14deg) scale(1.12);
+  }
+
+  34% {
+    opacity: 0.84;
+    transform: translate3d(0, -40px, 0) rotate(118deg) rotateY(-22deg) scale(1.2);
+  }
+
+  54% {
+    opacity: 0.74;
+    transform: translate3d(0, -48px, 0) rotate(196deg) rotateY(20deg) scale(1.24);
+  }
+
+  74% {
+    opacity: 0.46;
+    transform: translate3d(0, -34px, 0) rotate(274deg) rotateY(-16deg) scale(1.08);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -18px, 0) rotate(360deg) rotateY(0deg) scale(0.96);
+  }
+}
+
 :global(.custom-scrollbar-hidden::-webkit-scrollbar) {
   display: none;
 }
@@ -37,15 +96,6 @@
   opacity: 0.8;
 }
 
-:global(.room-status-safe-area) {
-  position: fixed;
-  top: 0.7rem;
-  left: 50%;
-  z-index: 96;
-  width: min(34rem, calc(100vw - 1.25rem));
-  transform: translateX(-50%);
-}
-
 :global(.room-status-banner) {
   padding: 0.7rem 0.95rem 0.82rem;
   border-radius: 1.15rem;
@@ -53,6 +103,44 @@
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(18px) saturate(145%);
   box-shadow: 0 24px 50px -38px rgba(15, 23, 42, 0.5);
+}
+
+:global(.room-status-banner--inline) {
+  width: 100%;
+  min-width: 0;
+  padding: 0.36rem 0.62rem 0.42rem;
+  border-radius: 0.9rem;
+  box-shadow: 0 16px 34px -30px rgba(15, 23, 42, 0.42);
+}
+
+:global(.room-status-banner--inline .room-status-banner__eyebrow) {
+  gap: 0.3rem;
+  margin-bottom: 0.22rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+}
+
+:global(.room-status-banner--inline .room-status-banner__body) {
+  gap: 0.5rem;
+}
+
+:global(.room-status-banner--inline .room-status-banner__title) {
+  font-size: 0.78rem;
+  line-height: 1.05;
+}
+
+:global(.room-status-banner--inline .room-status-banner__text) {
+  margin-top: 0.1rem;
+  font-size: 0.64rem;
+  line-height: 1.25;
+}
+
+:global(.room-status-banner--inline .room-status-banner__meta) {
+  min-width: 2.35rem;
+  padding: 0.36rem 0.45rem;
+  border-radius: 0.7rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
 }
 
 :global(.dark .room-status-banner) {
@@ -221,13 +309,12 @@
 }
 
 @media (max-width: 640px) {
-  :global(.room-status-safe-area) {
-    top: 0.55rem;
-    width: calc(100vw - 1rem);
-  }
-
   :global(.room-status-banner) {
     padding: 0.68rem 0.8rem 0.76rem;
+  }
+
+  :global(.room-status-banner--inline) {
+    padding: 0.32rem 0.52rem 0.38rem;
   }
 
   :global(.room-status-banner__body) {
@@ -246,5 +333,19 @@
     min-width: 2.7rem;
     padding: 0.45rem 0.55rem;
     font-size: 0.68rem;
+  }
+
+  :global(.room-status-banner--inline .room-status-banner__title) {
+    font-size: 0.72rem;
+  }
+
+  :global(.room-status-banner--inline .room-status-banner__text) {
+    font-size: 0.58rem;
+  }
+
+  :global(.room-status-banner--inline .room-status-banner__meta) {
+    min-width: 2.1rem;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.58rem;
   }
 }

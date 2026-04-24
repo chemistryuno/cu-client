@@ -29,6 +29,8 @@ import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tu
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
+const AI_TURN_DELAY_MIN_MS = 500
+const AI_TURN_DELAY_MAX_MS = 1500
 const eventBus = new EventTarget()
 const turnTimers = new Map<string, number>()
 const aiTimers = new Map<string, number>()
@@ -1076,9 +1078,14 @@ const clearTimer = (map: Map<string, number>, roomId: string) => {
 const randomId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 const unique = <T>(items: T[]) => Array.from(new Set(items))
 const normalizeFormula = (value: string) => String(value || '').replace(/\s+/g, '')
+const randomIntBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+const allKnownFormulas = unique([...Object.keys(substanceNames), ...Object.keys(builtinDeck)])
+const parsedFormulaCache = new Map<string, Record<string, number>>()
 
 const parseFormula = (formula: string): Record<string, number> => {
   const input = normalizeFormula(formula)
+  const cached = parsedFormulaCache.get(input)
+  if (cached) return cached
   const stack: Array<Record<string, number>> = [{}]
   let i = 0
 
@@ -1128,6 +1135,7 @@ const parseFormula = (formula: string): Record<string, number> => {
   if (Object.keys(parsed).length === 0 && input) {
     parsed[input] = 1
   }
+  parsedFormulaCache.set(input, parsed)
   return parsed
 }
 
@@ -1139,14 +1147,15 @@ const getCardCounts = (cards: Card[]) => {
   return result
 }
 
-const canFormSubstance = (cards: Card[], substance: string) => {
+const canFormSubstanceFromCounts = (counts: Record<string, number>, substance: string) => {
   if (specialCards.has(substance)) {
-    return cards.some((card) => card.type === substance)
+    return (counts[substance] || 0) > 0
   }
-  const counts = getCardCounts(cards)
   const need = parseFormula(substance)
   return Object.entries(need).every(([key, value]) => (counts[key] || 0) >= value)
 }
+
+const canFormSubstance = (cards: Card[], substance: string) => canFormSubstanceFromCounts(getCardCounts(cards), substance)
 
 const removeFormulaCards = (cards: Card[], substance: string) => {
   const next = [...cards]
@@ -1178,8 +1187,8 @@ const isReactionPair = (a: string, b: string) => {
 }
 
 const getAvailableSubstances = (cards: Card[]) => {
-  const formulas = unique([...Object.keys(substanceNames), ...Object.keys(builtinDeck)])
-  return formulas.filter((formula) => canFormSubstance(cards, formula))
+  const counts = getCardCounts(cards)
+  return allKnownFormulas.filter((formula) => canFormSubstanceFromCounts(counts, formula))
 }
 
 const serializeUser = (user: User) => {
@@ -1311,6 +1320,12 @@ const runTutorialAiTurn = (state: State, room: Room) => {
 
   if (currentStep.action === 'play' && currentStep.substance) {
     const scriptedSubstance = normalizeFormula(currentStep.substance)
+    if (!canFormSubstance(player.hand_cards, scriptedSubstance)) {
+      throw { status: 400, data: { error: `Tutorial AI is missing required cards for ${scriptedSubstance}` } }
+    }
+    if (game.last_card && !isReactionPair(game.last_card.substance, scriptedSubstance)) {
+      throw { status: 400, data: { error: `Tutorial AI cannot legally play ${scriptedSubstance} after ${game.last_card.substance}` } }
+    }
     applyPlay(
       state,
       room,
@@ -1428,7 +1443,13 @@ const runAiTurn = (state: State, room: Room) => {
   const game = ensureGame(room)
   const player = game.players[game.current_player]
   if (!player?.is_ai) return
-  if (isTutorialScriptEnabled(room) && runTutorialAiTurn(state, room)) return
+  if (isTutorialScriptEnabled(room)) {
+    const currentStep = getCurrentTutorialStep(game)
+    if (currentStep?.player === 'ai') {
+      runTutorialAiTurn(state, room)
+      return
+    }
+  }
   const available = getAvailableSubstances(player.hand_cards)
   const playable = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula))
   if (playable.length > 0) {
@@ -1458,7 +1479,7 @@ const maybeScheduleAiTurn = (_state: State, room: Room) => {
     writeState(latest)
     emitGameUpdate(targetRoom)
     emitRoomsUpdate(latest)
-  }, 900)
+  }, randomIntBetween(AI_TURN_DELAY_MIN_MS, AI_TURN_DELAY_MAX_MS))
   aiTimers.set(room.id, timer)
 }
 
@@ -1466,6 +1487,10 @@ const scheduleTurnTimer = (_state: State, room: Room) => {
   clearTimer(turnTimers, room.id)
   const game = room.game_state
   if (!game || game.status !== 'playing') return
+  if (isTutorialScriptEnabled(room)) {
+    game.turn_end_time = 0
+    return
+  }
   game.turn_end_time = nowMs() + TURN_TIMEOUT_MS
   const current = game.players[game.current_player]
   const timer = window.setTimeout(() => {
@@ -1498,11 +1523,12 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
   const game = ensureGame(room)
   const player = game.players[playerIndex]
   const normalized = normalizeFormula(substance)
+  const isFreeDeployTurn = game.allowed_any_player === playerIndex
   if (!normalized) throw { status: 400, data: { error: 'Substance is required' } }
   if (!canFormSubstance(player.hand_cards, normalized)) {
     throw { status: 400, data: { error: 'Required cards are not available locally' } }
   }
-  if (game.last_card && !isReactionPair(game.last_card.substance, normalized)) {
+  if (game.last_card && !isFreeDeployTurn && !isReactionPair(game.last_card.substance, normalized)) {
     throw { status: 400, data: { error: 'These substances cannot react' } }
   }
 
@@ -1521,12 +1547,27 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
     reactants
   }
 
-  game.last_card = playedCard
   game.discard_pile.push(playedCard)
+  game.allowed_any_player = -1
 
-  const pair = reactants?.length === 2 ? reactants.sort().join('|') : ''
-  const fullReaction = pair ? reactionPairs[pair] : null
-  game.current_reaction = fullReaction || (reactants?.length ? reactants.join(' + ') : normalized)
+  if (normalized === 'Au') {
+    const skippedPlayerIndex = nextActivePlayerIndex(game)
+    game.last_card = null
+    game.current_reaction = ''
+    game.allowed_any_player = skippedPlayerIndex
+    game.last_effect_type = 'ban'
+    game.effect_target_uid = game.players[skippedPlayerIndex]?.uid ?? null
+  } else if (['He', 'Ne', 'Ar', 'Kr'].includes(normalized)) {
+    game.last_effect_type = 'reverse'
+    game.effect_target_uid = null
+  } else {
+    game.last_card = playedCard
+    const pair = reactants?.length === 2 ? reactants.sort().join('|') : ''
+    const fullReaction = pair ? reactionPairs[pair] : null
+    game.current_reaction = fullReaction || normalized
+    game.last_effect_type = ''
+    game.effect_target_uid = null
+  }
 
   if (normalized === '+2') {
     game.pending_draw_count += 2
@@ -1540,17 +1581,13 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
   if (['He', 'Ne', 'Ar', 'Kr'].includes(normalized)) {
     game.direction *= -1
   }
-  if (normalized === 'Au') {
-    // Au is a skip card in this implementation
-    game.current_player = nextActivePlayerIndex(game)
-  }
 
   if (player.hand_cards.length === 0) {
     appendFinishedPlayer(game, player.uid)
   }
 
   if (isSpecial) {
-    const effectText = normalized === '+2' ? '摸 2 张牌' : (normalized === '+4' ? '摸 4 张牌' : (normalized === 'Au' ? '跳过对方回合' : '反转出牌顺序'))
+    const effectText = normalized === '+2' ? '摸 2 张牌' : (normalized === '+4' ? '摸 4 张牌' : (normalized === 'Au' ? '清空场上手牌，下一位任意出牌' : '反转出牌顺序'))
     emit('action_toast', { type: 'action_toast', data: `${player.nickname} 使用了 ${normalized} (${effectText})` })
   }
 }
@@ -1604,6 +1641,8 @@ const buildGameState = (state: State, room: Room) => {
     points_changes: {},
     xp_changes: {},
     current_reaction: '',
+    last_effect_type: '',
+    effect_target_uid: null,
     tutorial_script_mode: room.tutorial_script,
     tutorial_current_step: room.tutorial_script ? 1 : 0,
     pending_forced_plays: 0,

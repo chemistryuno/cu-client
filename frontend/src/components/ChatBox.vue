@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Send, MessageSquare, User, X, FlaskConical, Users, Trophy } from 'lucide-vue-next'
+import { FlaskConical, MessageSquare, Send, Trophy, User, Users, X } from 'lucide-vue-next'
 import websocket from '../utils/websocket'
 import UserAvatar from './UserAvatar.vue'
 import { authAPI, gameAPI } from '../utils/api'
@@ -23,15 +23,9 @@ const messages = ref<any[]>([])
 const newMessage = ref('')
 const currentUID = ref(JSON.parse(localStorage.getItem('user') || '{}').uid)
 const scrollContainer = ref<HTMLElement | null>(null)
-
-// 输入法状态标记 - 跟踪用户是否正在使用输入法
 const isComposing = ref(false)
-
-// 聊天模式切换
 const chatMode = ref<'normal' | 'private'>('normal')
 const privateTarget = ref<{uid: number, username: string, nickname?: string} | null>(null)
-
-// 房间状态缓存
 const roomStatusCache = ref<Record<string, { status: string, checkedAt: number }>>({})
 
 const scrollToBottom = () => {
@@ -40,9 +34,7 @@ const scrollToBottom = () => {
   }
 }
 
-// 检查房间状态
 const checkRoomStatus = async (roomId: string) => {
-  // 检查缓存（缓存5秒）
   const cached = roomStatusCache.value[roomId]
   if (cached && Date.now() - cached.checkedAt < 5000) {
     return cached.status
@@ -56,15 +48,13 @@ const checkRoomStatus = async (roomId: string) => {
       checkedAt: Date.now()
     }
     return status
-  } catch (err) {
-    // 如果出错，假设房间已关闭
+  } catch {
     return 'closed'
   }
 }
 
 const loadHistory = async () => {
   try {
-    // 加载大厅聊天历史
     const chatRes = await authAPI.getGlobalChatHistory(50)
     const chatMessages = (chatRes.data || []).map((m: any) => ({
       uid: m.user_uid,
@@ -76,7 +66,6 @@ const loadHistory = async () => {
     }))
 
     messages.value = chatMessages
-
     nextTick(scrollToBottom)
   } catch (err) {
     console.error('加载聊天历史失败', err)
@@ -84,15 +73,13 @@ const loadHistory = async () => {
 }
 
 onMounted(() => {
-  // 只有非房间内聊天才加载全服历史并加入大厅频道
   if (!props.roomId) {
-    loadHistory()
+    void loadHistory()
     websocket.joinRoom('lobby')
   }
 
   const handleChatMessage = (msg: any) => {
-    // 检查是否已存在（避免重复显示历史记录中的消息）
-    const isDuplicate = messages.value.some(m =>
+    const isDuplicate = messages.value.some((m) =>
       m.uid === msg.uid &&
       m.text === msg.message &&
       Math.abs(new Date(m.time).getTime() - new Date().getTime()) < 2000
@@ -111,7 +98,6 @@ onMounted(() => {
   }
 
   const handlePrivateMessage = async (msg: any) => {
-    // 尝试解析游戏邀请消息
     let isGameInvite = false
     let gameInviteData = null
 
@@ -121,14 +107,11 @@ onMounted(() => {
         isGameInvite = true
         gameInviteData = parsed
 
-        // 检查房间状态
         if (gameInviteData.room_id) {
           gameInviteData.room_status = await checkRoomStatus(gameInviteData.room_id)
         }
       }
-    } catch (e) {
-      // 不是JSON或不是游戏邀请，按普通消息处理
-    }
+    } catch {}
 
     messages.value.push({
       uid: msg.uid,
@@ -138,7 +121,7 @@ onMounted(() => {
       text: isGameInvite ? '' : msg.message,
       time: new Date(),
       type: isGameInvite ? 'game_invite' : 'private',
-      gameInviteData: gameInviteData
+      gameInviteData
     })
     nextTick(scrollToBottom)
   }
@@ -151,7 +134,6 @@ onMounted(() => {
     chatMode.value = 'private'
   }
 
-  // 监听外部私聊请求
   window.addEventListener('start-private-chat', handleStartPrivateChat as any)
 
   onUnmounted(() => {
@@ -165,13 +147,11 @@ onMounted(() => {
 })
 
 const handleSend = () => {
-  // 必须等待输入法输入完成后再发送消息
   if (isComposing.value) return
   if (!newMessage.value.trim()) return
 
   if (chatMode.value === 'private' && privateTarget.value) {
     if (props.roomId) {
-      // 实验室室内禁止私聊，强制切换回公聊
       chatMode.value = 'normal'
       privateTarget.value = null
       return
@@ -181,7 +161,6 @@ const handleSend = () => {
       target_uid: privateTarget.value.uid,
       message: newMessage.value
     })
-    // 服务器会给发送者也发一个 private_chat，所以这里不用手动 push
   } else {
     websocket.send({
       type: 'chat',
@@ -197,7 +176,6 @@ const handleJoinGame = (roomId: string) => {
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  // 仅在 Enter 键且非 composition 状态时发送
   if (e.key === 'Enter' && !isComposing.value) {
     handleSend()
   }
@@ -219,43 +197,41 @@ const formatTime = (date: Date) => {
 
 <template>
   <div
-    :class="cn('flex flex-col bg-white/95 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[28px] overflow-hidden shadow-2xl', $attrs.class as string)"
+    :class="cn('console-card flex flex-col overflow-hidden backdrop-blur', $attrs.class as string)"
     :style="maxHeight ? { height: maxHeight } : {}"
   >
-    <!-- Header - 移动端优化 -->
-    <div v-if="!hideHeader" class="px-4 py-3 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/[0.02] shrink-0">
+    <div v-if="!hideHeader" class="flex shrink-0 items-center justify-between border-b border-slate-200/70 bg-slate-50/60 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
       <div class="flex items-center gap-2">
-        <div class="w-7 h-7 sm:w-6 sm:h-6 rounded-lg bg-blue-500/10 flex items-center justify-center">
-          <MessageSquare class="w-4 h-4 sm:w-3.5 sm:h-3.5 text-blue-500" />
+        <div class="flex h-8 w-8 items-center justify-center rounded-xl border border-sky-500/15 bg-sky-500/10">
+          <MessageSquare class="h-4 w-4 text-sky-500" />
         </div>
         <div>
           <h3 class="text-xs-mobile font-black uppercase tracking-widest text-slate-800 dark:text-white">{{ title || '实验通信频道' }}</h3>
-          <p class="text-[9px] sm:text-[8px] font-mono text-slate-400 uppercase tracking-tighter">Messaging_Protocol</p>
+          <p class="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Messaging Protocol</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 rounded-full border border-blue-500/20">
-          <span class="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></span>
-          <span class="text-[9px] sm:text-[8px] font-black text-blue-500 uppercase">Live</span>
+        <div class="console-notice-chip">
+          <span class="h-1 w-1 rounded-full bg-sky-500"></span>
+          Live
         </div>
         <button
           v-if="roomId"
           @click="emit('close')"
-          class="p-1.5 sm:p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-white touch-feedback"
+          class="console-button console-button-ghost p-2 touch-feedback"
         >
-          <X class="w-4 h-4" />
+          <X class="h-4 w-4" />
         </button>
       </div>
     </div>
 
-    <!-- Messages - 移动端优化 -->
     <div
       ref="scrollContainer"
-      class="flex-1 overflow-y-auto p-3 sm:p-2 space-y-2.5 sm:space-y-2 custom-scrollbar bg-transparent"
+      class="custom-scrollbar flex-1 space-y-2 overflow-y-auto bg-transparent p-3"
     >
-      <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full py-10 opacity-20">
-        <div class="w-14 h-14 sm:w-12 sm:h-12 rounded-2xl bg-slate-200 dark:bg-white/10 flex items-center justify-center mb-3">
-          <MessageSquare class="w-7 h-7 sm:w-6 sm:h-6" />
+      <div v-if="messages.length === 0" class="flex h-full flex-col items-center justify-center py-10 opacity-20">
+        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-200 dark:bg-white/10">
+          <MessageSquare class="h-7 w-7" />
         </div>
         <p class="text-xs-mobile font-black uppercase tracking-widest text-slate-500">连接已建立 | 等待数据包...</p>
       </div>
@@ -268,25 +244,22 @@ const formatTime = (date: Date) => {
           msg.type === 'system' ? 'justify-center my-3' : (msg.uid === currentUID ? 'justify-end' : 'justify-start')
         )"
       >
-        <!-- System Message -->
-        <div v-if="msg.type === 'system'" class="flex flex-col items-center gap-1.5 max-w-[85%]">
-          <div class="px-3 py-1 bg-slate-100/50 dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-full flex items-center gap-1.5 shadow-sm">
-             <div class="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></div>
-             <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] font-mono leading-none">日志</span>
-             <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 tracking-tight leading-none">{{ msg.text }}</span>
+        <div v-if="msg.type === 'system'" class="flex max-w-[85%] flex-col items-center gap-1.5">
+          <div class="flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-slate-100/60 px-3 py-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+             <div class="h-1 w-1 rounded-full bg-sky-500"></div>
+             <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">日志</span>
+             <span class="text-[10px] font-bold tracking-tight text-slate-500 dark:text-slate-400">{{ msg.text }}</span>
           </div>
         </div>
 
-        <!-- User Message -->
         <div v-else :class="cn(
-          'flex gap-2.5 sm:gap-2 max-w-[95%]',
+          'flex max-w-[95%] gap-2.5 sm:gap-2',
           msg.uid === currentUID ? 'flex-row-reverse' : 'flex-row'
         )">
-          <!-- Avatar - 移动端增大 -->
-          <div class="shrink-0 mt-1">
-            <div 
+          <div class="mt-1 shrink-0">
+            <div
               @click="router.push(`/user/${msg.uid}`)"
-              class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-xs sm:text-[10px] overflow-hidden shadow-inner cursor-pointer hover:ring-2 hover:ring-blue-500/50 transition-all"
+              class="flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 shadow-inner transition-all hover:ring-2 hover:ring-sky-500/40 dark:border-white/10 dark:bg-white/[0.04]"
             >
               <UserAvatar :avatar="msg.avatar" />
             </div>
@@ -297,66 +270,60 @@ const formatTime = (date: Date) => {
             msg.uid === currentUID ? 'items-end' : 'items-start'
           )">
             <div class="flex items-center gap-1 px-0.5">
-              <span v-if="msg.uid !== currentUID" class="text-[9px] sm:text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+              <span v-if="msg.uid !== currentUID" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-slate-400">
                 {{ msg.nickname || msg.username }}
-                <span v-if="msg.type === 'private'" class="text-rose-500 ml-1">(私语)</span>
-                <span v-if="msg.type === 'game_invite'" class="text-blue-500 ml-1">(游戏邀请)</span>
+                <span v-if="msg.type === 'private'" class="ml-1 text-rose-500">(私语)</span>
+                <span v-if="msg.type === 'game_invite'" class="ml-1 text-sky-500">(游戏邀请)</span>
               </span>
-              <span v-else-if="msg.type === 'private'" class="text-[9px] sm:text-[8px] font-black text-rose-500 uppercase tracking-tighter">
+              <span v-else-if="msg.type === 'private'" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-rose-500">
                 对 {{ msg.target_uid === currentUID ? '自己' : '研究员' }} 说道
               </span>
-              <span v-else-if="msg.type === 'game_invite'" class="text-[9px] sm:text-[8px] font-black text-blue-500 uppercase tracking-tighter">
+              <span v-else-if="msg.type === 'game_invite'" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-sky-500">
                 发送了游戏邀请
               </span>
               <span class="text-[8px] sm:text-[7px] font-mono text-slate-300 dark:text-slate-600">{{ formatTime(msg.time) }}</span>
             </div>
 
-            <!-- Game Invite Card - 移动端优化 -->
             <div v-if="msg.type === 'game_invite' && msg.gameInviteData"
               :class="cn(
-                'w-full max-w-xs p-3.5 sm:p-3 rounded-2xl bg-gradient-to-br border-2 shadow-lg backdrop-blur-sm transition-all',
+                'w-full max-w-xs rounded-2xl border p-3.5 shadow-lg backdrop-blur-sm transition-all',
                 msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'
-                  ? 'from-slate-300/30 to-slate-400/30 border-slate-400/30 grayscale opacity-60'
-                  : 'from-blue-500/10 to-purple-500/10 border-blue-500/20'
+                  ? 'border-slate-300/70 bg-slate-200/40 grayscale opacity-60 dark:border-white/10 dark:bg-white/[0.03]'
+                  : 'border-sky-500/20 bg-sky-500/10'
               )"
             >
-              <div class="flex items-center gap-2 mb-2">
+              <div class="mb-2 flex items-center gap-2">
                 <div :class="cn(
-                  'w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center',
+                  'flex h-9 w-9 items-center justify-center rounded-lg',
                   msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'
                     ? 'bg-slate-500/20'
-                    : 'bg-blue-500/20'
+                    : 'bg-sky-500/20'
                 )">
                   <FlaskConical :class="cn(
-                    'w-5 h-5 sm:w-4 sm:h-4',
+                    'h-5 w-5',
                     msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'
                       ? 'text-slate-500'
-                      : 'text-blue-500'
+                      : 'text-sky-500'
                   )" />
                 </div>
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs-mobile font-black text-slate-800 dark:text-white truncate">
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-xs-mobile font-black text-slate-800 dark:text-white">
                     {{ msg.gameInviteData.room_name }}
                   </div>
-                  <div :class="cn(
-                    'text-[9px] sm:text-[8px] font-mono uppercase',
-                    msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'
-                      ? 'text-slate-500'
-                      : 'text-slate-500'
-                  )">
+                  <div class="text-[9px] font-mono uppercase text-slate-500">
                     {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭' : '实验室邀请' }}
                   </div>
                 </div>
               </div>
 
-              <div v-if="msg.gameInviteData.room_status !== 'finished' && msg.gameInviteData.room_status !== 'closed'" class="flex items-center gap-3 mb-3 text-xs-mobile">
+              <div v-if="msg.gameInviteData.room_status !== 'finished' && msg.gameInviteData.room_status !== 'closed'" class="mb-3 flex items-center gap-3 text-xs-mobile">
                 <div class="flex items-center gap-1 text-slate-600 dark:text-slate-400">
-                  <Users class="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+                  <Users class="h-3.5 w-3.5 sm:h-3 sm:w-3" />
                   <span class="font-bold">{{ msg.gameInviteData.player_count }}/{{ msg.gameInviteData.max_players }}</span>
                 </div>
-                <div v-if="msg.gameInviteData.is_points_mode" class="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-lg">
-                  <Trophy class="w-3.5 h-3.5 sm:w-3 sm:h-3" />
-                  <span class="font-black uppercase tracking-widest text-[9px] sm:text-[8px]">燃素模式</span>
+                <div v-if="msg.gameInviteData.is_points_mode" class="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-0.5 text-amber-600 dark:text-amber-400">
+                  <Trophy class="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                  <span class="text-[9px] font-black uppercase tracking-widest sm:text-[8px]">积分模式</span>
                 </div>
               </div>
 
@@ -364,24 +331,23 @@ const formatTime = (date: Date) => {
                 @click="msg.gameInviteData.room_status !== 'finished' && msg.gameInviteData.room_status !== 'closed' && handleJoinGame(msg.gameInviteData.room_id)"
                 :disabled="msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'"
                 :class="cn(
-                  'w-full h-10 sm:h-9 rounded-xl font-black text-xs-mobile uppercase tracking-widest transition-all shadow-md touch-feedback flex items-center justify-center gap-2',
+                  'flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs-mobile font-black uppercase tracking-widest shadow-md transition-all touch-feedback',
                   msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed'
-                    ? 'bg-slate-400 text-slate-600 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white'
+                    ? 'cursor-not-allowed bg-slate-400 text-slate-600'
+                    : 'bg-sky-600 text-white hover:bg-sky-500'
                 )"
               >
-                <FlaskConical class="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                <FlaskConical class="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                 {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭' : '立即加入实验室' }}
               </button>
             </div>
 
-            <!-- Normal Message - 移动端优化 -->
             <div v-else :class="cn(
-              'px-3 sm:px-2 py-2 sm:py-1 rounded-xl text-xs-mobile font-medium leading-relaxed break-words shadow-sm',
+              'break-words rounded-2xl px-3 py-2 text-xs-mobile font-medium leading-relaxed shadow-sm',
               msg.type === 'private' ? 'border-2 border-rose-500/10' : '',
               msg.uid === currentUID
-                ? 'bg-blue-600 text-white rounded-tr-none'
-                : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-200 border border-slate-200/50 dark:border-white/5 rounded-tl-none'
+                ? 'rounded-tr-md bg-sky-600 text-white'
+                : 'rounded-tl-md border border-slate-200/70 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200'
             )">
               {{ msg.text }}
             </div>
@@ -390,27 +356,25 @@ const formatTime = (date: Date) => {
       </div>
     </div>
 
-    <!-- Input - 移动端优化 -->
-    <div class="p-3 sm:p-2.5 pb-4 sm:pb-3 border-t border-slate-100 dark:border-white/10 bg-white/90 dark:bg-slate-800/60 space-y-2 shrink-0">
-      <!-- Mode Selector -->
-      <div v-if="chatMode === 'private'" class="flex items-center gap-2 animate-in slide-in-from-bottom-1">
-        <div class="flex items-center gap-2 px-3 py-1.5 sm:py-1 rounded-lg text-xs-mobile font-black uppercase tracking-widest transition-all bg-rose-500 text-white shadow-lg shadow-rose-500/20">
-          <User class="w-3 h-3 sm:w-2.5 sm:h-2.5" />
+    <div class="shrink-0 space-y-2 border-t border-slate-200/70 bg-white/88 p-3 pb-4 dark:border-white/10 dark:bg-[#0e1722]/85">
+      <div v-if="chatMode === 'private'" class="animate-in slide-in-from-bottom-1 flex items-center gap-2">
+        <div class="flex items-center gap-2 rounded-xl bg-rose-500 px-3 py-1.5 text-xs-mobile font-black uppercase tracking-widest text-white shadow-lg shadow-rose-500/20">
+          <User class="h-3 w-3 sm:h-2.5 sm:w-2.5" />
           {{ `私密传输: ${privateTarget?.nickname || privateTarget?.username}` }}
         </div>
-        <button @click="chatMode = 'normal'; privateTarget = null" class="p-1.5 sm:p-1 px-2.5 sm:px-2 rounded-lg bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-all uppercase text-[9px] sm:text-[8px] font-black touch-feedback">
+        <button @click="chatMode = 'normal'; privateTarget = null" class="console-button touch-feedback px-2.5 py-1.5 text-[9px]">
           取消
         </button>
       </div>
 
       <div class="flex gap-2">
-        <div class="flex-1 relative group">
-          <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur opacity-0 group-focus-within:opacity-30 transition duration-500"></div>
+        <div class="group relative flex-1">
+          <div class="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-sky-500/25 to-cyan-500/25 blur opacity-0 transition duration-300 group-focus-within:opacity-100"></div>
           <input
             v-model="newMessage"
             type="text"
             :placeholder="placeholder || '输入实验指令或群聊讯息...'"
-            class="relative w-full h-11 sm:h-10 bg-white dark:bg-slate-700/80 border border-slate-200 dark:border-white/10 rounded-xl px-3 sm:px-2.5 text-sm sm:text-xs font-bold focus:outline-none focus:border-blue-500/50 transition-all dark:text-white dark:placeholder:text-slate-500"
+            class="relative h-11 w-full rounded-2xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-800 transition-all focus:border-sky-500/40 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-slate-500"
             @keydown="handleKeyDown"
             @compositionstart="handleCompositionStart"
             @compositionend="handleCompositionEnd"
@@ -421,9 +385,9 @@ const formatTime = (date: Date) => {
         <button
           @click="handleSend"
           :disabled="!newMessage.trim()"
-          class="btn-touch bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:grayscale text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-500/20 touch-feedback shrink-0 group/send"
+          class="btn-touch touch-feedback group/send flex shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-900/15 transition-all hover:bg-sky-500 disabled:opacity-50 disabled:grayscale"
         >
-          <Send class="w-4 h-4 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          <Send class="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:h-3.5 sm:w-3.5" />
         </button>
       </div>
     </div>
