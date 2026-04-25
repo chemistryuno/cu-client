@@ -29,8 +29,8 @@ import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tu
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
-const AI_TURN_DELAY_MIN_MS = 500
-const AI_TURN_DELAY_MAX_MS = 1500
+const AI_TURN_DELAY_MIN_MS = 180
+const AI_TURN_DELAY_MAX_MS = 420
 const eventBus = new EventTarget()
 const turnTimers = new Map<string, number>()
 const aiTimers = new Map<string, number>()
@@ -1081,6 +1081,8 @@ const normalizeFormula = (value: string) => String(value || '').replace(/\s+/g, 
 const randomIntBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 const allKnownFormulas = unique([...Object.keys(substanceNames), ...Object.keys(builtinDeck)])
 const parsedFormulaCache = new Map<string, Record<string, number>>()
+const aiReactionTargetsByFormula = new Map<string, string[]>()
+const aiFormulaCandidatesByCard = new Map<string, string[]>()
 
 const parseFormula = (formula: string): Record<string, number> => {
   const input = normalizeFormula(formula)
@@ -1139,6 +1141,28 @@ const parseFormula = (formula: string): Record<string, number> => {
   return parsed
 }
 
+allKnownFormulas.forEach((formula) => {
+  const normalized = normalizeFormula(formula)
+  const keys = specialCards.has(normalized) ? [normalized] : Object.keys(parseFormula(normalized))
+  keys.forEach((key) => {
+    const bucket = aiFormulaCandidatesByCard.get(key) || []
+    if (!bucket.includes(normalized)) bucket.push(normalized)
+    aiFormulaCandidatesByCard.set(key, bucket)
+  })
+})
+
+Object.keys(reactionPairs).forEach((pair) => {
+  const [left, right] = pair.split('|').map((value) => normalizeFormula(value))
+  if (!left || !right) return
+  const leftBucket = aiReactionTargetsByFormula.get(left) || []
+  if (!leftBucket.includes(right)) leftBucket.push(right)
+  aiReactionTargetsByFormula.set(left, leftBucket)
+
+  const rightBucket = aiReactionTargetsByFormula.get(right) || []
+  if (!rightBucket.includes(left)) rightBucket.push(left)
+  aiReactionTargetsByFormula.set(right, rightBucket)
+})
+
 const getCardCounts = (cards: Card[]) => {
   const result: Record<string, number> = {}
   cards.forEach((card) => {
@@ -1189,6 +1213,23 @@ const isReactionPair = (a: string, b: string) => {
 const getAvailableSubstances = (cards: Card[]) => {
   const counts = getCardCounts(cards)
   return allKnownFormulas.filter((formula) => canFormSubstanceFromCounts(counts, formula))
+}
+
+const getAiPlayableSubstances = (cards: Card[], lastCardSubstance?: string | null) => {
+  const counts = getCardCounts(cards)
+  const normalizedLastCard = normalizeFormula(lastCardSubstance || '')
+  const candidateSet = new Set<string>()
+
+  if (normalizedLastCard) {
+    ;(aiReactionTargetsByFormula.get(normalizedLastCard) || []).forEach((formula) => candidateSet.add(formula))
+    specialCards.forEach((formula) => candidateSet.add(formula))
+  } else {
+    Object.keys(counts).forEach((cardType) => {
+      ;(aiFormulaCandidatesByCard.get(cardType) || []).forEach((formula) => candidateSet.add(formula))
+    })
+  }
+
+  return Array.from(candidateSet).filter((formula) => canFormSubstanceFromCounts(counts, formula))
 }
 
 const serializeUser = (user: User) => {
@@ -1450,8 +1491,7 @@ const runAiTurn = (state: State, room: Room) => {
       return
     }
   }
-  const available = getAvailableSubstances(player.hand_cards)
-  const playable = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula))
+  const playable = getAiPlayableSubstances(player.hand_cards, game.last_card?.substance)
   if (playable.length > 0) {
     applyPlay(state, room, game.current_player, playable[0], game.last_card ? [game.last_card.substance, playable[0]] : [playable[0]])
     emit('action_toast', { type: 'action_toast', data: `${player.nickname} played ${playable[0]}.` })
