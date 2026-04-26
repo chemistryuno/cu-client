@@ -7,7 +7,7 @@ import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/a
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
-import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary, Radar, Orbit } from 'lucide-vue-next'
+import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary, Radar, Orbit, Users, QrCode, UserPlus } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
@@ -166,10 +166,24 @@ const fetchRandomHints = async () => {
   }
 }
 
+const normalizeReactionHint = (hint: any, index: number) => {
+  const substance = String(hint?.substance || hint?.formula || '').trim()
+  if (!substance) return null
+  return {
+    ...hint,
+    id: hint?.id ?? index + 1,
+    substance,
+    formula: String(hint?.formula || substance),
+    name: String(hint?.name || getSubstanceName(substance)),
+  }
+}
+
 const fetchReactionHints = async () => {
   try {
     const res = await gameAPI.getReactionHints(id)
-    reactionHints.value = res.data || []
+    reactionHints.value = (Array.isArray(res.data) ? res.data : [])
+      .map(normalizeReactionHint)
+      .filter(Boolean)
   } catch (error) {
     console.error('Failed to fetch reaction hints:', error)
     reactionHints.value = []
@@ -646,19 +660,21 @@ const getFormulaFontSize = (formula: string, type: 'single' | 'double' = 'single
 
 // 解析化学式，返回元素及其数量（与后端 parseSubstance 逻辑一致）
 const parseSubstanceElements = (substance: string): Record<string, number> => {
+  const formula = String(substance || '').trim()
   const result: Record<string, number> = {}
+  if (!formula) return result
   const stack: Record<string, number>[] = [result]
   let i = 0
-  while (i < substance.length) {
-    const c = substance[i]
+  while (i < formula.length) {
+    const c = formula[i]
     if (c === '(') {
       stack.push({})
       i++
     } else if (c === ')') {
       i++
       let count = 0
-      while (i < substance.length && substance[i] >= '0' && substance[i] <= '9') {
-        count = count * 10 + (substance.charCodeAt(i) - 48)
+      while (i < formula.length && formula[i] >= '0' && formula[i] <= '9') {
+        count = count * 10 + (formula.charCodeAt(i) - 48)
         i++
       }
       if (count === 0) count = 1
@@ -670,11 +686,11 @@ const parseSubstanceElements = (substance: string): Record<string, number> => {
     } else if (c >= 'A' && c <= 'Z') {
       const start = i
       i++
-      while (i < substance.length && substance[i] >= 'a' && substance[i] <= 'z') i++
-      const element = substance.slice(start, i)
+      while (i < formula.length && formula[i] >= 'a' && formula[i] <= 'z') i++
+      const element = formula.slice(start, i)
       let count = 0
-      while (i < substance.length && substance[i] >= '0' && substance[i] <= '9') {
-        count = count * 10 + (substance.charCodeAt(i) - 48)
+      while (i < formula.length && formula[i] >= '0' && formula[i] <= '9') {
+        count = count * 10 + (formula.charCodeAt(i) - 48)
         i++
       }
       if (count === 0) count = 1
@@ -690,7 +706,9 @@ const parseSubstanceElements = (substance: string): Record<string, number> => {
 // 检查玩家手牌是否包含合成该物质所需的所有元素
 const canPlayerMakeSubstance = (substance: string): boolean => {
   if (!myData.value?.hand_cards) return false
+  if (!String(substance || '').trim()) return false
   const required = parseSubstanceElements(substance)
+  if (Object.keys(required).length === 0) return false
   // 统计手牌中各元素数量
   const handElements: Record<string, number> = {}
   for (const card of myData.value.hand_cards) {
@@ -705,7 +723,7 @@ const canPlayerMakeSubstance = (substance: string): boolean => {
 // 过滤并随机取最多3个可接续反应物提示
 const filteredReactionHints = computed(() => {
   if (!reactionHints.value.length || !isMyTurn.value) return []
-  const eligible = reactionHints.value.filter((hint: any) => canPlayerMakeSubstance(hint.substance))
+  const eligible = reactionHints.value.filter((hint: any) => canPlayerMakeSubstance(String(hint?.substance || hint?.formula || '')))
   if (eligible.length <= 3) return eligible
   // 随机打乱后取前3个
   const shuffled = [...eligible]

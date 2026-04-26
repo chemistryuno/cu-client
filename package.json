@@ -6,14 +6,14 @@
     "init": "node init.js",
     "start": "pnpm frontend:dev",
     "dev": "pnpm start",
-    "build": "pnpm build:frontend",
+    "build": "node build.js --release",
+    "build:dev": "node build.js --dev",
     "frontend:dev": "pnpm -C frontend dev",
-    "build:frontend": "pnpm -C frontend build",
     "electron:dev": "pnpm -C frontend electron:dev",
-    "electron:run": "pnpm -C frontend electron:run",
-    "electron:pack:win": "pnpm -C frontend electron:pack:win",
-    "clean": "node -e \"const fs = require('fs'); ['dist'].forEach(f => { try { if (fs.existsSync(f)) { if (fs.statSync(f).isDirectory()) { fs.rmSync(f, {recursive: true}); } else { fs.unlinkSync(f); } } } catch(e) {} })\"",
-    "clean:all": "pnpm clean && node -e \"const fs = require('fs'); ['frontend/node_modules', 'frontend/dist', 'frontend/.vite'].forEach(f => { try { if (fs.existsSync(f)) { fs.rmSync(f, {recursive: true}); } } catch(e) {} })\""
+    "electron:run": "pnpm build:dev",
+    "electron:pack:win": "pnpm build",
+    "clean": "node build.js --clean",
+    "clean:all": "pnpm clean && node -e \"const fs = require('fs'); ['frontend/node_modules', 'frontend/.vite'].forEach(f => { try { if (fs.existsSync(f)) { fs.rmSync(f, {recursive: true, force: true}); } } catch(e) {} })\""
   },
   "description": "Chemistry UNO V1.2.1 Mendeleef - 化学元素版UNO游戏",
   "keywords": [

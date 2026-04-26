@@ -16,12 +16,13 @@ Open `http://localhost:5000`.
 ## Scripts
 
 - `pnpm start`: start the Vite development server.
-- `pnpm build`: build the frontend into `frontend/dist`.
+- `pnpm build`: build the Electron release output into `build/release`.
+- `pnpm build:dev`: build the unpacked Electron output into `build/dev`.
+- `pnpm clean`: remove build outputs and temporary renderer assets.
 - `pnpm -C frontend type-check`: run TypeScript checks.
-- `pnpm -C frontend preview`: preview the production build.
 - `pnpm electron:dev`: run the Electron shell against the Vite dev server.
-- `pnpm electron:run`: build and run the Electron shell from local assets.
-- `pnpm electron:pack:win`: build the Windows installer.
+- `pnpm electron:run`: build the unpacked Electron output.
+- `pnpm electron:pack:win`: build the Electron release output.
 - `pnpm -C frontend android:sync`: build and sync Capacitor assets.
 - `pnpm -C frontend android:build:debug`: build an Android debug APK.
 - `pnpm -C frontend android:build:release`: build an Android release APK.
@@ -64,7 +65,7 @@ Data records such as reactions, substances, announcements, configs, and leaderbo
 
 ```bash
 pnpm -C frontend type-check
-pnpm -C frontend build
+pnpm build:dev
 ```
 
 ## Notes

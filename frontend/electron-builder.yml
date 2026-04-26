@@ -1,7 +1,7 @@
 appId: com.chemistryuno.client
 productName: Chemistry UNO
 directories:
-  output: release
+  output: ../build/release
   buildResources: public
 files:
   - dist/**

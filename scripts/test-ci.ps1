@@ -18,7 +18,7 @@ function Invoke-Step {
 }
 
 Invoke-Step "Run frontend type-check" { pnpm -C frontend type-check }
-Invoke-Step "Run frontend build" { pnpm -C frontend build }
+Invoke-Step "Run Electron dev build" { pnpm build:dev }
 
 Write-Host ""
 Write-Host "CI test script completed successfully."

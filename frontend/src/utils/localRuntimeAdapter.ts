@@ -2233,7 +2233,10 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       const game = ensureGame(room)
       const index = findPlayerIndexByUid(game, user.uid)
       const available = index >= 0 ? getAvailableSubstances(game.players[index].hand_cards) : []
-      const hintsData = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula)).slice(0, 12).map((formula, idx) => ({ id: idx + 1, formula, name: substanceNameByFormula.get(formula) || formula }))
+      const hintsData = available
+        .filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula))
+        .slice(0, 12)
+        .map((formula, idx) => ({ id: idx + 1, formula, substance: formula, name: substanceNameByFormula.get(formula) || formula }))
       return { status: 200, data: hintsData }
     }
     if (method === 'POST' && path === '/game/check-reaction') {

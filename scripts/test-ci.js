@@ -11,8 +11,8 @@ const steps = [
     command: 'pnpm -C frontend type-check'
   },
   {
-    name: 'Run frontend build',
-    command: 'pnpm -C frontend build'
+    name: 'Run Electron dev build',
+    command: 'pnpm build:dev'
   }
 ];
 
