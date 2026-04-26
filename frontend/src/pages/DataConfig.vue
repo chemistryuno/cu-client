@@ -20,12 +20,49 @@
             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             {{ userRole }}
           </div>
+          <button v-if="hasBundledDb && !importedDb && !importing" @click="importBundledData" class="console-button group bg-emerald-500 text-white hover:bg-emerald-600">
+            <Download class="h-4 w-4" />
+            导入数据
+          </button>
+          <div v-if="importing" class="console-button group opacity-75">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            导入中...
+          </div>
+          <div v-if="importedDb" class="console-button group bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30">
+            <Check class="h-4 w-4" />
+            已导入
+          </div>
           <button @click="router.push('/')" class="console-button group">
             <ArrowLeft class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
             返回实验室
           </button>
         </div>
       </header>
+
+      <section v-if="importStats" class="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div class="text-center">
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-300">{{ importStats.announcements }}</div>
+            <div class="text-xs text-slate-600 dark:text-slate-400">公告</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-300">{{ importStats.reactions }}</div>
+            <div class="text-xs text-slate-600 dark:text-slate-400">反应</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-300">{{ importStats.substances }}</div>
+            <div class="text-xs text-slate-600 dark:text-slate-400">物质</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-300">{{ importStats.configs }}</div>
+            <div class="text-xs text-slate-600 dark:text-slate-400">配置</div>
+          </div>
+          <div class="text-center">
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-300">{{ importStats.total }}</div>
+            <div class="text-xs text-slate-600 dark:text-slate-400">总计</div>
+          </div>
+        </div>
+      </section>
 
       <section class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <router-link
@@ -89,9 +126,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Beaker, Database, FlaskConical } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Beaker, Database, FlaskConical, Download, Loader2, Check } from 'lucide-vue-next'
+import { importBundledDatabase, hasBundledDatabase } from '../utils/importedDatabaseManager'
+import type { ImportStats } from '../utils/importedDatabaseManager'
 
 const router = useRouter()
 let user: any = {}
@@ -102,4 +141,35 @@ try {
 }
 
 const userRole = computed(() => user?.role || 'WIKI_READER')
+const hasBundledDb = ref(false)
+const importedDb = ref(false)
+const importing = ref(false)
+const importStats = ref<ImportStats | null>(null)
+
+const importBundledData = async () => {
+  if (importing.value) return
+
+  importing.value = true
+  try {
+    const result = await importBundledDatabase()
+    if (result.status === 'success' || result.status === 'skipped') {
+      importedDb.value = true
+      importStats.value = result.stats || null
+      console.log('[DataConfig] Import result:', result)
+    }
+  } catch (error) {
+    console.error('[DataConfig] Import failed:', error)
+  } finally {
+    importing.value = false
+  }
+}
+
+onMounted(() => {
+  hasBundledDb.value = hasBundledDatabase()
+  // Check if database is already imported
+  const mark = localStorage.getItem('imported-database-mark-v1')
+  if (mark === 'true') {
+    importedDb.value = true
+  }
+})
 </script>

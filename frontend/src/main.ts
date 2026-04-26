@@ -5,6 +5,7 @@ import { OFFLINE_MODE } from './utils/runtimeConfig'
 import { ensureAuthReady } from './utils/authSession'
 import { installClientRuntimeFetchInterceptor } from './utils/clientRuntimeService'
 import { initializeI18n } from './utils/i18n'
+import { importBundledDatabase } from './utils/importedDatabaseManager'
 import './index.css'
 
 const syncViewportHeight = () => {
@@ -74,6 +75,22 @@ async function bootstrap() {
         console.warn('[Plugin] deferred runtime init failed', error)
       })
   })
+
+  scheduleNonCriticalTask(() => {
+    void importBundledDatabase()
+      .then((result) => {
+        if (result.status === 'success') {
+          console.log('[Database] bundled database imported', result.stats)
+        } else if (result.status === 'skipped') {
+          console.log('[Database] bundled database already imported')
+        } else {
+          console.warn('[Database] import failed:', result.error)
+        }
+      })
+      .catch((error) => {
+        console.warn('[Database] import failed', error)
+      })
+  }, 800)
 }
 
 void bootstrap()
