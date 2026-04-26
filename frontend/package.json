@@ -6,6 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --port 5000 --strictPort",
+    "dev:strict": "vite --port 5000 --strictPort",
     "dev:test": "vite --mode test --port 5000 --strictPort",
     "dev:prod": "vite --mode production --port 5000 --strictPort",
     "build": "tsc && vite build",
