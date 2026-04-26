@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { substanceAPI } from '../utils/api'
 import {
   AlertTriangle,
@@ -194,11 +194,12 @@ const searchTerm = ref('')
 const filterStatus = ref<string>('all')
 const filterNeedsImprovement = ref<boolean | null>(null)
 const filterInvalidElements = ref<boolean | null>(null)
+let searchTimer: number | null = null
 
 const fetchSubstances = async () => {
   loading.value = true
   try {
-    const res = await substanceAPI.getSubstances()
+    const res = await substanceAPI.getSubstances(searchTerm.value)
     substances.value = res.data || []
   } catch (e) {
     console.error('Failed to fetch substances')
@@ -210,7 +211,7 @@ const fetchSubstances = async () => {
 const filteredSubstances = computed(() => {
   let filtered = substances.value
 
-  if (searchTerm.value) {
+  if (searchTerm.value && !loading.value) {
     const term = searchTerm.value.toLowerCase()
     filtered = filtered.filter((s) =>
       s.formula.toLowerCase().includes(term) ||
@@ -231,6 +232,23 @@ const filteredSubstances = computed(() => {
   }
 
   return filtered
+})
+
+watch(searchTerm, () => {
+  if (searchTimer != null) {
+    window.clearTimeout(searchTimer)
+  }
+  searchTimer = window.setTimeout(() => {
+    fetchSubstances()
+    searchTimer = null
+  }, 280)
+})
+
+onUnmounted(() => {
+  if (searchTimer != null) {
+    window.clearTimeout(searchTimer)
+    searchTimer = null
+  }
 })
 
 onMounted(fetchSubstances)

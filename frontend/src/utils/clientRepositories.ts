@@ -7,6 +7,7 @@ import {
   listClientRuntimeKeys,
   removeClientRuntimeKeys,
 } from './clientRuntimeStorage'
+import { runtimeSqlite } from './clientRuntimeDatabase'
 import type {
   ChatMessage,
   Deck,
@@ -276,11 +277,12 @@ export const feedbackRepository = {
 
 export const announcementRepository = {
   read(fallback: RuntimeAnnouncement[] = []) {
-    return readStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.announcements, fallback)
+    const records = runtimeSqlite.listAnnouncements()
+    if (records.length || fallback.length === 0) return records
+    return runtimeSqlite.replaceAnnouncements(fallback)
   },
   write(announcements: RuntimeAnnouncement[]) {
-    writeStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.announcements, announcements)
-    return announcements
+    return runtimeSqlite.replaceAnnouncements(announcements)
   },
   list(fallback: RuntimeAnnouncement[] = []) {
     return this.read(fallback)
@@ -289,11 +291,12 @@ export const announcementRepository = {
 
 export const reactionRepository = {
   read(fallback: RuntimeReactionRecord[] = []) {
-    return readStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.reactions, fallback)
+    const records = runtimeSqlite.listReactions()
+    if (records.length || fallback.length === 0) return records
+    return runtimeSqlite.replaceReactions(fallback)
   },
   write(reactions: RuntimeReactionRecord[]) {
-    writeStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.reactions, reactions)
-    return reactions
+    return runtimeSqlite.replaceReactions(reactions)
   },
   list(fallback: RuntimeReactionRecord[] = []) {
     return this.read(fallback)
@@ -302,11 +305,12 @@ export const reactionRepository = {
 
 export const substanceRepository = {
   read(fallback: RuntimeSubstanceRecord[] = []) {
-    return readStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.substances, fallback)
+    const records = runtimeSqlite.listSubstances()
+    if (records.length || fallback.length === 0) return records
+    return runtimeSqlite.replaceSubstances(fallback)
   },
   write(substances: RuntimeSubstanceRecord[]) {
-    writeStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.substances, substances)
-    return substances
+    return runtimeSqlite.replaceSubstances(substances)
   },
   list(fallback: RuntimeSubstanceRecord[] = []) {
     return this.read(fallback)
@@ -315,11 +319,14 @@ export const substanceRepository = {
 
 export const configRepository = {
   read(fallback: RuntimeConfigRecord = {}) {
-    return readStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.configs, fallback)
+    const records = runtimeSqlite.readConfigs(fallback)
+    if (records === fallback && Object.keys(fallback).length > 0) {
+      return runtimeSqlite.replaceConfigs(fallback)
+    }
+    return records
   },
   write(config: RuntimeConfigRecord) {
-    writeStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.configs, config)
-    return config
+    return runtimeSqlite.replaceConfigs(config)
   },
   merge(partial: RuntimeConfigRecord, fallback: RuntimeConfigRecord = {}) {
     const next = {
@@ -333,11 +340,11 @@ export const configRepository = {
 
 export const leaderboardRepository = {
   read(fallback: RuntimeLeaderboardRecord[] = []) {
-    return readStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.leaderboard, fallback)
+    const records = runtimeSqlite.listLeaderboard()
+    return records.length ? records : fallback
   },
   write(entries: RuntimeLeaderboardRecord[]) {
-    writeStoredJson(CLIENT_RUNTIME_STORAGE_KEYS.leaderboard, entries)
-    return entries
+    return runtimeSqlite.replaceLeaderboard(entries)
   },
 }
 

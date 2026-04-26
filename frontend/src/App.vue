@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import websocket from './utils/websocket'
 import feedback from './utils/feedback'
 import { useDialog } from './utils/dialog'
+import { applyThemeColor, THEME_COLOR_STORAGE_KEY } from './utils/themeColor'
 
 const CustomDialog = defineAsyncComponent(() => import('./components/CustomDialog.vue'))
 
@@ -58,6 +59,7 @@ const updateTheme = () => {
   const storedTheme = localStorage.getItem('theme') || 'system'
   const root = document.documentElement
   root.classList.remove('light', 'dark')
+  applyThemeColor()
 
   if (storedTheme === 'system') {
     if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -73,7 +75,7 @@ const updateTheme = () => {
 updateTheme()
 
 const handleThemeStorage = (e: StorageEvent) => {
-  if (e.key === 'theme') updateTheme()
+  if (e.key === 'theme' || e.key === THEME_COLOR_STORAGE_KEY) updateTheme()
 }
 
 const handleGlobalClick = (e: MouseEvent) => {
@@ -209,9 +211,9 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.2), transparent 38%),
-    radial-gradient(circle at bottom, rgba(45, 212, 191, 0.16), transparent 34%),
-    linear-gradient(180deg, #f8fbff 0%, #eef6ff 52%, #e7f4f1 100%);
+    radial-gradient(circle at top, rgb(var(--theme-rgb) / 0.2), transparent 38%),
+    radial-gradient(circle at bottom, rgb(var(--theme-rgb-soft) / 0.14), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 52%, #f7f8fb 100%);
   color: #0f172a;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -222,9 +224,9 @@ onUnmounted(() => {
 
 :global(.dark) .app-loader-shell {
   background:
-    radial-gradient(circle at top, rgba(34, 211, 238, 0.16), transparent 38%),
-    radial-gradient(circle at bottom, rgba(16, 185, 129, 0.14), transparent 34%),
-    linear-gradient(180deg, #020617 0%, #0b1120 52%, #071a17 100%);
+    radial-gradient(circle at top, rgb(var(--theme-rgb-soft) / 0.16), transparent 38%),
+    radial-gradient(circle at bottom, rgb(var(--theme-rgb) / 0.12), transparent 34%),
+    linear-gradient(180deg, #020617 0%, #0b1120 52%, #0d1220 100%);
   color: #e2e8f0;
 }
 
@@ -288,11 +290,11 @@ onUnmounted(() => {
   inset: 0;
   border-radius: 999px;
   border: 2px solid rgba(148, 163, 184, 0.22);
-  box-shadow: 0 0 24px rgba(45, 212, 191, 0.24);
+  box-shadow: 0 0 24px rgb(var(--theme-rgb-soft) / 0.24);
 }
 
 :global(.dark) .app-loader-ring {
-  box-shadow: 0 0 24px rgba(34, 211, 238, 0.18);
+  box-shadow: 0 0 24px rgb(var(--theme-rgb-soft) / 0.18);
 }
 
 .app-loader-ring--a {
@@ -315,10 +317,10 @@ onUnmounted(() => {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #ffffff 0%, #38bdf8 35%, #14b8a6 100%);
+  background: radial-gradient(circle at 30% 30%, #ffffff 0%, var(--theme-400) 35%, var(--theme-600) 100%);
   box-shadow:
-    0 0 0 10px rgba(20, 184, 166, 0.08),
-    0 0 34px rgba(56, 189, 248, 0.45);
+    0 0 0 10px rgb(var(--theme-rgb) / 0.08),
+    0 0 34px rgb(var(--theme-rgb) / 0.45);
   animation: loader-core-pulse 1.8s ease-in-out infinite;
 }
 
@@ -383,7 +385,7 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0), rgba(56, 189, 248, 0.95), rgba(45, 212, 191, 0.92), rgba(56, 189, 248, 0));
+  background: linear-gradient(90deg, rgb(var(--theme-rgb) / 0), rgb(var(--theme-rgb) / 0.95), rgb(var(--theme-rgb-soft) / 0.92), rgb(var(--theme-rgb) / 0));
   transform: translateX(-100%);
   animation: loader-progress 1.35s ease-in-out infinite;
 }

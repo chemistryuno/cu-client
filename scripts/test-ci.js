@@ -7,10 +7,6 @@ const rootDir = path.resolve(__dirname, '..');
 
 const steps = [
   {
-    name: 'Run backend tests',
-    command: 'go test ./backend/...'
-  },
-  {
     name: 'Run frontend type-check',
     command: 'pnpm -C frontend type-check'
   },

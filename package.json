@@ -21,7 +21,7 @@
     "uno",
     "chemistry",
     "vue",
-    "go"
+    "frontend-only"
   ],
   "author": "TomKe & Copilot",
   "license": "MIT"

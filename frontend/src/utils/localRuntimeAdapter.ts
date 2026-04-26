@@ -10,6 +10,7 @@ import {
   userRepository,
 } from './clientRepositories'
 import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage, getClientRuntimeHost, removeClientRuntimeKeys } from './clientRuntimeStorage'
+import { ensureClientRuntimeDatabase, runtimeSqlite } from './clientRuntimeDatabase'
 import type {
   Card,
   ChatMessage,
@@ -29,8 +30,8 @@ import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tu
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
-const AI_TURN_DELAY_MIN_MS = 180
-const AI_TURN_DELAY_MAX_MS = 420
+const AI_TURN_DELAY_MIN_MS = 60
+const AI_TURN_DELAY_MAX_MS = 140
 const eventBus = new EventTarget()
 const turnTimers = new Map<string, number>()
 const aiTimers = new Map<string, number>()
@@ -783,7 +784,7 @@ const defaultAnnouncements = [{ id: 1, title: 'Offline Mode', content: 'Running 
 const hints = [
   { id: 1, content: 'Offline mode is active. Everything stays on this device.' },
   { id: 2, content: 'Use AI Arena in the lobby for quick local matches.' },
-  { id: 3, content: 'No backend server is required in this build.' }
+  { id: 3, content: 'This build runs entirely in the frontend.' }
 ]
 
 const buildDefaultSubstances = () => Object.keys(substanceNames).map((formula, index) => ({
@@ -887,10 +888,20 @@ const parseBooleanQueryValue = (value: string | undefined) => {
 }
 
 const readRuntimeReactions = () => reactionRepository.read(buildDefaultReactions())
-const writeRuntimeReactions = (records: Array<Record<string, any>>) => reactionRepository.write(records)
+const writeRuntimeReactions = (records: Array<Record<string, any>>) => {
+  const next = reactionRepository.write(records)
+  runtimeIndexesReady = false
+  rebuildRuntimeIndexes()
+  return next
+}
 
 const readRuntimeSubstances = () => substanceRepository.read(buildDefaultSubstances())
-const writeRuntimeSubstances = (records: Array<Record<string, any>>) => substanceRepository.write(records)
+const writeRuntimeSubstances = (records: Array<Record<string, any>>) => {
+  const next = substanceRepository.write(records)
+  runtimeIndexesReady = false
+  rebuildRuntimeIndexes()
+  return next
+}
 
 const paginateRecords = <T>(items: T[], page: number, pageSize: number) => {
   const normalizedPage = Math.max(1, page)
@@ -986,6 +997,8 @@ const resetOfflineState = () => {
   aiTimers.forEach((timer) => clearTimeout(timer))
   turnTimers.clear()
   aiTimers.clear()
+  runtimeSqlite.clear()
+  runtimeIndexesReady = false
 
   // Clear all known storage keys for a truly fresh start
   const keysToRemove = [
@@ -1078,8 +1091,21 @@ const clearTimer = (map: Map<string, number>, roomId: string) => {
 const randomId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 const unique = <T>(items: T[]) => Array.from(new Set(items))
 const normalizeFormula = (value: string) => String(value || '').replace(/\s+/g, '')
+let reactionEquationByPair = new Map<string, string>()
+let substanceNameByFormula = new Map<string, string>()
+let allKnownFormulas: string[] = []
+let runtimeIndexesReady = false
+const getReactionPairKey = (a: string, b: string) => {
+  const left = normalizeFormula(a)
+  const right = normalizeFormula(b)
+  if (!left || !right) return ''
+  return [left, right].sort().join('|')
+}
+const getReactionEquation = (a: string, b: string) => {
+  const pair = getReactionPairKey(a, b)
+  return pair ? reactionEquationByPair.get(pair) || null : null
+}
 const randomIntBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
-const allKnownFormulas = unique([...Object.keys(substanceNames), ...Object.keys(builtinDeck)])
 const parsedFormulaCache = new Map<string, Record<string, number>>()
 const aiReactionTargetsByFormula = new Map<string, string[]>()
 const aiFormulaCandidatesByCard = new Map<string, string[]>()
@@ -1141,27 +1167,53 @@ const parseFormula = (formula: string): Record<string, number> => {
   return parsed
 }
 
-allKnownFormulas.forEach((formula) => {
-  const normalized = normalizeFormula(formula)
-  const keys = specialCards.has(normalized) ? [normalized] : Object.keys(parseFormula(normalized))
-  keys.forEach((key) => {
-    const bucket = aiFormulaCandidatesByCard.get(key) || []
-    if (!bucket.includes(normalized)) bucket.push(normalized)
-    aiFormulaCandidatesByCard.set(key, bucket)
+const rebuildRuntimeIndexes = () => {
+  readRuntimeSubstances()
+  readRuntimeReactions()
+
+  const names = runtimeSqlite.listSubstanceNames()
+  substanceNameByFormula = new Map(Object.entries(names))
+  reactionEquationByPair = new Map(
+    runtimeSqlite
+      .listReactionPairs()
+      .map((reaction) => [getReactionPairKey(reaction.r1, reaction.r2), reaction.display] as const)
+      .filter(([pair]) => Boolean(pair)),
+  )
+  allKnownFormulas = unique([...runtimeSqlite.listApprovedSubstanceFormulas(), ...Object.keys(builtinDeck)])
+  aiReactionTargetsByFormula.clear()
+  aiFormulaCandidatesByCard.clear()
+
+  allKnownFormulas.forEach((formula) => {
+    const normalized = normalizeFormula(formula)
+    const keys = specialCards.has(normalized) ? [normalized] : Object.keys(parseFormula(normalized))
+    keys.forEach((key) => {
+      const bucket = aiFormulaCandidatesByCard.get(key) || []
+      if (!bucket.includes(normalized)) bucket.push(normalized)
+      aiFormulaCandidatesByCard.set(key, bucket)
+    })
   })
-})
 
-Object.keys(reactionPairs).forEach((pair) => {
-  const [left, right] = pair.split('|').map((value) => normalizeFormula(value))
-  if (!left || !right) return
-  const leftBucket = aiReactionTargetsByFormula.get(left) || []
-  if (!leftBucket.includes(right)) leftBucket.push(right)
-  aiReactionTargetsByFormula.set(left, leftBucket)
+  reactionEquationByPair.forEach((_equation, pair) => {
+    const [left, right] = pair.split('|').map((value) => normalizeFormula(value))
+    if (!left || !right) return
+    const leftBucket = aiReactionTargetsByFormula.get(left) || []
+    if (!leftBucket.includes(right)) leftBucket.push(right)
+    aiReactionTargetsByFormula.set(left, leftBucket)
 
-  const rightBucket = aiReactionTargetsByFormula.get(right) || []
-  if (!rightBucket.includes(left)) rightBucket.push(left)
-  aiReactionTargetsByFormula.set(right, rightBucket)
-})
+    const rightBucket = aiReactionTargetsByFormula.get(right) || []
+    if (!rightBucket.includes(left)) rightBucket.push(left)
+    aiReactionTargetsByFormula.set(right, rightBucket)
+  })
+
+  runtimeIndexesReady = true
+}
+
+export const ensureLocalRuntimeReady = async () => {
+  await ensureClientRuntimeDatabase()
+  if (!runtimeIndexesReady) {
+    rebuildRuntimeIndexes()
+  }
+}
 
 const getCardCounts = (cards: Card[]) => {
   const result: Record<string, number> = {}
@@ -1206,8 +1258,7 @@ const isReactionPair = (a: string, b: string) => {
   const right = normalizeFormula(b)
   if (!left || !right) return false
   if (specialCards.has(left) || specialCards.has(right)) return true
-  const pair = [left, right].sort().join('|')
-  return !!reactionPairs[pair]
+  return !!getReactionEquation(left, right)
 }
 
 const getAvailableSubstances = (cards: Card[]) => {
@@ -1602,8 +1653,7 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
     game.effect_target_uid = null
   } else {
     game.last_card = playedCard
-    const pair = reactants?.length === 2 ? reactants.sort().join('|') : ''
-    const fullReaction = pair ? reactionPairs[pair] : null
+    const fullReaction = reactants?.length === 2 ? getReactionEquation(reactants[0], reactants[1]) : null
     game.current_reaction = fullReaction || normalized
     game.last_effect_type = ''
     game.effect_target_uid = null
@@ -1788,7 +1838,7 @@ const parseImportedEntries = (body: Record<string, any>) => {
   return normalized
 }
 
-export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResult => {
+const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<DispatchResult> => {
   const method = String(config.method || 'get').toUpperCase()
   const url = new URL(config.url || '/', 'http://offline.local')
   const path = url.pathname.replace(/^\/api/, '') || '/'
@@ -1844,7 +1894,7 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       return { status: 200, data: { user: serializeUser(user), token: 'offline-token' } }
     }
     if (method === 'POST' && path === '/auth/register') {
-      return dispatchOfflineRequest({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
+      return dispatchOfflineRequestSync({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
     }
     if (method === 'POST' && path === '/auth/login') {
       const nickname = String(body.nickname || body.identifier || body.username || '').trim()
@@ -1911,7 +1961,13 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
     if (method === 'GET' && path === '/hints') return { status: 200, data: hints }
     if (method === 'POST' && path === '/runtime/export') {
       authed()
-      return { status: 200, data: stateRepository.exportBundle() }
+      runtimeSqlite.flush()
+      const bundle = stateRepository.exportBundle() as Record<string, any>
+      bundle.sqlite = {
+        encoding: 'base64',
+        data: runtimeSqlite.exportImage(),
+      }
+      return { status: 200, data: bundle }
     }
     if (method === 'POST' && path === '/runtime/import') {
       authed()
@@ -1926,6 +1982,19 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       }
 
       stateRepository.import(entries)
+      if (typeof body.sqlite?.data === 'string') {
+        await runtimeSqlite.importImage(body.sqlite.data)
+        runtimeIndexesReady = false
+        rebuildRuntimeIndexes()
+      } else if (typeof body.bundle?.sqlite?.data === 'string') {
+        await runtimeSqlite.importImage(body.bundle.sqlite.data)
+        runtimeIndexesReady = false
+        rebuildRuntimeIndexes()
+      } else {
+        await runtimeSqlite.reload()
+        runtimeIndexesReady = false
+        rebuildRuntimeIndexes()
+      }
       state = readState()
       const current = currentUser(state)
       if (current) {
@@ -2164,7 +2233,7 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
       const game = ensureGame(room)
       const index = findPlayerIndexByUid(game, user.uid)
       const available = index >= 0 ? getAvailableSubstances(game.players[index].hand_cards) : []
-      const hintsData = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula)).slice(0, 12).map((formula, idx) => ({ id: idx + 1, formula, name: substanceNames[formula] || formula }))
+      const hintsData = available.filter((formula) => !game.last_card || isReactionPair(game.last_card.substance, formula)).slice(0, 12).map((formula, idx) => ({ id: idx + 1, formula, name: substanceNameByFormula.get(formula) || formula }))
       return { status: 200, data: hintsData }
     }
     if (method === 'POST' && path === '/game/check-reaction') {
@@ -2583,15 +2652,20 @@ export const dispatchOfflineRequest = (config: AxiosRequestConfig): DispatchResu
     return { status: 200, data: [] }
   } catch (error: any) {
     if (error?.status) return error
-    return { status: 500, data: { error: error?.message || 'Offline backend error' } }
+    return { status: 500, data: { error: error?.message || 'Local runtime error' } }
   } finally {
     writeState(state)
   }
 }
 
+export const dispatchOfflineRequest = async (config: AxiosRequestConfig): Promise<DispatchResult> => {
+  await ensureLocalRuntimeReady()
+  return dispatchOfflineRequestSync(config)
+}
+
 export const offlineAxiosAdapter: AxiosAdapter = async (config) => {
   await sleep(30)
-  const result = dispatchOfflineRequest(config)
+  const result = await dispatchOfflineRequest(config)
   if (result.status >= 400) failure(config, result.status, result.data)
   return success(config, result.data, result.status)
 }
@@ -2607,7 +2681,7 @@ export const installOfflineFetchInterceptor = () => {
     const url = new URL(requestUrl, window.location.origin)
     if (!url.pathname.startsWith('/api/')) return g.__offlineOriginalFetch!(input as any, init)
 
-    const result = dispatchOfflineRequest({ url: url.pathname + url.search, method: init?.method || 'GET', data: init?.body })
+    const result = await dispatchOfflineRequest({ url: url.pathname + url.search, method: init?.method || 'GET', data: init?.body })
     return new Response(JSON.stringify(result.data), { status: result.status, headers: { 'Content-Type': 'application/json' } })
   }
 }

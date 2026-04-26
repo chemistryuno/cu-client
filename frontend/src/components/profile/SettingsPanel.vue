@@ -4,6 +4,12 @@ import { Sun, Moon, Monitor, Palette, Volume2, Smartphone, Keyboard, Save, FileT
 import { authAPI } from '../../utils/api'
 import { useDialog } from '../../utils/dialog'
 import { feedback } from '../../utils/feedback'
+import {
+  THEME_COLOR_OPTIONS,
+  getStoredThemeColor,
+  setStoredThemeColor,
+  type ThemeColor,
+} from '../../utils/themeColor'
 
 const props = defineProps<{
   user: any,
@@ -20,6 +26,7 @@ const activeTab = ref<'system' | 'user_agreement' | 'privacy_policy'>(props.forc
 
 // 系统设置状态
 const currentTheme = ref(localStorage.getItem('theme') || 'system')
+const currentThemeColor = ref<ThemeColor>(getStoredThemeColor())
 const soundVolume = ref(feedback.getVolume())
 const vibrationEnabled = ref(feedback.getVibrationEnabled())
 const enableElementInput = ref(props.user.enable_element_input ?? true)
@@ -30,9 +37,15 @@ const themes = [
   { id: 'dark', name: '深邃星空 / DARK', icon: Moon }
 ]
 
+const themeColors = THEME_COLOR_OPTIONS
+
 const applyTheme = (theme: string) => {
   localStorage.setItem('theme', theme)
   window.dispatchEvent(new CustomEvent('theme-changed'))
+}
+
+const applyThemeColorSetting = (color: ThemeColor) => {
+  setStoredThemeColor(color)
 }
 
 const handleSaveSettings = async () => {
@@ -78,6 +91,10 @@ watch(currentTheme, (newTheme) => {
   applyTheme(newTheme)
 })
 
+watch(currentThemeColor, (newColor) => {
+  applyThemeColorSetting(newColor)
+})
+
 watch(soundVolume, (newVolume) => {
   feedback.setVolume(newVolume)
 })
@@ -97,7 +114,7 @@ watch(() => props.user, (newUser) => {
   <div class="space-y-6">
     <!-- 选项卡导航 (仅在非强制模式下显示，且只显示系统设置) -->
     <div v-if="!forceTab" class="flex p-1 bg-slate-100 dark:bg-white/5 rounded-2xl mb-2">
-      <div class="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-[10px] font-black tracking-widest bg-white dark:bg-white/10 text-blue-600 shadow-sm">
+      <div class="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-[10px] font-black tracking-widest bg-white dark:bg-white/10 text-[var(--theme-text)] shadow-sm">
         <Monitor class="w-3.5 h-3.5" />
         系统设置 / SYSTEM_SETTINGS
       </div>
@@ -134,7 +151,7 @@ watch(() => props.user, (newUser) => {
       <!-- 主题设置 -->
       <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm dark:shadow-none transition-all">
         <h3 class="text-base font-black uppercase tracking-widest mb-5 flex items-center gap-2.5 text-slate-800 dark:text-white">
-          <Palette class="w-4 h-4 text-blue-500" />
+          <Palette class="w-4 h-4 text-[var(--theme-text)]" />
           外观控制 <span class="text-[10px] font-mono opacity-30">/ THEME</span>
         </h3>
 
@@ -146,7 +163,7 @@ watch(() => props.user, (newUser) => {
             :class="[
               'flex items-center gap-2.5 p-3 rounded-xl border transition-all group backdrop-blur-md',
               currentTheme === theme.id 
-                ? 'border-blue-500/50 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 shadow-[0_4px_12px_rgba(59,130,246,0.1)]' 
+                ? 'border-[color:rgb(var(--theme-rgb)/0.5)] bg-[color:rgb(var(--theme-rgb)/0.1)] dark:bg-[color:rgb(var(--theme-rgb)/0.2)] text-[var(--theme-text)] dark:text-[var(--theme-text-soft)] shadow-[0_4px_12px_rgb(var(--theme-rgb)/0.1)]'
                 : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] text-slate-400 hover:border-slate-200 dark:hover:border-white/10'
             ]"
           >
@@ -159,6 +176,33 @@ watch(() => props.user, (newUser) => {
             />
             <span class="text-[10px] font-black uppercase tracking-tight text-left leading-none">{{ theme.name.split('/')[0].trim() }}</span>
           </button>
+        </div>
+
+        <div class="mt-6 space-y-3">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">涓婚鑹? / accent color</span>
+            <span class="text-[9px] font-mono uppercase text-slate-400">Default Blue</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <button
+              v-for="color in themeColors"
+              :key="color.id"
+              type="button"
+              @click="currentThemeColor = color.id"
+              :class="[
+                'theme-color-swatch flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left',
+                currentThemeColor === color.id
+                  ? 'border-[color:rgb(var(--theme-rgb)/0.52)] bg-[color:rgb(var(--theme-rgb)/0.12)] text-slate-900 dark:text-white shadow-[0_10px_24px_-18px_rgb(var(--theme-rgb)/0.75)]'
+                  : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] text-slate-500 hover:border-slate-200 dark:hover:border-white/10'
+              ]"
+            >
+              <span
+                class="h-5 w-5 shrink-0 rounded-md border border-black/10 shadow-inner"
+                :style="{ background: color.swatch }"
+              ></span>
+              <span class="min-w-0 text-[10px] font-black uppercase tracking-tight leading-none">{{ color.name.split('/')[0].trim() }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -177,7 +221,7 @@ watch(() => props.user, (newUser) => {
                 <Volume2 class="w-4 h-4 text-slate-400" />
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">音效大小 / volume</span>
               </div>
-              <span class="text-[10px] font-mono text-blue-500">{{ Math.round(soundVolume * 100) }}%</span>
+              <span class="text-[10px] font-mono text-[var(--theme-text)]">{{ Math.round(soundVolume * 100) }}%</span>
             </div>
             <input 
               v-model.number="soundVolume" 
@@ -185,7 +229,7 @@ watch(() => props.user, (newUser) => {
               min="0" 
               max="1" 
               step="0.01"
-              class="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              class="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-lg appearance-none cursor-pointer accent-[var(--theme-500)]"
             />
           </div>
 
@@ -204,7 +248,7 @@ watch(() => props.user, (newUser) => {
               <button 
                 @click="vibrationEnabled = !vibrationEnabled"
                 :class="[
-                  'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                  'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:rgb(var(--theme-rgb)/0.6)] focus:ring-offset-2',
                   vibrationEnabled ? 'bg-orange-500' : 'bg-slate-200 dark:bg-white/10'
                 ]"
               >
@@ -231,7 +275,7 @@ watch(() => props.user, (newUser) => {
               <button 
                 @click="enableElementInput = !enableElementInput"
                 :class="[
-                  'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                  'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:rgb(var(--theme-rgb)/0.6)] focus:ring-offset-2',
                   enableElementInput ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-white/10'
                 ]"
               >

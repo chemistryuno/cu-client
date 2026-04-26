@@ -3,6 +3,7 @@ import router from '../router'
 import { API_BASE_URL, OFFLINE_MODE } from './runtimeConfig'
 import { clearClientAuthState } from './authSession'
 import { clientRuntimeAxiosAdapter } from './clientRuntimeService'
+import { fetchPubChemSubstanceNames, searchPubChemSubstances } from './pubchem'
 
 interface CacheEntry {
   data: any
@@ -211,7 +212,7 @@ export const commonAPI = {
   getAnnouncements: () => api.get('/announcements'),
   getHints: () => api.get('/hints'),
   exportLocalRuntimeData: () => api.post('/runtime/export'),
-  importLocalRuntimeData: (payload: { entries?: Record<string, string>; bundle?: { entries?: Record<string, string> }; mode?: 'merge' | 'replace' }) =>
+  importLocalRuntimeData: (payload: { entries?: Record<string, string>; sqlite?: { data?: string }; bundle?: { entries?: Record<string, string>; sqlite?: { data?: string } }; mode?: 'merge' | 'replace' }) =>
     api.post('/runtime/import', payload)
 }
 
@@ -231,17 +232,41 @@ export const substanceAPI = {
     const key = createCacheKey('/substances/names')
     const cached = getCached(key)
     if (cached) return { data: cached }
-    const response = await api.get('/substances/names')
-    setCached(key, response.data, 30 * 60 * 1000)
-    return response
+    const fallbackResponse = await api.get('/substances/names')
+    const fallbackNames = fallbackResponse.data || {}
+    try {
+      const pubchemNames = await fetchPubChemSubstanceNames(Object.keys(fallbackNames))
+      const merged = {
+        ...fallbackNames,
+        ...pubchemNames,
+      }
+      setCached(key, merged, 30 * 60 * 1000)
+      return { data: merged }
+    } catch {
+      setCached(key, fallbackNames, 30 * 60 * 1000)
+      return fallbackResponse
+    }
   },
-  getSubstances: async () => {
-    const key = createCacheKey('/data/substances')
+  getSubstances: async (query = '') => {
+    const key = createCacheKey('/data/substances', { query })
     const cached = getCached(key)
     if (cached) return { data: cached }
-    const response = await api.get('/data/substances')
-    setCached(key, response.data, 30 * 60 * 1000)
-    return response
+    const fallbackResponse = await api.get('/data/substances')
+    const fallbackList = Array.isArray(fallbackResponse.data) ? fallbackResponse.data : []
+    try {
+      const pubchemList = await searchPubChemSubstances(query)
+      const merged = query
+        ? (pubchemList.length > 0 ? pubchemList : fallbackList.filter((item: any) => {
+            const term = String(query).trim().toLowerCase()
+            return String(item?.formula || '').toLowerCase().includes(term) || String(item?.name || '').toLowerCase().includes(term)
+          }))
+        : fallbackList
+      setCached(key, merged, 10 * 60 * 1000)
+      return { data: merged }
+    } catch {
+      setCached(key, fallbackList, 30 * 60 * 1000)
+      return fallbackResponse
+    }
   },
   getMySubstances: () => api.get('/data/substances/my'),
   getSubstanceGroup: (id: number) => api.get(`/data/substances/${id}/group`),
@@ -273,4 +298,3 @@ export const invalidateApiCache = (...keys: string[]) => {
 }
 
 export default api
-

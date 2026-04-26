@@ -290,17 +290,17 @@ onMounted(() => {
         </div>
       </header>
 
-      <main class="flex-1 max-w-[1200px] mx-auto w-full px-4 sm:px-5 py-5 flex flex-col gap-5">
+      <main class="lobby-main">
         <div class="hub-header-section">
           <div class="hub-title-group">
             <div class="hub-status-badge">
               <span class="hub-status-dot"></span>
-              <span class="text-[8px] font-black text-blue-500 uppercase tracking-widest">{{ t('common.localMode') }}</span>
+              <span class="hub-status-label hub-status-label--primary">{{ t('common.localMode') }}</span>
               <span class="hub-status-divider"></span>
-              <span class="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Low Noise UI</span>
+              <span class="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Reactor Ready</span>
             </div>
             <h2 class="hub-title">{{ t('lobby.title') }}</h2>
-            <p class="text-[11px] text-slate-500 font-medium max-w-xl leading-relaxed">
+            <p class="hub-subtitle">
               {{ t('lobby.subtitle') }}
             </p>
           </div>
@@ -331,13 +331,13 @@ onMounted(() => {
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <section class="lobby-panel lobby-hero-panel lg:col-span-8 group">
             <div class="lobby-hero-panel__mesh" aria-hidden="true"></div>
-            <div class="absolute top-0 right-0 p-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-500">
+            <div class="lobby-hero-watermark" aria-hidden="true">
               <Bot class="w-40 h-40" />
             </div>
             <div class="lobby-hero-orb lobby-hero-orb--a" aria-hidden="true"></div>
             <div class="lobby-hero-orb lobby-hero-orb--b" aria-hidden="true"></div>
 
-            <div class="relative z-10">
+            <div class="lobby-hero-content relative z-10">
               <div class="lobby-hero-head">
                 <div>
                   <div class="flex items-center gap-2 mb-3">
@@ -358,7 +358,7 @@ onMounted(() => {
                   <span class="lobby-summary-stat__value">{{ selectedDeck?.name || t('lobby.deck') }}</span>
                 </div>
                 <div class="lobby-summary-stat">
-                  <span class="lobby-summary-stat__label">{{ t('lobby.points') }}</span>
+                  <span class="lobby-summary-stat__label">{{ t('profileHeader.points') }}</span>
                   <span class="lobby-summary-stat__value">{{ playerPhlogiston }}</span>
                 </div>
                 <div class="lobby-summary-stat">
@@ -367,7 +367,7 @@ onMounted(() => {
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              <div class="lobby-detail-grid grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                 <div class="lobby-detail-card group/card">
                   <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">{{ t('lobby.currentPlayer') }}</p>
                   <div class="flex items-center gap-3">
@@ -407,6 +407,38 @@ onMounted(() => {
           </section>
 
           <section class="lg:col-span-4 flex flex-col gap-5">
+            <div class="lobby-panel lobby-side-panel lobby-side-panel--status">
+              <div class="lobby-side-panel__header">
+                <div>
+                  <p class="lobby-side-panel__eyebrow">Run Status</p>
+                  <h3 class="lobby-side-panel__title">Match Console</h3>
+                </div>
+              </div>
+              <div class="lobby-readout-list">
+                <div class="lobby-readout">
+                  <span class="lobby-readout__signal"></span>
+                  <div>
+                    <p class="lobby-readout__label">{{ t('lobby.currentPlayer') }}</p>
+                    <p class="lobby-readout__value">{{ user.nickname || t('common.localPlayer') }}</p>
+                  </div>
+                </div>
+                <div class="lobby-readout">
+                  <span class="lobby-readout__signal lobby-readout__signal--cyan"></span>
+                  <div>
+                    <p class="lobby-readout__label">{{ t('lobby.deck') }}</p>
+                    <p class="lobby-readout__value">{{ selectedDeck?.name || t('lobby.deck') }}</p>
+                  </div>
+                </div>
+                <div class="lobby-readout">
+                  <span class="lobby-readout__signal lobby-readout__signal--orange"></span>
+                  <div>
+                    <p class="lobby-readout__label">{{ t('profileHeader.points') }}</p>
+                    <p class="lobby-readout__value">{{ playerPhlogiston }} / {{ selectedDeckElementCount }} Elements</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="lobby-panel lobby-side-panel">
               <div class="lobby-side-panel__header">
                 <div>

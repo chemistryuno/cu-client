@@ -19,17 +19,6 @@ if (!existsSync(join(process.cwd(), 'android'))) {
   process.exit(1)
 }
 
-const androidApiOrigin =
-  process.env.CHEM_ANDROID_API_ORIGIN ||
-  process.env.CHEM_SERVER_ORIGIN ||
-  process.env.VITE_SERVER_ORIGIN ||
-  process.env.VITE_API_ORIGIN ||
-  ''
-if (!androidApiOrigin) {
-  console.error('[Android] Missing CHEM_ANDROID_API_ORIGIN. Release builds must target a real backend origin.')
-  process.exit(1)
-}
-
 const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'))
 const hasSigning = [
   process.env.CHEM_ANDROID_KEYSTORE_PATH,
@@ -38,18 +27,10 @@ const hasSigning = [
   process.env.CHEM_ANDROID_KEY_PASSWORD
 ].every((value) => typeof value === 'string' && value.trim().length > 0)
 
-console.log(`[Android] Using API origin: ${androidApiOrigin}`)
+console.log('[Android] Building frontend-only offline release')
 console.log(`[Android] Release signing: ${hasSigning ? 'enabled' : 'disabled (unsigned APK)'}`)
 
-run('node', ['scripts/android-sync.cjs'], {
-  env: {
-    ...process.env,
-    CHEM_ANDROID_API_ORIGIN: androidApiOrigin,
-    CHEM_SERVER_ORIGIN: androidApiOrigin,
-    VITE_SERVER_ORIGIN: androidApiOrigin,
-    VITE_API_ORIGIN: androidApiOrigin
-  }
-})
+run('node', ['scripts/android-sync.cjs'])
 
 const gradleWrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew'
 run(gradleWrapper, ['assembleRelease'], { cwd: join(process.cwd(), 'android') })

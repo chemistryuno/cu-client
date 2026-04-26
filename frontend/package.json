@@ -21,8 +21,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "copy-dist": "node -e \"const fs=require('fs'),path=require('path');const src='dist',dst='../backend/static/dist';if(fs.existsSync(dst))fs.rmSync(dst,{recursive:true});fs.mkdirSync(path.dirname(dst),{recursive:true});fs.cpSync(src,dst,{recursive:true});console.log('✓ 前端文件已复制到 backend/static/dist')\""
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@capacitor/core": "^7.4.3",
@@ -33,6 +32,7 @@
     "cropperjs": "^1.6.2",
     "gsap": "^3.15.0",
     "lucide-vue-next": "^0.575.0",
+    "sql.js": "^1.14.1",
     "tailwind-merge": "^3.4.0",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5"

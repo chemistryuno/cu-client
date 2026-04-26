@@ -1,15 +1,8 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const serverOrigin =
-    env.VITE_SERVER_ORIGIN ||
-    env.CHEM_SERVER_ORIGIN ||
-    env.VITE_API_ORIGIN ||
-    'http://127.0.0.1:8080'
-
+export default defineConfig(() => {
   return {
     plugins: [
       vue(),
@@ -17,16 +10,8 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       host: true,
-      allowedHosts: true, // true = ???????????
-      port: 5000,
-      proxy: {
-        '/api': {
-          target: serverOrigin,
-          changeOrigin: true,
-          ws: true,
-          xfwd: true
-        }
-      }
+      allowedHosts: true,
+      port: 5000
     },
     build: {
       target: 'ES2020',

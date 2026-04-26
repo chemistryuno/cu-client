@@ -1,7 +1,7 @@
 import type { AxiosAdapter, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { getClientRuntimeModule } from './clientRuntimeRoutes'
 import type { RuntimeRequest, RuntimeResult } from './clientRuntimeTypes'
-import { dispatchOfflineRequest, resetOfflineTestState, seedOfflineTestState } from './offlineBackend'
+import { dispatchOfflineRequest, resetOfflineTestState, seedOfflineTestState } from './localRuntimeAdapter'
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
@@ -26,9 +26,9 @@ const throwAxiosError = (config: AxiosRequestConfig, result: RuntimeResult): nev
   throw error
 }
 
-export const dispatchClientRuntimeRequest = (request: RuntimeRequest): RuntimeResult => {
+export const dispatchClientRuntimeRequest = async (request: RuntimeRequest): Promise<RuntimeResult> => {
   const config = toAxiosConfig(request)
-  const result = dispatchOfflineRequest(config)
+  const result = await dispatchOfflineRequest(config)
   return {
     ...result,
     module: getClientRuntimeModule(request.url, request.method),
@@ -37,7 +37,7 @@ export const dispatchClientRuntimeRequest = (request: RuntimeRequest): RuntimeRe
 
 export const clientRuntimeAxiosAdapter: AxiosAdapter = async (config) => {
   await sleep(30)
-  const result = dispatchClientRuntimeRequest({
+  const result = await dispatchClientRuntimeRequest({
     url: config.url || '/',
     method: config.method || 'GET',
     data: config.data,
@@ -69,7 +69,7 @@ export const installClientRuntimeFetchInterceptor = () => {
       return g.__offlineOriginalFetch!(input as any, init)
     }
 
-    const result = dispatchClientRuntimeRequest({
+    const result = await dispatchClientRuntimeRequest({
       url: url.pathname + url.search,
       method: init?.method || 'GET',
       data: init?.body,

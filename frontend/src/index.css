@@ -8,6 +8,123 @@
   /* Global compact density: shrink rem-based spacing and typography a bit. */
   :root {
     --app-height: 100vh;
+    --theme-rgb: 59 130 246;
+    --theme-rgb-soft: 96 165 250;
+    --theme-rgb-dark: 29 78 216;
+    --theme-50: #eff6ff;
+    --theme-100: #dbeafe;
+    --theme-200: #bfdbfe;
+    --theme-300: #93c5fd;
+    --theme-400: #60a5fa;
+    --theme-500: #3b82f6;
+    --theme-600: #2563eb;
+    --theme-700: #1d4ed8;
+    --theme-800: #1e40af;
+    --theme-900: #1e3a8a;
+    --theme-on: #ffffff;
+    --theme-text: #1d4ed8;
+    --theme-text-strong: #1e3a8a;
+    --theme-text-soft: #dbeafe;
+  }
+
+  :root[data-theme-color="cyan"] {
+    --theme-rgb: 6 182 212;
+    --theme-rgb-soft: 34 211 238;
+    --theme-rgb-dark: 8 145 178;
+    --theme-50: #ecfeff;
+    --theme-100: #cffafe;
+    --theme-200: #a5f3fc;
+    --theme-300: #67e8f9;
+    --theme-400: #22d3ee;
+    --theme-500: #06b6d4;
+    --theme-600: #0891b2;
+    --theme-700: #0e7490;
+    --theme-800: #155e75;
+    --theme-900: #164e63;
+    --theme-on: #0f172a;
+    --theme-text: #0e7490;
+    --theme-text-strong: #164e63;
+    --theme-text-soft: #cffafe;
+  }
+
+  :root[data-theme-color="green"] {
+    --theme-rgb: 132 204 22;
+    --theme-rgb-soft: 190 242 100;
+    --theme-rgb-dark: 77 124 15;
+    --theme-50: #f7fee7;
+    --theme-100: #ecfccb;
+    --theme-200: #d9f99d;
+    --theme-300: #bef264;
+    --theme-400: #a3e635;
+    --theme-500: #84cc16;
+    --theme-600: #65a30d;
+    --theme-700: #4d7c0f;
+    --theme-800: #3f6212;
+    --theme-900: #365314;
+    --theme-on: #0f172a;
+    --theme-text: #4d7c0f;
+    --theme-text-strong: #365314;
+    --theme-text-soft: #d9f99d;
+  }
+
+  :root[data-theme-color="violet"] {
+    --theme-rgb: 139 92 246;
+    --theme-rgb-soft: 167 139 250;
+    --theme-rgb-dark: 109 40 217;
+    --theme-50: #f5f3ff;
+    --theme-100: #ede9fe;
+    --theme-200: #ddd6fe;
+    --theme-300: #c4b5fd;
+    --theme-400: #a78bfa;
+    --theme-500: #8b5cf6;
+    --theme-600: #7c3aed;
+    --theme-700: #6d28d9;
+    --theme-800: #5b21b6;
+    --theme-900: #4c1d95;
+    --theme-on: #ffffff;
+    --theme-text: #6d28d9;
+    --theme-text-strong: #4c1d95;
+    --theme-text-soft: #ede9fe;
+  }
+
+  :root[data-theme-color="orange"] {
+    --theme-rgb: 249 115 22;
+    --theme-rgb-soft: 251 146 60;
+    --theme-rgb-dark: 194 65 12;
+    --theme-50: #fff7ed;
+    --theme-100: #ffedd5;
+    --theme-200: #fed7aa;
+    --theme-300: #fdba74;
+    --theme-400: #fb923c;
+    --theme-500: #f97316;
+    --theme-600: #ea580c;
+    --theme-700: #c2410c;
+    --theme-800: #9a3412;
+    --theme-900: #7c2d12;
+    --theme-on: #0f172a;
+    --theme-text: #c2410c;
+    --theme-text-strong: #7c2d12;
+    --theme-text-soft: #ffedd5;
+  }
+
+  :root[data-theme-color="rose"] {
+    --theme-rgb: 244 63 94;
+    --theme-rgb-soft: 251 113 133;
+    --theme-rgb-dark: 190 18 60;
+    --theme-50: #fff1f2;
+    --theme-100: #ffe4e6;
+    --theme-200: #fecdd3;
+    --theme-300: #fda4af;
+    --theme-400: #fb7185;
+    --theme-500: #f43f5e;
+    --theme-600: #e11d48;
+    --theme-700: #be123c;
+    --theme-800: #9f1239;
+    --theme-900: #881337;
+    --theme-on: #ffffff;
+    --theme-text: #be123c;
+    --theme-text-strong: #881337;
+    --theme-text-soft: #ffe4e6;
   }
 
   html {
@@ -30,11 +147,15 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 dark:bg-[#0a0a0c] dark:text-slate-200 antialiased selection:bg-blue-500/30;
+  @apply bg-slate-50 text-slate-900 dark:bg-[#0a0a0c] dark:text-slate-200 antialiased;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   min-height: var(--app-height);
   line-height: 1.45;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+::selection {
+  background: rgb(var(--theme-rgb-soft) / 0.35);
 }
 
 @layer components {
@@ -43,16 +164,18 @@ body {
     position: relative;
     overflow-x: hidden;
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 26%),
-      linear-gradient(180deg, #f3f7fb 0%, #edf3f8 45%, #e9f0f6 100%);
+      linear-gradient(115deg, rgb(var(--theme-rgb) / 0.13), transparent 22%),
+      linear-gradient(250deg, rgb(var(--theme-rgb-dark) / 0.07), transparent 24%),
+      repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.045) 0 1px, transparent 1px 42px),
+      linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f7f8fb 100%);
   }
 
   .dark .console-app-shell {
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.05), transparent 24%),
-      linear-gradient(180deg, #071019 0%, #09131d 52%, #0b1620 100%);
+      linear-gradient(116deg, rgb(var(--theme-rgb-soft) / 0.12), transparent 23%),
+      linear-gradient(248deg, rgb(var(--theme-rgb) / 0.08), transparent 22%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 42px),
+      linear-gradient(180deg, #060b16 0%, #0a1020 52%, #0d1220 100%);
   }
 
   .console-grid-overlay {
@@ -60,20 +183,24 @@ body {
     inset: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(100, 116, 139, 0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(100, 116, 139, 0.07) 1px, transparent 1px);
-    background-size: 24px 24px;
-    mask-image: radial-gradient(circle at center, black 30%, transparent 92%);
-    opacity: 0.32;
+      linear-gradient(rgba(15, 23, 42, 0.075) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.075) 1px, transparent 1px),
+      linear-gradient(135deg, transparent 0 47%, rgb(var(--theme-rgb) / 0.1) 47% 48%, transparent 48% 100%);
+    background-size: 26px 26px, 26px 26px, 160px 160px;
+    mask-image: linear-gradient(180deg, black, transparent 96%);
+    opacity: 0.38;
   }
 
   .console-card {
-    @apply border border-slate-300/60 dark:border-white/10 bg-white/90 dark:bg-[#0b1420]/90 rounded-[28px];
-    box-shadow: 0 24px 60px -40px rgba(15, 23, 42, 0.45);
+    @apply border border-slate-300/80 dark:border-white/12 bg-white/88 dark:bg-[#0c141b]/92 rounded-[14px];
+    box-shadow:
+      0 28px 60px -44px rgba(15, 23, 42, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   }
 
   .console-subcard {
-    @apply border border-slate-200/70 dark:border-white/10 bg-white/75 dark:bg-[#101923]/76 rounded-2xl;
+    @apply border border-slate-300/70 dark:border-white/10 bg-white/74 dark:bg-[#101a21]/80 rounded-[10px];
   }
 
   .console-section-title {
@@ -81,11 +208,15 @@ body {
   }
 
   .console-eyebrow {
-    @apply text-[10px] uppercase tracking-[0.18em] font-black text-sky-700 dark:text-sky-400;
+    @apply text-[10px] uppercase tracking-[0.18em] font-black;
+    color: var(--theme-text);
   }
 
   .console-notice-chip {
-    @apply inline-flex items-center gap-2 rounded-full border border-sky-500/15 bg-sky-500/7 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700 dark:border-sky-400/18 dark:bg-sky-400/8 dark:text-sky-300;
+    @apply inline-flex items-center gap-2 rounded-[6px] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em];
+    border: 1px solid rgb(var(--theme-rgb) / 0.25);
+    background: rgb(var(--theme-rgb-soft) / 0.15);
+    color: var(--theme-text-strong);
   }
 
   .console-page-shell {
@@ -94,17 +225,19 @@ body {
     overflow-x: hidden;
     color: rgb(15 23 42);
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 26%),
-      linear-gradient(180deg, #f3f7fb 0%, #edf3f8 45%, #e9f0f6 100%);
+      linear-gradient(115deg, rgb(var(--theme-rgb) / 0.13), transparent 22%),
+      linear-gradient(250deg, rgb(var(--theme-rgb-dark) / 0.07), transparent 24%),
+      repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.045) 0 1px, transparent 1px 42px),
+      linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f7f8fb 100%);
   }
 
   .dark .console-page-shell {
     color: rgb(226 232 240);
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
-      radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.05), transparent 24%),
-      linear-gradient(180deg, #071019 0%, #09131d 52%, #0b1620 100%);
+      linear-gradient(116deg, rgb(var(--theme-rgb-soft) / 0.12), transparent 23%),
+      linear-gradient(248deg, rgb(var(--theme-rgb) / 0.08), transparent 22%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 42px),
+      linear-gradient(180deg, #060b16 0%, #0a1020 52%, #0d1220 100%);
   }
 
   .console-page-shell::before {
@@ -113,10 +246,12 @@ body {
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 14% 12%, rgba(14, 165, 233, 0.12), transparent 24%),
-      radial-gradient(circle at 86% 18%, rgba(249, 115, 22, 0.08), transparent 18%),
-      radial-gradient(circle at 72% 82%, rgba(16, 185, 129, 0.08), transparent 18%);
-    opacity: 0.9;
+      linear-gradient(135deg, transparent 0 49%, rgba(15, 23, 42, 0.05) 49% 50%, transparent 50% 100%),
+      radial-gradient(circle at 16% 12%, rgb(var(--theme-rgb) / 0.14), transparent 18%),
+      radial-gradient(circle at 86% 18%, rgb(var(--theme-rgb-dark) / 0.08), transparent 18%),
+      radial-gradient(circle at 72% 82%, rgb(var(--theme-rgb-soft) / 0.09), transparent 18%);
+    background-size: 180px 180px, auto, auto, auto;
+    opacity: 0.82;
   }
 
   .console-page-container {
@@ -132,7 +267,11 @@ body {
   }
 
   .console-page-icon {
-    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/88 text-sky-700 shadow-lg shadow-slate-900/5 dark:border-white/10 dark:bg-[#0f1824]/90 dark:text-sky-300;
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border shadow-lg;
+    border-color: rgb(var(--theme-rgb) / 0.25);
+    background: rgb(var(--theme-rgb-soft) / 0.18);
+    color: var(--theme-text-strong);
+    box-shadow: 0 10px 26px -18px rgb(var(--theme-rgb) / 0.45);
   }
 
   .console-page-title {
@@ -144,7 +283,7 @@ body {
   }
 
   .console-toolbar {
-    @apply flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/82 px-3 py-2 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-white/10 dark:bg-[#0f1824]/80;
+    @apply flex flex-wrap items-center gap-2 rounded-[12px] border border-slate-300/80 bg-white/82 px-3 py-2 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-white/10 dark:bg-[#0f1824]/80;
   }
 
   .console-toolbar-group {
@@ -152,20 +291,25 @@ body {
   }
 
   .console-tab-strip {
-    @apply flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/75 p-1 dark:border-white/10 dark:bg-white/[0.05];
+    @apply flex items-center gap-1 rounded-[10px] border border-slate-300/80 bg-slate-100/75 p-1 dark:border-white/10 dark:bg-white/[0.05];
   }
 
   .console-tab-button {
-    @apply rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 transition-all hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
+    @apply rounded-[7px] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 transition-all hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
   }
 
   .console-tab-button--active {
-    @apply bg-white text-sky-700 shadow-sm dark:bg-sky-500/18 dark:text-sky-200;
+    @apply shadow-sm;
+    background: var(--theme-500);
+    color: var(--theme-on);
   }
 
   .console-panel {
-    @apply border border-slate-300/60 bg-white/90 rounded-[28px] p-4 dark:border-white/10 dark:bg-[#0b1420]/90 sm:p-5;
-    box-shadow: 0 24px 60px -40px rgba(15, 23, 42, 0.45);
+    @apply border border-slate-300/80 bg-white/88 rounded-[14px] p-4 dark:border-white/12 dark:bg-[#0c141b]/92 sm:p-5;
+    box-shadow:
+      0 28px 60px -44px rgba(15, 23, 42, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   }
 
   .console-panel-header {
@@ -173,23 +317,30 @@ body {
   }
 
   .console-metric-chip {
-    @apply inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-slate-100/75 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300;
+    @apply inline-flex items-center gap-2 rounded-[6px] border border-slate-300/80 bg-slate-100/75 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300;
   }
 
   .console-filter-bar {
-    @apply mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-slate-100/70 p-2 dark:border-white/10 dark:bg-white/[0.04];
+    @apply mb-4 flex flex-wrap items-center gap-2 rounded-[12px] border border-slate-300/80 bg-slate-100/70 p-2 dark:border-white/10 dark:bg-white/[0.04];
   }
 
   .console-filter-pill {
-    @apply rounded-xl border border-transparent px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:border-sky-500/20 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
+    @apply rounded-[7px] border border-transparent px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 transition-all hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
+  }
+
+  .console-filter-pill:hover {
+    border-color: rgb(var(--theme-rgb) / 0.25);
   }
 
   .console-filter-pill--active {
-    @apply border-sky-500/25 bg-white text-sky-700 shadow-sm dark:bg-sky-500/18 dark:text-sky-200;
+    @apply shadow-sm;
+    border-color: rgb(var(--theme-rgb) / 0.35);
+    background: rgb(var(--theme-rgb-soft) / 0.28);
+    color: var(--theme-text-strong);
   }
 
   .console-input-shell {
-    @apply flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/88 px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/[0.05];
+    @apply flex items-center gap-2 rounded-[10px] border border-slate-300/80 bg-white/88 px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/[0.05];
   }
 
   .console-input {
@@ -197,11 +348,20 @@ body {
   }
 
   .console-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white/85 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition-all hover:border-sky-500/30 hover:text-sky-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300 dark:hover:text-sky-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-[7px] border border-slate-300/80 bg-white/85 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition-all dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300;
+  }
+
+  .console-button:hover {
+    border-color: rgb(var(--theme-rgb) / 0.3);
+    color: var(--theme-text-strong);
   }
 
   .console-button-primary {
-    @apply border-sky-500/15 bg-sky-600 text-white shadow-lg shadow-sky-900/15 hover:border-sky-500/15 hover:bg-sky-500 hover:text-white dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400;
+    @apply shadow-lg hover:text-[var(--theme-on)];
+    border-color: rgb(var(--theme-rgb-soft) / 0.7);
+    background: var(--theme-500);
+    color: var(--theme-on);
+    box-shadow: 0 16px 32px -24px rgb(var(--theme-rgb) / 0.55);
   }
 
   .console-button-ghost {
@@ -209,7 +369,7 @@ body {
   }
 
   .console-data-table {
-    @apply min-w-full overflow-hidden rounded-2xl border border-slate-200/70 bg-white/80 dark:border-white/10 dark:bg-[#0d1520]/75;
+    @apply min-w-full overflow-hidden rounded-[12px] border border-slate-300/70 bg-white/80 dark:border-white/10 dark:bg-[#0d1520]/75;
   }
 
   .console-data-table thead {
@@ -229,7 +389,7 @@ body {
   }
 
   .console-empty-state {
-    @apply rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center dark:border-white/15 dark:bg-white/[0.03];
+    @apply rounded-[12px] border border-dashed border-slate-300/80 bg-white/70 px-6 py-10 text-center dark:border-white/15 dark:bg-white/[0.03];
   }
 }
 
@@ -325,6 +485,22 @@ body {
   .h-screen {
     height: var(--app-height) !important;
   }
+}
+
+.console-button-accent {
+  border-color: rgb(var(--theme-rgb-soft) / 0.72) !important;
+  background-color: var(--theme-500) !important;
+  background-image: none !important;
+  color: var(--theme-on) !important;
+  box-shadow:
+    0 14px 28px -20px rgb(var(--theme-rgb) / 0.82),
+    inset 0 -2px 0 rgba(15, 23, 42, 0.22);
+}
+
+.console-button-accent:hover {
+  border-color: var(--theme-200) !important;
+  background-color: var(--theme-400) !important;
+  color: var(--theme-on) !important;
 }
 
 @layer utilities {

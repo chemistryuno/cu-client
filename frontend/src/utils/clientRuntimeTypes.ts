@@ -42,6 +42,10 @@ export type RuntimeExportBundle = {
   exported_at: string
   host: 'browser' | 'electron' | 'capacitor'
   entries: Record<string, string>
+  sqlite?: {
+    encoding: 'base64'
+    data: string
+  }
 }
 
 export type User = {
