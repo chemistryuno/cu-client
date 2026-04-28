@@ -64,6 +64,15 @@ async function bootstrap() {
   await ensureAuthReady()
 
   const app = createApp(App)
+  // Register global bilingual component
+  try {
+    // Lazy-import to avoid increasing initial bundle if not used
+    import('./components/BilingualText.vue').then((module) => {
+      app.component('BilingualText', module.default)
+    }).catch(() => {})
+  } catch (e) {
+    // ignore
+  }
   app.use(router)
   app.mount('#app')
   markBootSplashReady()

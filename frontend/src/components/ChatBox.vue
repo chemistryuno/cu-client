@@ -68,7 +68,7 @@ const loadHistory = async () => {
     messages.value = chatMessages
     nextTick(scrollToBottom)
   } catch (err) {
-    console.error('加载聊天历史失败', err)
+    console.error('加载聊天历史失败 / Failed to load chat history', err)
   }
 }
 
@@ -88,7 +88,7 @@ onMounted(() => {
 
     messages.value.push({
       uid: msg.uid,
-      username: msg.data?.nickname || '研究员',
+      username: msg.data?.nickname || '研究员 / Researcher',
       avatar: msg.data?.avatar,
       text: msg.message,
       time: new Date(),
@@ -116,7 +116,7 @@ onMounted(() => {
     messages.value.push({
       uid: msg.uid,
       target_uid: msg.target_uid,
-      username: msg.data?.nickname || '研究员',
+      username: msg.data?.nickname || '研究员 / Researcher',
       avatar: msg.data?.avatar,
       text: isGameInvite ? '' : msg.message,
       time: new Date(),
@@ -206,14 +206,14 @@ const formatTime = (date: Date) => {
           <MessageSquare class="h-4 w-4 text-sky-500" />
         </div>
         <div>
-          <h3 class="text-xs-mobile font-black uppercase tracking-widest text-slate-800 dark:text-white">{{ title || '实验通信频道' }}</h3>
-          <p class="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Messaging Protocol</p>
+          <h3 class="text-xs-mobile font-black uppercase tracking-widest text-slate-800 dark:text-white">{{ title || '实验通信频道 / Lab Comm Channel' }}</h3>
+          <p class="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Messaging Protocol / 消息协议</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
         <div class="console-notice-chip">
           <span class="h-1 w-1 rounded-full bg-sky-500"></span>
-          Live
+          Live / 在线
         </div>
         <button
           v-if="roomId"
@@ -233,7 +233,7 @@ const formatTime = (date: Date) => {
         <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-200 dark:bg-white/10">
           <MessageSquare class="h-7 w-7" />
         </div>
-        <p class="text-xs-mobile font-black uppercase tracking-widest text-slate-500">连接已建立 | 等待数据包...</p>
+        <p class="text-xs-mobile font-black uppercase tracking-widest text-slate-500">连接已建立 | 等待数据包... / Connection established | Waiting for packets...</p>
       </div>
 
       <div
@@ -247,7 +247,7 @@ const formatTime = (date: Date) => {
         <div v-if="msg.type === 'system'" class="flex max-w-[85%] flex-col items-center gap-1.5">
           <div class="flex items-center gap-1.5 rounded-full border border-slate-200/70 bg-slate-100/60 px-3 py-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
              <div class="h-1 w-1 rounded-full bg-sky-500"></div>
-             <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">日志</span>
+             <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">日志 / Log</span>
              <span class="text-[10px] font-bold tracking-tight text-slate-500 dark:text-slate-400">{{ msg.text }}</span>
           </div>
         </div>
@@ -272,14 +272,14 @@ const formatTime = (date: Date) => {
             <div class="flex items-center gap-1 px-0.5">
               <span v-if="msg.uid !== currentUID" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-slate-400">
                 {{ msg.nickname || msg.username }}
-                <span v-if="msg.type === 'private'" class="ml-1 text-rose-500">(私语)</span>
-                <span v-if="msg.type === 'game_invite'" class="ml-1 text-sky-500">(游戏邀请)</span>
+                <span v-if="msg.type === 'private'" class="ml-1 text-rose-500">(私语 / Private)</span>
+                <span v-if="msg.type === 'game_invite'" class="ml-1 text-sky-500">(游戏邀请 / Game Invite)</span>
               </span>
               <span v-else-if="msg.type === 'private'" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-rose-500">
-                对 {{ msg.target_uid === currentUID ? '自己' : '研究员' }} 说道
+                对 {{ msg.target_uid === currentUID ? '自己 / Self' : '研究员 / Researcher' }} 说道
               </span>
               <span v-else-if="msg.type === 'game_invite'" class="text-[9px] sm:text-[8px] font-black uppercase tracking-tighter text-sky-500">
-                发送了游戏邀请
+                发送了游戏邀请 / Sent a Game Invite
               </span>
               <span class="text-[8px] sm:text-[7px] font-mono text-slate-300 dark:text-slate-600">{{ formatTime(msg.time) }}</span>
             </div>
@@ -311,7 +311,7 @@ const formatTime = (date: Date) => {
                     {{ msg.gameInviteData.room_name }}
                   </div>
                   <div class="text-[9px] font-mono uppercase text-slate-500">
-                    {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭' : '实验室邀请' }}
+                    {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭 / Room Closed' : '实验室邀请 / Lab Invite' }}
                   </div>
                 </div>
               </div>
@@ -323,7 +323,7 @@ const formatTime = (date: Date) => {
                 </div>
                 <div v-if="msg.gameInviteData.is_points_mode" class="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-0.5 text-amber-600 dark:text-amber-400">
                   <Trophy class="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                  <span class="text-[9px] font-black uppercase tracking-widest sm:text-[8px]">积分模式</span>
+                  <span class="text-[9px] font-black uppercase tracking-widest sm:text-[8px]">积分模式 / Point Mode</span>
                 </div>
               </div>
 
@@ -338,7 +338,7 @@ const formatTime = (date: Date) => {
                 )"
               >
                 <FlaskConical class="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-                {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭' : '立即加入实验室' }}
+                {{ msg.gameInviteData.room_status === 'finished' || msg.gameInviteData.room_status === 'closed' ? '房间已关闭 / Room Closed' : '立即加入实验室 / Join Lab Now' }}
               </button>
             </div>
 

@@ -41,38 +41,38 @@ const emit = defineEmits<{
 const defaultSteps: TutorialStep[] = [
   {
     id: 'welcome',
-    titlePlaceholder: '欢迎来到实验室',
-    contentPlaceholder: '欢迎来到 Chemistry UNO。这是一场融合化学知识与策略的卡牌对战，接下来我会带你快速认识核心界面。',
+    titlePlaceholder: '欢迎来到实验室 / Welcome to the Lab',
+    contentPlaceholder: '欢迎来到 Chemistry UNO。这是一场融合化学知识与策略的卡牌对战，接下来我会带你快速认识核心界面。 / Welcome to Chemistry UNO. This is a card battle that blends chemistry knowledge and strategy, and I will quickly walk you through the core interface.',
     position: 'center'
   },
   {
     id: 'hand-cards',
-    titlePlaceholder: '你的手牌区',
-    contentPlaceholder: '这里会展示你当前持有的元素与化合物卡牌。点击卡牌可以选中，准备打出到场上。',
+    titlePlaceholder: '你的手牌区 / Your Hand',
+    contentPlaceholder: '这里会展示你当前持有的元素与化合物卡牌。点击卡牌可以选中，准备打出到场上。 / This area shows the elements and compounds you currently hold. Click a card to select it before playing it to the field.',
     targetSelector: '.hand-container-mobile',
     position: 'top',
     spotlightRadius: 180
   },
   {
     id: 'operation-area',
-    titlePlaceholder: '操作区域',
-    contentPlaceholder: '这里是你的操作中心。你可以输入化学式精确出牌，也可以点击摸牌来补充手牌。',
+    titlePlaceholder: '操作区域 / Operation Area',
+    contentPlaceholder: '这里是你的操作中心。你可以输入化学式精确出牌，也可以点击摸牌来补充手牌。 / This is your command center. You can type a formula to play precisely, or draw cards to refill your hand.',
     targetSelector: '.operation-area',
     position: 'bottom',
     spotlightRadius: 200
   },
   {
     id: 'center-play',
-    titlePlaceholder: '中央反应区',
-    contentPlaceholder: '中央区域显示当前战场牌面。你需要打出可匹配的物质，或者利用化学反应改变局势。',
+    titlePlaceholder: '中央反应区 / Center Play Area',
+    contentPlaceholder: '中央区域显示当前战场牌面。你需要打出可匹配的物质，或者利用化学反应改变局势。 / The center shows the current battlefield. Play a matching substance or use a reaction to change the situation.',
     targetSelector: '.center-play-area',
     position: 'bottom',
     spotlightRadius: 220
   },
   {
     id: 'complete',
-    titlePlaceholder: '准备开始了吗',
-    contentPlaceholder: '你已经掌握了基础区域和操作方式。接下来可以直接进入教学关卡，边玩边熟悉规则。',
+    titlePlaceholder: '准备开始了吗 / Ready to Start?',
+    contentPlaceholder: '你已经掌握了基础区域和操作方式。接下来可以直接进入教学关卡，边玩边熟悉规则。 / You now know the basic areas and controls. Start the tutorial to learn the rules by playing.',
     position: 'center'
   }
 ]
@@ -94,8 +94,8 @@ const activeTargetEl = ref<HTMLElement | null>(null)
 const prefersReducedMotion = ref(false)
 const fallbackStep: TutorialStep = {
   id: 'fallback',
-  titlePlaceholder: '新手引导',
-  contentPlaceholder: '暂无引导内容。',
+  titlePlaceholder: '新手引导 / Tutorial',
+  contentPlaceholder: '暂无引导内容。 / No tutorial content available yet.',
   position: 'center'
 }
 

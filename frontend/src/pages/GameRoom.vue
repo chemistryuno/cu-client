@@ -3,6 +3,8 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { OFFLINE_MODE } from '../utils/runtimeConfig'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
+import BilingualText from '../components/BilingualText.vue'
+import { useI18n } from '../utils/i18n'
 import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
@@ -21,6 +23,7 @@ import '../styles/mobile-game.css'
 
 const route = useRoute()
 const router = useRouter()
+const { td } = useI18n()
 const { showAlert, showConfirm, showPrompt, showToast } = useDialog()
 const gameToastRef = ref()
 const id = route.params.id as string
@@ -2306,8 +2309,8 @@ watch(() => gameState.value?.current_player, () => {
           </div>
         </div>
         <div class="text-center space-y-3">
-          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase drop-shadow-lg">Initializing Lab</h2>
-          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">正在连接实验室...</p>
+          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase drop-shadow-lg">Initializing Lab / 初始化实验室</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">正在连接实验室... / Connecting to the lab...</p>
           <div class="flex items-center gap-1 justify-center">
              <span class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s] shadow-lg shadow-blue-500/50"></span>
              <span class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s] shadow-lg shadow-blue-500/50"></span>
@@ -2327,8 +2330,8 @@ watch(() => gameState.value?.current_player, () => {
           <Activity class="w-12 h-12 text-red-500 dark:text-red-400" />
         </div>
         <div class="text-center space-y-3">
-          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Connection Lost</h2>
-          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">{{ loadError || '实验室连接异常' }}</p>
+          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Connection Lost / 连接中断</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">{{ loadError || '实验室连接异常 / Lab connection interrupted' }}</p>
         </div>
         <div class="flex items-center gap-3 mt-4">
           <button
@@ -2336,14 +2339,14 @@ watch(() => gameState.value?.current_player, () => {
             :class="cn(consoleButton({ tone: 'primary', size: 'md' }), 'text-xs')"
           >
             <RefreshCw class="w-4 h-4" />
-            重新连接
+            重新连接 / Reconnect
           </button>
           <button
             @click="router.push('/')"
             :class="cn(consoleButton({ tone: 'secondary', size: 'md' }), 'text-xs')"
           >
             <ArrowLeft class="w-4 h-4" />
-            返回大厅
+            返回大厅 / Back to Lobby
           </button>
         </div>
       </div>
@@ -2368,7 +2371,9 @@ watch(() => gameState.value?.current_player, () => {
           >
             <ArrowLeft v-if="!(roomInfo?.is_pve && isSpectator)" class="icon-touch" />
             <Trophy v-else class="w-4 h-4 text-amber-500" />
-            <span class="text-[10px] font-black uppercase tracking-widest">{{ isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '') }}</span>
+            <span class="text-[10px] font-black uppercase tracking-widest">
+              <BilingualText :zh="isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '')" :en="isReplayBridgeMode ? 'Return Timeline' : ((roomInfo?.is_pve && isSpectator) ? 'Settlement' : '')" />
+            </span>
           </button>
           <div class="hidden xs:block">
             <h2 class="text-[10px] sm:text-xs font-black tracking-[0.22em] uppercase font-mono text-slate-400">Node: {{ roomInfo?.name || id.substring(0, 6) }}</h2>
@@ -2385,7 +2390,7 @@ watch(() => gameState.value?.current_player, () => {
                   <div class="flex flex-col items-start leading-none gap-0.5 min-w-0">
                     <span class="text-[5px] sm:text-[7px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 opacity-80 flex items-center gap-1">
                       <Binary class="w-1.5 h-1.5 sm:w-2 sm:h-2" />
-                      REACTION_SYNC
+                      <BilingualText zh="反应同步" en="Reaction Sync" />
                     </span>
                     <span class="text-[8px] sm:text-[11px] font-mono font-black text-slate-700 dark:text-emerald-300 drop-shadow-sm truncate">
                       {{ gameState.current_reaction }}
@@ -2399,7 +2404,7 @@ watch(() => gameState.value?.current_player, () => {
               <div :class="cn('room-status-banner room-status-banner--inline', `room-status-banner--${roomStatusTone}`)">
                 <div class="room-status-banner__eyebrow">
                   <Radar class="w-3.5 h-3.5" />
-                  ROOM STATUS
+                  <BilingualText zh="房间状态" en="Room Status" />
                 </div>
                 <div class="room-status-banner__body">
                   <div class="room-status-banner__copy">
@@ -2434,16 +2439,16 @@ watch(() => gameState.value?.current_player, () => {
       </header>
 
       <div v-if="isReplayBridgeMode" class="relative z-[80] px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 pointer-events-auto">
-        <div class="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div class="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">
-            <span>Replay Simulation</span>
+            <BilingualText zh="回放模拟" en="Replay Simulation" />
             <span class="px-2 py-0.5 rounded-md bg-amber-500/20">{{ replayStatusText }}</span>
-            <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-700 dark:text-cyan-300">视角 {{ replayPerspectiveName }}</span>
-            <span class="text-amber-600/90 dark:text-amber-200">输入选项已禁用</span>
+            <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"><BilingualText zh="视角" en="Perspective" /> {{ replayPerspectiveName }}</span>
+            <span class="text-amber-600/90 dark:text-amber-200"><BilingualText zh="输入选项已禁用" en="Input options disabled" /></span>
           </div>
 
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">倍速</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="倍速" en="Speed" /></span>
             <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5">
               <button
                 v-for="speed in replaySpeedOptions"
@@ -2462,7 +2467,7 @@ watch(() => gameState.value?.current_player, () => {
               :disabled="replayGameOver"
               :class="cn('px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border', replayGameOver ? 'border-slate-300 text-slate-400 cursor-not-allowed' : 'border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15')"
             >
-              {{ replayIsPlaying ? '暂停' : '继续' }}
+              <BilingualText :zh="replayIsPlaying ? '暂停' : '继续'" :en="replayIsPlaying ? 'Pause' : 'Play'" />
             </button>
 
             <button
@@ -2470,10 +2475,10 @@ watch(() => gameState.value?.current_player, () => {
               @click.stop.prevent="restartReplayPlayback"
               class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
             >
-              重新播放
+              <BilingualText zh="重新播放" en="Restart" />
             </button>
 
-            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">进度 {{ replayProgressText }}</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="进度" en="Progress" /> {{ replayProgressText }}</span>
           </div>
         </div>
       </div>
@@ -2488,7 +2493,7 @@ watch(() => gameState.value?.current_player, () => {
               @keyup.enter="handleInputPlay"
               @focus="handleInputFocus"
               @blur="handleInputBlur"
-              placeholder="手动注入化学式"
+              :placeholder="td('reactions.searchPlaceholder')"
               :inputmode="isMobile || user.enable_element_input ? 'none' : 'text'"
               autocomplete="off"
               class="bg-transparent border-none outline-none text-sm sm:text-xs-mobile px-3 sm:px-2 py-1.5 sm:py-1 w-32 sm:w-40 font-black tracking-widest placeholder:text-slate-400 text-slate-900 dark:text-white"
@@ -2499,7 +2504,7 @@ watch(() => gameState.value?.current_player, () => {
                   data-testid="game-play-button"
                   @click="handleInputPlay"
                   class="btn-touch bg-blue-600 hover:bg-blue-500 rounded-lg sm:rounded-md flex items-center justify-center transition-all touch-feedback shadow-md group"
-                  title="执行反应"
+                  :title="td('reactions.registryTitle')"
                >
                   <ChevronRight class="w-4 h-4 sm:w-3.5 sm:h-3.5 text-white group-hover:translate-x-0.5 transition-transform" />
                </button>
@@ -2908,13 +2913,13 @@ watch(() => gameState.value?.current_player, () => {
            <div ref="handContainer" class="hand-container-mobile w-full custom-scrollbar-hidden">
             <div v-if="isReplayBridgeMode && replayPerspectivePlayer" class="mb-1 flex items-center justify-center">
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-[10px] font-black uppercase tracking-widest text-cyan-700 dark:text-cyan-300">
-                <span>当前视角</span>
+                <span>当前视角 / Perspective</span>
                 <span>{{ replayPerspectiveName }}</span>
               </div>
             </div>
             <div v-if="roomInfo?.status === 'waiting'" class="flex flex-col items-center justify-center opacity-30 pb-1 min-w-full">
               <Loader2 class="w-8 h-8 sm:w-6 sm:h-6 mb-1 animate-spin text-blue-500" />
-              <p class="font-black uppercase tracking-widest text-xs-mobile text-slate-500 text-center">正在同步量子状态并等待开场就绪...</p>
+              <p class="font-black uppercase tracking-widest text-xs-mobile text-slate-500 text-center">正在同步量子状态并等待开场就绪... / Syncing quantum state and waiting for the round to begin...</p>
             </div>
             <template v-else-if="myData?.hand_cards?.length > 0">
               <div
@@ -2931,18 +2936,18 @@ watch(() => gameState.value?.current_player, () => {
                   transform: selectedCard === card ? (isMobile ? 'translateY(-10px)' : 'translateY(-12px)') : 'none'
                 }"
               >
-                <div class="absolute top-1 left-1 text-xs-mobile sm:text-[6px] font-black opacity-30 uppercase tracking-tighter">{{ ELEMENTS_DATA[card.type] ? 'Elem' : 'Spec' }}</div>
+                <div class="absolute top-1 left-1 text-xs-mobile sm:text-[6px] font-black opacity-30 uppercase tracking-tighter">{{ ELEMENTS_DATA[card.type] ? 'Elem / 元素' : 'Spec / 特殊' }}</div>
                 <div class="flex flex-col items-center justify-center">
                   <div class="text-base sm:text-base font-black font-mono italic tracking-tighter leading-none">{{ card.type }}</div>
                   <div v-if="card.effect || ['He','Ne','Ar','Kr'].includes(card.type)" class="mt-1 px-1.5 sm:px-1 py-0.5 bg-black/10 rounded-md text-xs-mobile sm:text-[8px] font-black uppercase tracking-tighter">
-                    {{ ['He','Ne','Ar','Kr'].includes(card.type) ? '转向' : card.effect === 'Au' ? '跳过' : card.effect === '+2' ? '+2' : card.effect === '+4' ? '+4' : card.effect }}
+                    {{ ['He','Ne','Ar','Kr'].includes(card.type) ? '转向 / Reverse' : card.effect === 'Au' ? '跳过 / Skip' : card.effect === '+2' ? '+2 / Draw 2' : card.effect === '+4' ? '+4 / Draw 4' : card.effect }}
                   </div>
                   <div v-else-if="ELEMENTS_DATA[card.type]" class="text-xs-mobile sm:text-[8px] font-bold opacity-80 mt-0.5 uppercase tracking-tighter font-serif italic text-black/40">
                     {{ getSubstanceName(card.type) }}
                   </div>
                 </div>
                 <div class="absolute bottom-1 right-1 text-xs-mobile sm:text-[6px] font-mono opacity-40 uppercase tracking-tighter">
-                  {{ card.effect ? 'Func' : 'Pass' }}
+                  {{ card.effect ? 'Func / 作用' : 'Pass / 普通' }}
                 </div>
               </div>
             </template>

@@ -11,7 +11,7 @@ import { cn } from '../utils/cn'
 import { consoleButton, consolePanel } from '../utils/ui'
 
 const router = useRouter()
-const { locale, t, setLocale } = useI18n()
+const { locale, t, td, setLocale } = useI18n()
 
 const nickname = ref('')
 const avatar = ref('flask')
@@ -26,17 +26,17 @@ const handleSubmit = async () => {
   error.value = ''
 
   if (!trimmedNickname) {
-    error.value = t('login.errors.empty')
+    error.value = td('login.errors.empty')
     return
   }
 
   if (trimmedNickname.length > 20) {
-    error.value = t('login.errors.tooLong')
+    error.value = td('login.errors.tooLong')
     return
   }
 
   if (!nicknameRegex.test(trimmedNickname)) {
-    error.value = t('login.errors.invalid')
+    error.value = td('login.errors.invalid')
     return
   }
 
@@ -54,7 +54,7 @@ const handleSubmit = async () => {
       replace: true,
     })
   } catch (err: any) {
-    error.value = err.response?.data?.error || t('login.errors.failed')
+    error.value = err.response?.data?.error || td('login.errors.failed')
   } finally {
     loading.value = false
   }
@@ -79,7 +79,7 @@ const randomizeNickname = () => {
 }
 
 const previewUser = computed(() => ({
-  nickname: nickname.value.trim() || t('common.localPlayer'),
+  nickname: nickname.value.trim() || td('common.localPlayer'),
   avatar: avatar.value,
 }))
 </script>
@@ -95,12 +95,12 @@ const previewUser = computed(() => ({
         <div class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="console-notice-chip">Local Profile Setup</p>
+              <p class="console-notice-chip"><BilingualText zh="本地玩家设置" en="Local Player Setup" /></p>
               <h1 class="console-section-title text-2xl mt-2">
-                Chemistry UNO
+                Chemistry UNO / 化学 UNO
               </h1>
               <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium tracking-[0.08em] uppercase">
-                {{ t('login.setup') }}
+                {{ td('login.setup') }}
               </p>
             </div>
 
@@ -122,7 +122,7 @@ const previewUser = computed(() => ({
                 )"
               >
                 <Globe class="w-3.5 h-3.5" />
-                {{ t('common.zh') }}
+                <BilingualText zh="中文" en="Chinese" />
               </button>
               <button
                 type="button"
@@ -132,7 +132,7 @@ const previewUser = computed(() => ({
                   'px-3 min-h-8 tracking-[0.12em]'
                 )"
               >
-                {{ t('common.en') }}
+                <BilingualText zh="English" en="英文" />
               </button>
             </div>
           </div>
@@ -142,9 +142,9 @@ const previewUser = computed(() => ({
               <UserAvatar :avatar="previewUser.avatar" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] mb-1">{{ t('login.preview') }}</p>
+              <p class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] mb-1">{{ td('login.preview') }}</p>
               <p class="text-lg font-black text-slate-900 dark:text-white truncate">{{ previewUser.nickname }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('login.previewDesc') }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ td('login.previewDesc') }}</p>
             </div>
           </div>
 
@@ -155,14 +155,14 @@ const previewUser = computed(() => ({
           <form @submit.prevent="handleSubmit" class="space-y-4" data-testid="login-form">
             <div class="space-y-2">
               <div class="flex items-center justify-between px-1">
-                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.nickname') }}</label>
+                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ td('login.nickname') }}</label>
                 <button
                   type="button"
                   data-testid="login-randomize-button"
                   @click="randomizeNickname"
                   class="text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-widest"
                 >
-                  {{ t('login.random') }}
+                  {{ td('login.random') }}
                 </button>
               </div>
               <div class="relative group">
@@ -176,14 +176,14 @@ const previewUser = computed(() => ({
                   maxlength="20"
                   required
                   class="w-full bg-slate-50 dark:bg-[#0b1420] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 pl-10 pr-3 py-3 rounded-2xl focus:ring-2 focus:ring-sky-700/20 focus:border-sky-700 dark:focus:border-sky-400 outline-none transition-all placeholder:text-slate-500/50 text-sm font-bold"
-                  :placeholder="t('login.nicknamePlaceholder')"
+                  :placeholder="td('login.nicknamePlaceholder')"
                 />
               </div>
             </div>
 
             <div class="space-y-3">
               <div class="px-1">
-                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ t('login.avatar') }}</label>
+                <label class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{{ td('login.avatar') }}</label>
               </div>
               <div class="grid grid-cols-4 sm:grid-cols-6 gap-3">
                 <button
@@ -207,7 +207,7 @@ const previewUser = computed(() => ({
             </div>
 
             <div :class="cn(consolePanel({ tone: 'soft', radius: 'lg', padding: 'sm' }), 'text-xs text-slate-500 dark:text-slate-400 leading-relaxed')">
-              {{ t('login.intro') }}
+              {{ td('login.intro') }}
             </div>
 
             <button
@@ -218,10 +218,10 @@ const previewUser = computed(() => ({
             >
               <template v-if="loading">
                 <Loader2 class="w-4 h-4 animate-spin" />
-                {{ t('login.submitting') }}
+                {{ td('login.submitting') }}
               </template>
               <template v-else>
-                {{ t('login.submit') }}
+                {{ td('login.submit') }}
               </template>
             </button>
           </form>

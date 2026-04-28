@@ -1103,7 +1103,19 @@ const getReactionPairKey = (a: string, b: string) => {
 }
 const getReactionEquation = (a: string, b: string) => {
   const pair = getReactionPairKey(a, b)
-  return pair ? reactionEquationByPair.get(pair) || null : null
+  if (!pair) return null
+
+  const cached = reactionEquationByPair.get(pair)
+  if (cached) return cached
+
+  const [left, right] = pair.split('|')
+  const equation = runtimeSqlite.findReactionEquation(left || '', right || '')
+  if (equation) {
+    reactionEquationByPair.set(pair, equation)
+    return equation
+  }
+
+  return null
 }
 const randomIntBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 const parsedFormulaCache = new Map<string, Record<string, number>>()

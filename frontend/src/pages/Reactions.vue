@@ -4,17 +4,17 @@
 
     <div class="console-page-container" data-testid="reactions-page">
       <header class="console-page-header animate-in fade-in slide-in-from-top-2">
-        <div class="console-page-heading">
+          <div class="console-page-heading">
           <div class="console-page-icon">
             <Beaker class="h-5 w-5" />
           </div>
           <div>
-            <p class="console-eyebrow">Experimental Wiki</p>
+            <p class="console-eyebrow"><BilingualText path="reactions.eyebrow" /></p>
             <div class="flex flex-wrap items-center gap-2">
-              <h1 class="console-page-title">Chemical Reaction Encyclopedia</h1>
+              <h1 class="console-page-title"><BilingualText path="reactions.title" /></h1>
               <span class="console-notice-chip">{{ user?.role?.toUpperCase() || 'USER' }}</span>
             </div>
-            <p class="console-page-subtitle">实验室化学反应百科 / Reaction database</p>
+            <p class="console-page-subtitle"><BilingualText path="reactions.subtitle" /></p>
           </div>
         </div>
 
@@ -24,10 +24,6 @@
               <span class="h-1.5 w-1.5 rounded-full bg-sky-500" />
               {{ user?.role?.toUpperCase() || 'USER' }}
             </div>
-            <router-link to="/ranking" class="console-button text-amber-600 dark:text-amber-300">
-              <Trophy class="h-4 w-4" />
-              Rank
-            </router-link>
           </div>
           <button @click="router.push('/data')" class="console-button group">
             <ArrowLeft class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
@@ -37,10 +33,10 @@
       </header>
 
       <section class="console-panel animate-in fade-in slide-in-from-bottom-2">
-        <div class="console-panel-header">
+          <div class="console-panel-header">
           <div>
-            <p class="console-eyebrow">Global Wiki</p>
-            <h2 class="console-section-title text-lg">Reaction Registry</h2>
+            <p class="console-eyebrow"><BilingualText path="reactions.registryTitle" /></p>
+            <h2 class="console-section-title text-lg"><BilingualText path="reactions.registryTitle" /></h2>
           </div>
           <div class="flex w-full flex-col gap-2 md:w-auto md:min-w-[320px]">
             <label class="console-input-shell">
@@ -48,18 +44,18 @@
               <input
                 v-model="searchTerm"
                 type="text"
-                placeholder="搜索反应物或生成物"
+                :placeholder="td('reactions.searchPlaceholder')"
                 class="console-input"
               />
             </label>
             <div class="flex justify-end">
-              <span class="console-metric-chip">Matched {{ pagination.total }}</span>
+              <span class="console-metric-chip"><BilingualText path="reactions.matched" /> {{ pagination.total }}</span>
             </div>
           </div>
         </div>
 
         <div class="console-filter-bar">
-          <span class="px-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Status</span>
+          <span class="px-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"><BilingualText path="reactions.status" /></span>
           <div class="console-tab-strip overflow-x-auto">
             <button
               v-for="status in ['all', 'pending', 'approved', 'rejected']"
@@ -74,7 +70,7 @@
             @click="filterInvalidElements = filterInvalidElements === true ? null : true"
             :class="['console-filter-pill', filterInvalidElements === true && 'console-filter-pill--active text-rose-600 dark:text-rose-300']"
           >
-            无效元素
+            <BilingualText zh="无效元素" en="Invalid Elements" />
           </button>
           <button
             v-if="filterStatus !== 'all' || filterInvalidElements !== null || searchTerm"
@@ -82,19 +78,19 @@
             class="console-button console-button-ghost text-rose-600 dark:text-rose-300"
           >
             <Plus class="h-3.5 w-3.5 rotate-45" />
-            Clear
+            <BilingualText path="reactions.clear" />
           </button>
         </div>
 
         <div class="overflow-x-auto">
           <table class="console-data-table">
             <thead>
-              <tr>
-                <th>Reaction Formula</th>
-                <th>Status</th>
-                <th>Creator</th>
-                <th class="text-right">Actions</th>
-              </tr>
+                <tr>
+                  <th><BilingualText zh="反应方程" en="Reaction Formula" /></th>
+                  <th><BilingualText zh="状态" en="Status" /></th>
+                  <th><BilingualText zh="创建者" en="Creator" /></th>
+                  <th class="text-right"><BilingualText zh="操作" en="Actions" /></th>
+                </tr>
             </thead>
             <tbody>
               <tr v-for="reaction in filteredReactions" :key="reaction.id">
@@ -147,12 +143,12 @@
 
           <div v-if="filteredReactions.length === 0 && !loading" class="console-empty-state mt-4">
             <Database class="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-            <p class="text-sm font-bold text-slate-500 dark:text-slate-400">未检索到相关化学反应数据</p>
+            <p class="text-sm font-bold text-slate-500 dark:text-slate-400"><BilingualText path="reactions.emptyState" /></p>
           </div>
 
           <div v-if="loading" class="py-10 text-center">
             <div class="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-sky-500/20 border-t-sky-500 animate-spin" />
-            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">加载中...</p>
+            <p class="text-sm font-medium text-slate-500 dark:text-slate-400"><BilingualText path="common.loading" /></p>
           </div>
 
           <div class="mt-4 flex flex-col items-center justify-between gap-3 border-t border-slate-200/70 pt-4 sm:flex-row dark:border-white/10">
@@ -165,14 +161,14 @@
                 :disabled="loading || pagination.page <= 1"
                 class="console-button"
               >
-                Prev
+                <BilingualText path="reactions.prev" />
               </button>
               <button
                 @click="goToNextPage"
                 :disabled="loading || pagination.page >= Math.max(pagination.totalPages, 1)"
                 class="console-button"
               >
-                Next
+                <BilingualText path="reactions.next" />
               </button>
             </div>
           </div>
@@ -195,11 +191,13 @@ import {
   Database,
   Plus,
   Search as SearchIcon,
-  Trash2,
-  Trophy
+  Trash2
 } from 'lucide-vue-next'
+import BilingualText from '../components/BilingualText.vue'
+import { useI18n } from '../utils/i18n'
 
 const router = useRouter()
+const { td } = useI18n()
 
 const user = ref<any>({})
 try {

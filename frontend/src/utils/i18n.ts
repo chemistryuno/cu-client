@@ -115,6 +115,42 @@ const messages = {
       points: '燃素',
       createdAt: '注册时间',
     },
+    reactions: {
+      eyebrow: '实验百科',
+      title: '化学反应百科',
+      subtitle: '实验室化学反应百科',
+      registryTitle: 'Reaction Registry',
+      searchPlaceholder: '搜索反应物或生成物',
+      matched: 'Matched',
+      emptyState: '未检索到相关化学反应数据',
+      prev: 'Prev',
+      next: 'Next',
+      clear: 'Clear',
+      status: 'Status',
+    },
+    game: {
+      roomNotLoaded: '房间信息未加载，请刷新页面',
+      userInfoInvalid: '用户信息异常，请重新登录',
+      operationFailed: '操作失败',
+      joinFailedTitle: '加入失败',
+      roomNotFound: '房间不存在或已被关闭',
+      authFailed: '身份验证失败，请重新登录',
+      notInRoom: '您不在该房间中',
+      initTimeout: '实验室初始化超时，请检查网络连接后重试',
+      tutorialAiStep: '当前是 AI 演示步骤，请等待 AI 操作',
+      tutorialWrongAction: '当前步骤不支持该操作，请按提示执行',
+      playFailed: '出牌失败',
+      notSelectedTarget: '请选择要合成或放置的化学物质',
+      selectTwoSubstances: '请选择参与双联反应的两种物质',
+      doubleActionFailed: '双联行动失败',
+      doubleNotReady: '双联反应尚未就绪，请先进行普通实验（行动）',
+      drawFailed: '摸牌失败',
+      copyPrivateSuccess: '私密房间邀请链接已复制（含访问密钥），快发送给你的科研伙伴吧！',
+      copyPublicSuccess: '实验邀请链接已复制到剪贴板，快发送给你的科研伙伴吧！',
+      copyFailed: '链接复制失败，请手动复制浏览器地址栏',
+      achievementAlchemist: '获得成就：炼金术士 (合成单质金)',
+      achievementTitle: '成就达成！'
+    },
   },
   'en-US': {
     common: {
@@ -226,6 +262,42 @@ const messages = {
       points: 'Points',
       createdAt: 'Created',
     },
+    reactions: {
+      eyebrow: 'Experimental Wiki',
+      title: 'Chemical Reaction Encyclopedia',
+      subtitle: 'Reaction database',
+      registryTitle: 'Reaction Registry',
+      searchPlaceholder: 'Search reactant or product',
+      matched: 'Matched',
+      emptyState: 'No matching chemical reactions found',
+      prev: 'Prev',
+      next: 'Next',
+      clear: 'Clear',
+      status: 'Status',
+    },
+    game: {
+      roomNotLoaded: 'Room information has not loaded, please refresh the page',
+      userInfoInvalid: 'User information is invalid, please log in again',
+      operationFailed: 'Operation failed',
+      joinFailedTitle: 'Join failed',
+      roomNotFound: 'Room does not exist or has been closed',
+      authFailed: 'Authentication failed, please log in again',
+      notInRoom: 'You are not in this room',
+      initTimeout: 'Lab initialization timed out, please check your connection and try again',
+      tutorialAiStep: 'This is an AI demo step, please wait for the AI',
+      tutorialWrongAction: 'This step does not support that action, please follow the prompt',
+      playFailed: 'Play failed',
+      notSelectedTarget: 'Please select a substance to synthesize or place',
+      selectTwoSubstances: 'Please select two substances for the double reaction',
+      doubleActionFailed: 'Double action failed',
+      doubleNotReady: 'Double reaction is not ready yet, please perform a normal action first',
+      drawFailed: 'Draw failed',
+      copyPrivateSuccess: 'Private room invite link copied (with access key). Send it to your lab partner!',
+      copyPublicSuccess: 'Experiment invite link copied to clipboard. Send it to your lab partner!',
+      copyFailed: 'Link copy failed, please copy the browser address bar manually',
+      achievementAlchemist: 'Achievement unlocked: Alchemist (synthesize elemental gold)',
+      achievementTitle: 'Achievement Unlocked!'
+    }
   },
 } as const
 
@@ -255,12 +327,24 @@ export const setLocale = (nextLocale: SupportedLocale) => {
 
 export const useI18n = () => {
   const t = (path: string) => resolveMessage(locale.value, path)
+  // td: return both Chinese and English texts joined with a separator
+  const td = (path: string, separator = ' / ') => {
+    const zh = resolveMessage('zh-CN', path)
+    const en = resolveMessage('en-US', path)
+    // If both are identical or one is missing, fallback to the available one
+    if (!zh && !en) return path
+    if (!zh) return en
+    if (!en) return zh
+    if (zh === en) return zh
+    return `${zh}${separator}${en}`
+  }
   const currentLocale = computed(() => locale.value)
   const isZh = computed(() => locale.value === 'zh-CN')
   return {
     locale: currentLocale,
     isZh,
     t,
+    td,
     setLocale,
   }
 }
