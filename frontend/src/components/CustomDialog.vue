@@ -62,8 +62,8 @@ const confirmButtonClassByType: Record<string, string> = {
 
 <template>
   <Transition name="fade">
-    <div v-if="state.show" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div class="console-card animate-in zoom-in-95 flex w-full max-w-md flex-col overflow-hidden border p-6 sm:p-7">
+    <div v-if="state.show" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm mobile-modal-overlay">
+      <div class="console-card mobile-modal-shell animate-in zoom-in-95 flex w-full max-w-md flex-col overflow-hidden border p-5 sm:p-7">
         <div class="mb-6 flex items-center gap-4">
           <div :class="['flex h-12 w-12 items-center justify-center rounded-2xl border', iconShellClassByType[state.type]]">
             <AlertCircle v-if="state.type === 'alert'" :class="['h-6 w-6', iconClassByType[state.type]]" />
@@ -71,7 +71,7 @@ const confirmButtonClassByType: Record<string, string> = {
             <MessageSquare v-else-if="state.type === 'prompt'" :class="['h-6 w-6', iconClassByType[state.type]]" />
           </div>
           <div class="space-y-1">
-            <p class="console-eyebrow">System Notice</p>
+            <p class="console-eyebrow">System Notice / 系统提示</p>
             <h3 class="text-xl font-black tracking-tight text-slate-900 dark:text-white">{{ state.title }}</h3>
           </div>
         </div>
@@ -97,14 +97,14 @@ const confirmButtonClassByType: Record<string, string> = {
           <button
             v-if="state.type === 'confirm' || state.type === 'prompt'"
             @click="handleCancel"
-            class="console-button flex-1 justify-center"
+            class="console-button flex-1 justify-center whitespace-normal leading-tight"
           >
             {{ state.cancelText }}
           </button>
           <button
             @click="handleConfirm"
             :disabled="countdown > 0"
-            :class="['console-button flex-1 justify-center disabled:opacity-50 disabled:grayscale', confirmButtonClassByType[state.type]]"
+            :class="['console-button flex-1 justify-center whitespace-normal leading-tight disabled:opacity-50 disabled:grayscale', confirmButtonClassByType[state.type]]"
           >
             {{ countdown > 0 ? `${state.confirmText} (${countdown}s)` : state.confirmText }}
           </button>

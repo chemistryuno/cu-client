@@ -476,9 +476,9 @@ onMounted(() => {
       </footer>
     </div>
 
-    <div v-if="showAIArenaModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div v-if="showAIArenaModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
       <div class="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showAIArenaModal = false" />
-      <div class="lobby-modal-shell relative w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+      <div class="lobby-modal-shell mobile-modal-shell relative w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
         <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="lobby-modal-badge w-10 h-10 rounded-xl flex items-center justify-center">
@@ -593,9 +593,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="showDeckDetailModal && selectedDeckConfig" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div v-if="showDeckDetailModal && selectedDeckConfig" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
       <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showDeckDetailModal = false" />
-      <div class="lobby-modal-shell relative w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+      <div class="lobby-modal-shell mobile-modal-shell relative w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
         <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="lobby-modal-badge lobby-modal-badge--deck w-10 h-10 rounded-xl flex items-center justify-center">

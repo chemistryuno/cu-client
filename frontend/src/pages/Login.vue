@@ -85,7 +85,7 @@ const previewUser = computed(() => ({
 </script>
 
 <template>
-  <div class="console-app-shell flex items-center justify-center p-4 relative overflow-hidden">
+  <div class="console-app-shell mobile-fullpage-shell flex items-start justify-start sm:items-center sm:justify-center p-4 relative overflow-y-auto sm:overflow-hidden">
     <div class="console-grid-overlay"></div>
     <div class="absolute top-[-12%] right-[-8%] w-[36%] h-[36%] bg-sky-500/10 rounded-full blur-[120px]"></div>
     <div class="absolute bottom-[-12%] left-[-8%] w-[34%] h-[34%] bg-orange-500/8 rounded-full blur-[120px]"></div>

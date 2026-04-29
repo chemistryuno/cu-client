@@ -19,7 +19,7 @@
       <div class="px-4 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-          <span class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 font-mono">Input_Matrix</span>
+          <span class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 font-mono">Input_Matrix / 输入矩阵</span>
         </div>
 
         <div class="flex items-center gap-2">
@@ -55,7 +55,7 @@
       <!-- 元素分类区块（如果需要可以加标题，这里保持紧凑） -->
       <div class="space-y-2">
         <div class="flex items-center gap-2 px-1">
-          <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Chemical Elements</span>
+          <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Chemical Elements / 元素</span>
           <div class="h-px flex-1 bg-slate-200 dark:bg-white/5"></div>
         </div>
 
@@ -84,7 +84,7 @@
       <!-- 数字区块 -->
       <div class="space-y-2">
         <div class="flex items-center gap-2 px-1">
-          <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Scientific Symbols</span>
+          <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Scientific Symbols / 符号</span>
           <div class="h-px flex-1 bg-slate-200 dark:bg-white/5"></div>
         </div>
 
@@ -115,7 +115,7 @@
             class="col-span-4 h-12 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-blue-500/20 transition-all touch-feedback active:scale-95 text-white"
           >
             <Check class="w-4 h-4 stroke-[3px]" />
-            <span class="text-xs font-black uppercase tracking-widest">确认注入</span>
+            <span class="text-xs font-black uppercase tracking-widest">确认注入 / Confirm</span>
           </button>
         </div>
       </div>
@@ -241,8 +241,33 @@ const handleConfirm = () => {
 <style scoped>
 .chemical-keyboard {
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: calc(45vh - 60px);
+  max-height: calc(42vh - 54px);
   will-change: transform;
+}
+
+@media (max-width: 639px) {
+  .chemical-keyboard {
+    bottom: 120px;
+    max-height: calc(40vh - 48px);
+  }
+
+  .chemical-keyboard .px-4 {
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+  }
+
+  .chemical-keyboard .w-10.h-10 {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .chemical-keyboard .grid.grid-cols-6 {
+    gap: 0.4rem;
+  }
+
+  .chemical-keyboard button[class*='h-12'] {
+    height: 2.9rem;
+  }
 }
 
 .keyboard-scroll {

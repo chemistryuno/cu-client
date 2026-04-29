@@ -443,7 +443,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="console-page-shell h-screen overflow-hidden" data-testid="replay-page">
+  <div class="console-page-shell mobile-fullpage-shell h-[var(--app-height)] overflow-y-auto sm:overflow-hidden" data-testid="replay-page">
     <div class="console-grid-overlay" />
 
     <div class="relative z-10 flex h-full flex-col">

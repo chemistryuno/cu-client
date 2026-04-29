@@ -29,6 +29,24 @@
   }
 }
 
+@media (max-width: 639px) {
+  .btn-touch {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 7px;
+  }
+
+  .text-mobile-lg {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .text-mobile-xl {
+    font-size: 18px;
+    line-height: 1.35;
+  }
+}
+
 /* 触摸反馈动画 */
 .touch-feedback:active {
   transform: scale(0.95);
@@ -150,8 +168,8 @@
 /* 移动端倒计时容器 */
 .timer-mobile {
   position: fixed;
-  top: 60px;
-  right: 12px;
+  top: 54px;
+  right: 10px;
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -204,9 +222,9 @@
 
 /* 单张手牌 */
 .card-mobile {
-  min-width: 80px;
-  width: 80px;
-  height: 112px;
+  min-width: 76px;
+  width: 76px;
+  height: 106px;
   flex-shrink: 0;
   border-radius: 12px;
   scroll-snap-align: start;
@@ -230,15 +248,33 @@
   }
 }
 
+@media (max-width: 374px) {
+  .hand-container-mobile {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .card-mobile {
+    min-width: 70px;
+    width: 70px;
+    height: 98px;
+  }
+
+  .timer-mobile {
+    top: 50px;
+    right: 8px;
+  }
+}
+
 /* ==================== 场上物质区域优化 ==================== */
 
 /* 物质展示容器 */
 .substances-container-mobile {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 8px;
   padding: 12px;
-  max-height: 180px;
+  max-height: 168px;
   overflow-y: auto;
 }
 
@@ -246,6 +282,40 @@
   .substances-container-mobile {
     grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
     gap: 6px;
+  }
+}
+
+@media (max-width: 639px) {
+  .substances-container-mobile {
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .action-button-mobile {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .game-log-mobile {
+    max-height: 96px;
+  }
+
+  .bottom-action-bar-mobile {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .quick-action-button {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+
+  .turn-indicator-mobile {
+    top: 56px;
+    padding: 7px 13px;
+    font-size: 11px;
   }
 }
 
@@ -364,6 +434,18 @@
   .bottom-action-bar-mobile {
     background: rgba(0, 0, 0, 0.8);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+@media (max-width: 639px) {
+  .player-card-mobile {
+    gap: 6px;
+    padding: 7px 9px;
+  }
+
+  .player-avatar-mobile {
+    width: 32px;
+    height: 32px;
   }
 }
 

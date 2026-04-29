@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: player-journey.spec.ts >> normal offline PvE still uses non-tutorial AI flow
-- Location: tests\e2e\player-journey.spec.ts:77:1
+- Name: player-journey.spec.ts >> starts a real playable match from the lobby and exposes core controls
+- Location: tests\e2e\player-journey.spec.ts:65:1
 
 # Error details
 
@@ -38,7 +38,7 @@ Call log:
           - generic [ref=e17] [cursor=pointer]:
             - img [ref=e19]
             - generic [ref=e21]:
-              - generic [ref=e22]: JourneyGenericAI
+              - generic [ref=e22]: JourneyArena
               - generic [ref=e23]: 本地资料 / Local Profile
           - generic [ref=e24]:
             - button "本地牌组 / Local Decks" [ref=e25]:
@@ -80,7 +80,7 @@ Call log:
                 - generic [ref=e80]:
                   - img [ref=e82]
                   - generic [ref=e84]:
-                    - paragraph [ref=e85]: JourneyGenericAI
+                    - paragraph [ref=e85]: JourneyArena
                     - paragraph [ref=e86]: 本机存档 / Local Save
               - generic [ref=e87]:
                 - paragraph [ref=e88]: 牌组 / Deck
@@ -104,7 +104,7 @@ Call log:
             - generic [ref=e109]:
               - generic [ref=e112]:
                 - paragraph [ref=e113]: 当前玩家 / Current Player
-                - paragraph [ref=e114]: JourneyGenericAI
+                - paragraph [ref=e114]: JourneyArena
               - generic [ref=e117]:
                 - paragraph [ref=e118]: 牌组 / Deck
                 - paragraph [ref=e119]: Offline Default Deck

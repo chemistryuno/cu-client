@@ -67,6 +67,10 @@ const routes = [
     name: 'Substances',
     component: Substances,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 

@@ -179,10 +179,10 @@ onMounted(loadDecks)
     </div>
 
     <!-- Edit Modal Overlay -->
-    <div v-if="editingDeck" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+     <div v-if="editingDeck" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
        <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="editingDeck = null"></div>
        
-       <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-white/10 shadow-3xl overflow-hidden flex flex-col max-h-[90vh]">
+       <div class="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-white/10 shadow-3xl overflow-hidden flex flex-col max-h-[90vh] mobile-modal-shell">
           <div class="p-5 border-b border-white/5">
              <div class="flex items-center justify-between">
                 <h3 class="text-lg font-black italic tracking-tighter uppercase">Deck Configuration</h3>

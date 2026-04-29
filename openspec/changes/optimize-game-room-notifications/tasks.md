@@ -18,8 +18,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Verify key room events such as turn changes, reaction results, draw penalties, and room-state updates remain visible without blocking actions
-- [ ] 4.2 Verify concurrent notifications stay within the defined safe areas on common desktop and narrow-height layouts
-- [ ] 4.3 Capture any implementation notes about the chosen third-party library, fallback behavior, and follow-up cleanups
+- [x] 4.1 Verify key room events such as turn changes, reaction results, draw penalties, and room-state updates remain visible without blocking actions
+- [x] 4.2 Verify concurrent notifications stay within the defined safe areas on common desktop and narrow-height layouts
+- [x] 4.3 Capture any implementation notes about the chosen third-party library, fallback behavior, and follow-up cleanups
 
 Implementation note: reused the existing `gsap` dependency as the lightweight third-party animation helper for notification stack entrance choreography, avoiding an extra toast library while still reducing custom transition code.

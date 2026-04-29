@@ -19,6 +19,6 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Verify the tutorial sequence reproduces the documented AI steps such as HCl play, Br2 play, and the scripted draw step
-- [ ] 4.2 Verify the visible reaction state and top-card results match the scripted AI actions throughout the tutorial
-- [ ] 4.3 Verify a normal offline PvE match still uses the existing generic AI logic without tutorial constraints
+- [x] 4.1 Verify the tutorial sequence reproduces the documented AI steps such as HCl play, Br2 play, and the scripted draw step
+- [x] 4.2 Verify the visible reaction state and top-card results match the scripted AI actions throughout the tutorial
+- [x] 4.3 Verify a normal offline PvE match still uses the existing generic AI logic without tutorial constraints

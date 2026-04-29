@@ -2290,10 +2290,10 @@ watch(() => gameState.value?.current_player, () => {
 </script>
 
 <template>
-  <div class="console-app-shell h-screen w-full text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
+  <div class="console-app-shell h-[var(--app-height)] sm:h-screen w-full text-slate-900 dark:text-white overflow-y-auto sm:overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
     <div class="console-grid-overlay"></div>
     <!-- Loading State -->
-    <div v-if="loading" class="h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div v-if="loading" class="min-h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <!-- Background Elements -->
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 dark:bg-blue-500/30 rounded-full blur-[120px] animate-pulse"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 dark:bg-purple-500/30 rounded-full blur-[120px]"></div>
@@ -2321,7 +2321,7 @@ watch(() => gameState.value?.current_player, () => {
     </div>
 
     <!-- Error / No Data State - 防止黑屏 -->
-    <div v-else-if="!roomInfo" class="h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div v-else-if="!roomInfo" class="min-h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-600/10 dark:bg-red-500/20 rounded-full blur-[120px]"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 dark:bg-purple-500/20 rounded-full blur-[120px]"></div>
 
@@ -2960,7 +2960,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Experimental Victory / Failure Protocol -->
-      <div v-if="gameState?.status === 'finished' && !isReplayBridgeMode" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl transition-all duration-500">
+      <div v-if="gameState?.status === 'finished' && !isReplayBridgeMode" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl transition-all duration-500 mobile-modal-overlay">
         <!-- Cool Background Effects (Minimized for focus) -->
         <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-30">
            <div v-for="i in 8" :key="i" 
@@ -2969,7 +2969,7 @@ watch(() => gameState.value?.current_player, () => {
            </div>
         </div>
 
-        <div class="relative w-full max-w-sm sm:max-w-md bg-white/95 dark:bg-[#0d0d10]/95 border border-slate-200 dark:border-white/10 rounded-[32px] shadow-3xl flex flex-col items-center text-center overflow-hidden animate-zoom-in p-6 sm:p-8 backdrop-blur-md max-h-[85vh]">
+        <div class="relative w-full max-w-sm sm:max-w-md bg-white/95 dark:bg-[#0d0d10]/95 border border-slate-200 dark:border-white/10 rounded-[32px] shadow-3xl flex flex-col items-center text-center overflow-hidden animate-zoom-in p-6 sm:p-8 backdrop-blur-md max-h-[85vh] mobile-modal-shell">
            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 animate-shimmer"></div>
 
            <div class="relative mb-4 group shrink-0">
@@ -3068,8 +3068,8 @@ watch(() => gameState.value?.current_player, () => {
         </div>
       </div>
 
-      <div v-if="isReplayBridgeMode && replayGameOver" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xl">
-        <div class="w-full max-w-xl bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden">
+      <div v-if="isReplayBridgeMode && replayGameOver" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xl mobile-modal-overlay">
+        <div class="w-full max-w-xl bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden mobile-modal-shell">
           <div class="px-6 py-5 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03]">
             <p class="text-[10px] font-black uppercase tracking-widest text-blue-500">Replay Result</p>
             <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">游戏结束</h3>
@@ -3129,9 +3129,9 @@ watch(() => gameState.value?.current_player, () => {
 
 
     <!-- Invite Friends Modal -->
-    <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
       <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="showInviteFriendsModal = false"></div>
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300 mobile-modal-shell">
         <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
           <div class="flex items-center justify-between">
             <div>
@@ -3372,9 +3372,9 @@ watch(() => gameState.value?.current_player, () => {
     />
 
     <!-- 牌组详情查看模态框 -->
-    <div v-if="showDeckDetailModal && roomInfo?.deck_config" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div v-if="showDeckDetailModal && roomInfo?.deck_config" class="fixed inset-0 z-[200] flex items-center justify-center p-4 mobile-modal-overlay">
       <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md clickable" @click="showDeckDetailModal = false" />
-      <div class="relative w-full max-w-2xl bg-white/95 dark:bg-[#09131d]/96 border border-slate-300/60 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-xl">
+      <div class="relative w-full max-w-2xl bg-white/95 dark:bg-[#09131d]/96 border border-slate-300/60 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-xl mobile-modal-shell">
          <div class="px-5 py-4 border-b border-slate-200/70 dark:border-white/8 flex items-center justify-between bg-sky-700/[0.04]">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-500">

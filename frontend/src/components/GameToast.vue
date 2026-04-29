@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import gsap from 'gsap'
 
 type ToastTone = 'info' | 'success' | 'warning' | 'error'
@@ -55,6 +55,7 @@ interface StatusNotice {
 const eventToasts = ref<EventToast[]>([])
 const statusNotice = ref<StatusNotice | null>(null)
 const eventStackRef = ref<HTMLElement | null>(null)
+const hasVisibleNotices = computed(() => eventToasts.value.length > 0 || statusNotice.value !== null)
 const iconMap: Record<ToastTone, string> = {
   info: 'i',
   success: '+',
@@ -63,6 +64,22 @@ const iconMap: Record<ToastTone, string> = {
 }
 
 let toastId = 0
+
+const syncSafeArea = () => {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle('game-toast-safe-area', hasVisibleNotices.value)
+}
+
+watch(hasVisibleNotices, syncSafeArea, { immediate: true })
+
+onMounted(() => {
+  syncSafeArea()
+})
+
+onUnmounted(() => {
+  if (typeof document === 'undefined') return
+  document.body.classList.remove('game-toast-safe-area')
+})
 
 const animateStack = () => {
   if (!eventStackRef.value) return

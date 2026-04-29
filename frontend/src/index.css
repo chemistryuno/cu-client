@@ -178,6 +178,17 @@ body {
       linear-gradient(180deg, #060b16 0%, #0a1020 52%, #0d1220 100%);
   }
 
+  body.game-toast-safe-area .game-console-shell {
+    box-sizing: border-box;
+    padding-top: 5rem;
+  }
+
+  @media (max-width: 640px) {
+    body.game-toast-safe-area .game-console-shell {
+      padding-top: 5.75rem;
+    }
+  }
+
   .console-grid-overlay {
     position: absolute;
     inset: 0;
@@ -562,6 +573,30 @@ body {
 
   .modal-content-mobile {
     @apply p-5 sm:p-6;
+  }
+
+  .mobile-modal-overlay {
+    @apply items-start justify-center overflow-y-auto;
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-modal-shell {
+    width: min(100%, calc(100vw - 1rem));
+    max-height: calc(var(--app-height) - 1.5rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-fullpage-shell {
+    min-height: var(--app-height);
+  }
+
+  @media (max-width: 640px) {
+    .mobile-modal-shell {
+      border-radius: 1.25rem;
+    }
   }
 
   /* Input and button sizing */

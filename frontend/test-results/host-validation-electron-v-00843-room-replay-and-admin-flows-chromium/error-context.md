@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: player-journey.spec.ts >> tutorial room AI follows the scripted HCl, Br2, and draw sequence
-- Location: tests\e2e\player-journey.spec.ts:32:1
+- Name: host-validation.spec.ts >> electron validates startup persistence room replay and admin flows
+- Location: tests\e2e\host-validation.spec.ts:19:3
 
 # Error details
 
@@ -35,7 +35,7 @@ Tearing down "context" exceeded the test timeout of 60000ms.
           - generic [ref=e17] [cursor=pointer]:
             - img [ref=e19]
             - generic [ref=e21]:
-              - generic [ref=e22]: JourneyScriptedAI
+              - generic [ref=e22]: Host_electron
               - generic [ref=e23]: 本地资料 / Local Profile
           - generic [ref=e24]:
             - button "本地牌组 / Local Decks" [ref=e25]:
@@ -77,7 +77,7 @@ Tearing down "context" exceeded the test timeout of 60000ms.
                 - generic [ref=e80]:
                   - img [ref=e82]
                   - generic [ref=e84]:
-                    - paragraph [ref=e85]: JourneyScriptedAI
+                    - paragraph [ref=e85]: Host_electron
                     - paragraph [ref=e86]: 本机存档 / Local Save
               - generic [ref=e87]:
                 - paragraph [ref=e88]: 牌组 / Deck
@@ -101,7 +101,7 @@ Tearing down "context" exceeded the test timeout of 60000ms.
             - generic [ref=e109]:
               - generic [ref=e112]:
                 - paragraph [ref=e113]: 当前玩家 / Current Player
-                - paragraph [ref=e114]: JourneyScriptedAI
+                - paragraph [ref=e114]: Host_electron
               - generic [ref=e117]:
                 - paragraph [ref=e118]: 牌组 / Deck
                 - paragraph [ref=e119]: Offline Default Deck
