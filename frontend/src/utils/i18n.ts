@@ -149,7 +149,25 @@ const messages = {
       copyPublicSuccess: '实验邀请链接已复制到剪贴板，快发送给你的科研伙伴吧！',
       copyFailed: '链接复制失败，请手动复制浏览器地址栏',
       achievementAlchemist: '获得成就：炼金术士 (合成单质金)',
-      achievementTitle: '成就达成！'
+      achievementTitle: '成就达成！',
+      achievements: {
+        normal: {
+          title: '成就达成',
+          description: '你已完成一项成就',
+        },
+        milestone: {
+          title: '里程碑达成',
+          description: '阶段目标已完成',
+        },
+        rare: {
+          title: '稀有成就',
+          description: '解锁了一项罕见的成就',
+        },
+        final: {
+          title: '终局完成',
+          description: '达成了最终目标',
+        },
+      },
     },
   },
   'en-US': {
@@ -296,7 +314,25 @@ const messages = {
       copyPublicSuccess: 'Experiment invite link copied to clipboard. Send it to your lab partner!',
       copyFailed: 'Link copy failed, please copy the browser address bar manually',
       achievementAlchemist: 'Achievement unlocked: Alchemist (synthesize elemental gold)',
-      achievementTitle: 'Achievement Unlocked!'
+      achievementTitle: 'Achievement Unlocked!',
+      achievements: {
+        normal: {
+          title: 'Achievement Unlocked',
+          description: 'You have completed an achievement',
+        },
+        milestone: {
+          title: 'Milestone Reached',
+          description: 'You have completed an important milestone',
+        },
+        rare: {
+          title: 'Rare Achievement',
+          description: 'You have unlocked a rare achievement',
+        },
+        final: {
+          title: 'Final Achievement',
+          description: 'You have completed the final achievement',
+        },
+      },
     }
   },
 } as const

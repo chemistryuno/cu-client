@@ -740,11 +740,23 @@ const filteredReactionHints = computed(() => {
 const exp = ref(Number(localStorage.getItem('chem_exp') || '0'))
 const achievements = ref<string[]>(JSON.parse(localStorage.getItem('chem_achievements') || '[]'))
 
+const getAchievementTier = (achievementName: string): 'normal' | 'milestone' | 'rare' | 'final' => {
+  // Map achievement names to tiers
+  // 'rare' tier for rare achievements like synthesizing gold
+  // 'normal' tier for basic achievements
+  if (achievementName.includes('炼金术士')) return 'rare'
+  return 'normal'
+}
+
 const checkAchievements = (substance: string) => {
   if (!substance) return
   if (substance.includes('Au') && !achievements.value.includes('炼金术士')) {
     achievements.value.push('炼金术士')
-    showToast('获得成就：炼金术士 (合成单质金)', '成就达成！', 'success')
+    const { t } = useI18n()
+    const tier = getAchievementTier(substance)
+    const title = t(`game.achievements.${tier}.title`)
+    const description = t(`game.achievements.${tier}.description`)
+    showToast(description, title, 'success')
   }
   localStorage.setItem('chem_achievements', JSON.stringify(achievements.value))
 }
