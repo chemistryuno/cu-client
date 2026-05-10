@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authAPI, gameAPI } from '../utils/api'
 import { clearClientAuthState, getStoredUser, sanitizeStoredUser } from '../utils/authSession'
@@ -10,6 +10,8 @@ import { Beaker, Bot, BookOpen, Database, Loader2, Play, RotateCcw, Settings, Sw
 import { cn } from '../utils/cn'
 import { useI18n } from '../utils/i18n'
 import { consoleButton } from '../utils/ui'
+import { openAIAssistant } from '../utils/aiAssistantUI'
+import { setGlobalAIAssistantContext } from '../utils/aiAssistantContext'
 import '../styles/lobby.css'
 
 const router = useRouter()
@@ -116,6 +118,22 @@ const loadVersion = async () => {
   } catch (error) {
     console.error('Failed to load version:', error)
   }
+}
+
+const syncAIAssistantContext = () => {
+  const activeRoomName = activeRoom.value?.name || 'No active room'
+  const selectedDeckName = selectedDeck.value?.name || 'No deck selected'
+  const visibleRoomCount = rooms.value.length
+  setGlobalAIAssistantContext({
+    surface: 'lobby',
+    title: td('lobby.title'),
+    summary: `Lobby overview: ${user.value.nickname || td('common.localPlayer')} is on the main lobby. Active room: ${activeRoomName}. Selected deck: ${selectedDeckName}. Visible AI rooms: ${visibleRoomCount}.`,
+    hints: [
+      `Current deck: ${selectedDeckName}`,
+      `Active room: ${activeRoomName}`,
+      `Player profile: ${user.value.nickname || td('common.localPlayer')}`,
+    ],
+  })
 }
 
 const checkFirstTimeLobby = () => {
@@ -244,6 +262,8 @@ onMounted(() => {
   void loadVersion()
   checkFirstTimeLobby()
 })
+
+watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: true, immediate: true })
 </script>
 
 <template>
@@ -254,7 +274,7 @@ onMounted(() => {
       <div class="lobby-bg-decor-pattern"></div>
     </div>
 
-    <div class="relative z-10 flex flex-col min-h-screen">
+    <div class="relative z-10 flex h-[var(--app-height)] max-h-[var(--app-height)] flex-col overflow-hidden">
       <header class="lobby-header">
         <div class="lobby-header-container">
           <div class="lobby-brand">
@@ -284,6 +304,9 @@ onMounted(() => {
               </button>
               <button data-testid="lobby-settings-button" @click="router.push('/profile/settings')" class="lobby-nav-link" :title="td('profile.categories.settings')">
                 <Settings class="w-4 h-4" />
+              </button>
+              <button data-testid="lobby-ai-assistant-launcher" @click="openAIAssistant" class="lobby-nav-link" title="AI Assistant">
+                <Bot class="w-4 h-4" />
               </button>
             </div>
           </div>

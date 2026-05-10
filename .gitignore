@@ -71,3 +71,7 @@ frontend/.vite/
 frontend/.capacitor/
 coverage/
 .codex/
+
+.VSCodeCounter/
+.agent/
+openspec/

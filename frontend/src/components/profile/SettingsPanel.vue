@@ -10,6 +10,7 @@ import {
   setStoredThemeColor,
   type ThemeColor,
 } from '../../utils/themeColor'
+import AIAssistantSettings from './AIAssistantSettings.vue'
 
 const props = defineProps<{
   user: any,
@@ -148,6 +149,8 @@ watch(() => props.user, (newUser) => {
 
     <!-- 系统设置选项卡 -->
     <div v-if="activeTab === 'system' && !forceTab" class="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+      <AIAssistantSettings />
+
       <!-- 主题设置 -->
       <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm dark:shadow-none transition-all">
         <h3 class="text-base font-black uppercase tracking-widest mb-5 flex items-center gap-2.5 text-slate-800 dark:text-white">
@@ -180,7 +183,7 @@ watch(() => props.user, (newUser) => {
 
         <div class="mt-6 space-y-3">
           <div class="flex items-center justify-between px-1">
-            <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">涓婚鑹? / accent color</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">主题色 / accent color</span>
             <span class="text-[9px] font-mono uppercase text-slate-400">Default Blue</span>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">

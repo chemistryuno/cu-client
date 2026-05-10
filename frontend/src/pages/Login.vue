@@ -71,13 +71,13 @@ const previewUser = computed(() => ({
 </script>
 
 <template>
-  <div class="console-app-shell mobile-fullpage-shell flex items-start justify-start sm:items-center sm:justify-center p-4 relative overflow-y-auto sm:overflow-hidden">
+  <div class="console-app-shell mobile-fullpage-shell flex h-[var(--app-height)] max-h-[var(--app-height)] items-start justify-start overflow-hidden box-border p-4 relative sm:items-center sm:justify-center">
     <div class="console-grid-overlay"></div>
     <div class="absolute top-[-12%] right-[-8%] w-[36%] h-[36%] bg-sky-500/10 rounded-full blur-[120px]"></div>
     <div class="absolute bottom-[-12%] left-[-8%] w-[34%] h-[34%] bg-orange-500/8 rounded-full blur-[120px]"></div>
 
-    <div class="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
-      <div :class="cn(consolePanel({ tone: 'base', radius: 'xl', padding: 'none' }), 'overflow-hidden')">
+    <div class="w-full max-w-md max-h-full relative z-10 animate-in fade-in zoom-in duration-500">
+      <div :class="cn(consolePanel({ tone: 'base', radius: 'xl', padding: 'none' }), 'max-h-[calc(var(--app-height)-2rem)] overflow-hidden')">
         <div class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -96,7 +96,7 @@ const previewUser = computed(() => ({
           </div>
         </div>
 
-        <div class="px-5 sm:px-6 pt-4 pb-6">
+        <div class="px-5 sm:px-6 pt-4 pb-6 max-h-[calc(var(--app-height)-8rem)] overflow-hidden sm:overflow-y-auto custom-scrollbar">
           <div class="flex items-center justify-end mb-4">
             <div class="inline-flex items-center gap-1 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-[#0f1720] p-1">
               <button

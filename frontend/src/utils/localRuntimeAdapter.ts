@@ -26,7 +26,7 @@ import type {
   State,
   User,
 } from './clientRuntimeTypes'
-import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tutorialScript'
+import { TUTORIAL_INITIAL_STATE, getTutorialActionCheck, getTutorialStep, type TutorialStep } from './tutorialScript'
 import { createRandomNickname, hasUsableNickname } from './playerNickname'
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
@@ -1399,13 +1399,23 @@ const maybeAdvanceTutorialForHumanAction = (room: Room, playerIndex: number, act
   const currentStep = getCurrentTutorialStep(game)
   const player = game.players[playerIndex]
   if (!currentStep || currentStep.player !== 'human' || player?.is_ai) return
-  if (currentStep.action !== action) return
-
-  const normalizedSubstance = normalizeFormula(substance || '')
-  const expectedSubstance = normalizeFormula(currentStep.substance || '')
-  if (action === 'play' && expectedSubstance && normalizedSubstance !== expectedSubstance) return
+  if (!getTutorialActionCheck(game.tutorial_current_step, action, substance).allowed) return
 
   advanceTutorialStep(game)
+}
+
+const assertTutorialActionAllowed = (room: Room, playerIndex: number, action: TutorialStep['action'], substance?: string) => {
+  if (!isTutorialScriptEnabled(room)) return
+  const game = ensureGame(room)
+  const player = game.players[playerIndex]
+  if (!player || player.is_ai) return
+  const check = getTutorialActionCheck(game.tutorial_current_step, action, substance)
+  if (check.allowed) return
+
+  const expected = check.expectedSubstance
+    ? `${check.expectedAction || 'action'} ${check.expectedSubstance}`
+    : (check.expectedAction || 'the scripted tutorial action')
+  throw { status: 400, data: { error: `Tutorial step is locked. Perform ${expected}.` } }
 }
 
 const maybeAdvanceTutorialForAiAction = (room: Room) => {
@@ -2197,6 +2207,7 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       const index = findPlayerIndexByUid(game, user.uid)
       if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
       const playedSubstance = String(body.substance || body.card?.type || '')
+      assertTutorialActionAllowed(room, index, 'play', playedSubstance)
       applyPlay(state, room, index, playedSubstance)
       maybeAdvanceTutorialForHumanAction(room, index, 'play', playedSubstance)
       advanceTurn(state, room)
@@ -2214,6 +2225,7 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       const sub1 = String(body.sub1 || '')
       const sub2 = String(body.sub2 || '')
       if (!player.double_action_available && player.action_progress < 2) throw { status: 400, data: { error: 'Double action is not ready' } }
+      assertTutorialActionAllowed(room, index, 'double', `${sub1}+${sub2}`)
       applyPlay(state, room, index, sub1)
       player.double_action_available = false
       player.action_progress = 0
@@ -2230,6 +2242,7 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       const game = ensureGame(room)
       const index = findPlayerIndexByUid(game, user.uid)
       if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
+      assertTutorialActionAllowed(room, index, 'draw')
       const drawCount = Math.max(1, game.pending_draw_count || 1)
       drawCardsForPlayer(game, index, drawCount)
       game.pending_draw_count = 0

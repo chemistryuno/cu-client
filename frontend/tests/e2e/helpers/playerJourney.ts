@@ -125,7 +125,7 @@ export const dismissLobbyTutorialIfPresent = async (page: Page) => {
   const overlay = getTutorialOverlay(page)
   await page.waitForTimeout(1200)
   if (await overlay.isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: /skip tutorial/i }).click()
+    await page.getByRole('button', { name: /skip tutorial|跳过引导/i }).click()
     await expect(overlay).toBeHidden()
   }
 }

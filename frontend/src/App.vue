@@ -5,6 +5,8 @@ import websocket from './utils/websocket'
 import feedback from './utils/feedback'
 import { useDialog } from './utils/dialog'
 import { applyThemeColor, THEME_COLOR_STORAGE_KEY } from './utils/themeColor'
+import AIAssistantPanel from './components/AIAssistantPanel.vue'
+import { aiAssistantOpen, closeAIAssistant } from './utils/aiAssistantUI'
 
 const CustomDialog = defineAsyncComponent(() => import('./components/CustomDialog.vue'))
 
@@ -103,6 +105,19 @@ const handleAuthChanged = () => {
   }
 }
 
+const handleAIAssistantOpen = () => {
+  aiAssistantOpen.value = true
+}
+
+const handleAIAssistantClose = () => {
+  aiAssistantOpen.value = false
+}
+
+const handleAIAssistantToggle = (event: Event) => {
+  const nextOpen = (event as CustomEvent<{ open?: boolean }>).detail?.open
+  aiAssistantOpen.value = typeof nextOpen === 'boolean' ? nextOpen : !aiAssistantOpen.value
+}
+
 onMounted(() => {
   try {
     themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
@@ -110,6 +125,9 @@ onMounted(() => {
     window.addEventListener('storage', handleThemeStorage)
     window.addEventListener('theme-changed', updateTheme)
     window.addEventListener('auth-changed', handleAuthChanged)
+    window.addEventListener('ai-assistant-open', handleAIAssistantOpen)
+    window.addEventListener('ai-assistant-close', handleAIAssistantClose)
+    window.addEventListener('ai-assistant-toggle', handleAIAssistantToggle)
     const userData = localStorage.getItem('user')
 
     if (userData) {
@@ -136,6 +154,9 @@ onUnmounted(() => {
   window.removeEventListener('storage', handleThemeStorage)
   window.removeEventListener('theme-changed', updateTheme)
   window.removeEventListener('auth-changed', handleAuthChanged)
+  window.removeEventListener('ai-assistant-open', handleAIAssistantOpen)
+  window.removeEventListener('ai-assistant-close', handleAIAssistantClose)
+  window.removeEventListener('ai-assistant-toggle', handleAIAssistantToggle)
 })
 </script>
 
@@ -155,7 +176,7 @@ onUnmounted(() => {
     </div>
   </div>
   <template v-else>
-    <div class="app-viewport transition-colors duration-300 min-h-screen bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-200">
+    <div class="app-viewport transition-colors duration-300 h-[var(--app-height)] max-h-[var(--app-height)] overflow-hidden bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-200">
       <router-view v-slot="{ Component, route }">
         <Transition name="app-route" mode="out-in">
           <div :key="route.fullPath" class="app-route-shell">
@@ -163,6 +184,7 @@ onUnmounted(() => {
           </div>
         </Transition>
       </router-view>
+      <AIAssistantPanel :open="aiAssistantOpen" @close="closeAIAssistant" />
       <CustomDialog />
     </div>
   </template>
@@ -171,7 +193,8 @@ onUnmounted(() => {
 <style>
 .app-route-shell {
   will-change: opacity, transform, filter;
-  min-height: var(--app-height);
+  height: var(--app-height);
+  overflow: hidden;
 }
 
 .app-route-enter-active,
@@ -219,7 +242,8 @@ onUnmounted(() => {
 }
 
 .app-viewport {
-  min-height: var(--app-height);
+  height: var(--app-height);
+  overflow: hidden;
 }
 
 :global(.dark) .app-loader-shell {

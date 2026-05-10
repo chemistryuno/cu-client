@@ -92,10 +92,81 @@ export const getTutorialStep = (stepNumber: number): TutorialStep | undefined =>
   return TUTORIAL_SCRIPT.find((step) => step.stepNumber === stepNumber)
 }
 
+const normalizeTutorialSubstance = (value?: string) => String(value || '').trim()
+const normalizeTutorialSubstanceList = (values?: string[]) => (values || [])
+  .map(normalizeTutorialSubstance)
+  .filter(Boolean)
+
+export interface TutorialActionCheck {
+  allowed: boolean
+  reason?: 'no-step' | 'not-human-step' | 'wrong-action' | 'wrong-substance'
+  expectedAction?: TutorialStep['action']
+  expectedSubstance?: string
+}
+
+export const getTutorialActionCheck = (
+  stepNumber: number,
+  action: TutorialStep['action'],
+  substance?: string,
+): TutorialActionCheck => {
+  const step = getTutorialStep(stepNumber)
+  if (!step) return { allowed: false, reason: 'no-step' }
+
+  if (step.player !== 'human') {
+    return {
+      allowed: false,
+      reason: 'not-human-step',
+      expectedAction: step.action,
+      expectedSubstance: step.substance,
+    }
+  }
+
+  if (step.action !== action) {
+    return {
+      allowed: false,
+      reason: 'wrong-action',
+      expectedAction: step.action,
+      expectedSubstance: step.substance,
+    }
+  }
+
+  const expectedSubstance = action === 'double' && step.substances?.length
+    ? normalizeTutorialSubstanceList(step.substances).join('+')
+    : normalizeTutorialSubstance(step.substance)
+  const actualSubstance = normalizeTutorialSubstance(substance)
+  if ((action === 'play' || action === 'double') && expectedSubstance) {
+    if (!actualSubstance) {
+      return {
+        allowed: false,
+        reason: 'wrong-substance',
+        expectedAction: step.action,
+        expectedSubstance,
+      }
+    }
+
+    const matchesExpected = action === 'double' && step.substances?.length
+      ? actualSubstance.split('+').map(normalizeTutorialSubstance).join('+') === expectedSubstance
+      : actualSubstance === expectedSubstance
+
+    if (!matchesExpected) {
+      return {
+        allowed: false,
+        reason: 'wrong-substance',
+        expectedAction: step.action,
+        expectedSubstance,
+      }
+    }
+  }
+
+  return {
+    allowed: true,
+    expectedAction: step.action,
+    expectedSubstance,
+  }
+}
+
 export const canPlaySubstance = (substance: string, currentStep: number): boolean => {
-  const step = getTutorialStep(currentStep)
-  if (!step || step.player !== 'human') return false
-  return step.substance === substance
+  return getTutorialActionCheck(currentStep, 'play', substance).allowed
 }
 
 export const getTutorialProgress = (currentStep: number): string => {

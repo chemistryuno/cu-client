@@ -1,6 +1,7 @@
 .lobby-page {
-  min-height: var(--app-height);
+  height: var(--app-height);
   position: relative;
+  overflow: hidden;
   overflow-x: hidden;
   background:
     linear-gradient(118deg, rgb(var(--theme-rgb) / 0.18), transparent 24%),
@@ -1225,9 +1226,20 @@
 }
 
 @media (max-width: 640px) {
+  .lobby-page {
+    overflow: hidden;
+  }
+
+  .lobby-header {
+    position: relative;
+    top: auto;
+  }
+
   .lobby-main {
-    padding-top: 1rem;
-    gap: 0.9rem;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.7rem 0.75rem 0.8rem;
+    gap: 0.7rem;
   }
 
   .hub-title {
@@ -1242,7 +1254,7 @@
 
   .lobby-hero-panel {
     min-height: auto;
-    padding: 0.95rem;
+    padding: 0.85rem;
   }
 
   .lobby-hero-content {
@@ -1253,7 +1265,7 @@
   .lobby-hero-head {
     flex-direction: column;
     gap: 0.75rem;
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.6rem;
   }
 
   .lobby-hero-icon {
@@ -1262,7 +1274,7 @@
   }
 
   .lobby-hero-title {
-    font-size: 1.82rem;
+    font-size: 1.58rem;
     line-height: 0.96;
     max-width: none;
   }
@@ -1272,13 +1284,13 @@
   }
 
   .lobby-hero-summary {
-    gap: 0.55rem;
-    margin-bottom: 0.75rem;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
   }
 
   .hero-action-row {
     order: 3;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.55rem;
   }
 
   .lobby-detail-grid {
@@ -1287,17 +1299,17 @@
 
   .lobby-summary-stat {
     min-height: auto;
-    padding: 0.66rem 0.75rem;
+    padding: 0.6rem 0.68rem;
   }
 
   .lobby-detail-grid {
-    gap: 0.65rem;
+    gap: 0.55rem;
     margin-bottom: 0;
   }
 
   .lobby-detail-card {
     min-height: auto;
-    padding: 0.78rem;
+    padding: 0.68rem;
   }
 
   .lobby-avatar-shell {

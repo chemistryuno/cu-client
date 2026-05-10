@@ -144,13 +144,19 @@ html,
 body,
 #app {
   min-height: var(--app-height);
+  height: var(--app-height);
+  overflow: hidden;
 }
 
 body {
   @apply bg-slate-50 text-slate-900 dark:bg-[#0a0a0c] dark:text-slate-200 antialiased;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   min-height: var(--app-height);
+  height: var(--app-height);
   line-height: 1.45;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -591,6 +597,8 @@ body {
 
   .mobile-fullpage-shell {
     min-height: var(--app-height);
+    height: var(--app-height);
+    overflow: hidden;
   }
 
   @media (max-width: 640px) {

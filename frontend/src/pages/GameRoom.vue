@@ -1,15 +1,15 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { OFFLINE_MODE } from '../utils/runtimeConfig'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
 import BilingualText from '../components/BilingualText.vue'
 import { useI18n } from '../utils/i18n'
-import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/api'
+import { gameAPI, commonAPI, substanceAPI, friendAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
-import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary, Radar, Orbit, Users, QrCode, UserPlus } from 'lucide-vue-next'
+import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Sparkles, Ban, X, MessageCircle, Send, Binary, Radar, Orbit, Users, QrCode, UserPlus } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
@@ -18,13 +18,15 @@ import GameToast from '../components/GameToast.vue'
 import ChemicalKeyboard from '../components/ChemicalKeyboard.vue'
 import FeedbackSettings from '../components/FeedbackSettings.vue'
 import UserAvatar from '../components/UserAvatar.vue'
-import { getTutorialStep, TUTORIAL_TOTAL_STEPS } from '../utils/tutorialScript'
+import { getTutorialActionCheck, getTutorialStep, TUTORIAL_TOTAL_STEPS, type TutorialStep } from '../utils/tutorialScript'
+import { closeAIAssistant, openAIAssistant } from '../utils/aiAssistantUI'
+import { setGlobalAIAssistantContext } from '../utils/aiAssistantContext'
 import '../styles/mobile-game.css'
 
 const route = useRoute()
 const router = useRouter()
 const { td } = useI18n()
-const { showAlert, showConfirm, showPrompt, showToast } = useDialog()
+const { showAlert, showConfirm, showToast } = useDialog()
 const gameToastRef = ref()
 const id = route.params.id as string
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
@@ -34,7 +36,7 @@ const isReplayBridgeMode = computed(() => Number.isFinite(replayHistoryQueryID.v
 const user = ref<any>({})
 try {
   const userData = JSON.parse(localStorage.getItem('user') || '{}')
-  // 兼容旧版本的 id 字段
+  // 鍏煎鏃х増鏈殑 id 瀛楁
   if (userData.id && !userData.uid) {
     userData.uid = userData.id
   }
@@ -53,11 +55,11 @@ const friendMap = computed(() => {
 })
 const availableSubstances = ref<string[]>([])
 
-// 教学模式检测
+// 鏁欏妯″紡妫€
 const isTutorialMode = ref(false)
 const tutorialHintText = ref('')
-const tutorialCurrentStep = ref(1) // 当前脚本步骤
-const tutorialScriptMode = ref(false) // 是否启用脚本化教学
+const tutorialCurrentStep = ref(1) // 褰撳墠鑴氭湰姝ラ
+const tutorialScriptMode = ref(false) // 鏄惁鍚敤鑴氭湰鍖栨暀
 
 const loading = ref(true)
 const loadError = ref<string | null>(null)
@@ -80,7 +82,7 @@ let centerEffectTimer: number | null = null
 
 type RoomNoticeTone = 'info' | 'success' | 'warning' | 'error'
 
-// 回放模拟播放状态
+// 鍥炴斁妯℃嫙鎾斁鐘?
 const replayEvents = ref<any[]>([])
 const replayPlaybackIndex = ref(0)
 const replayIsPlaying = ref(false)
@@ -102,8 +104,26 @@ const handContainer = ref<HTMLElement | null>(null)
 const substancesContainer = ref<HTMLElement | null>(null)
 const playersContainer = ref<HTMLElement | null>(null)
 const levelUpAnimationRef = ref<InstanceType<typeof LevelUpAnimation> | null>(null)
+const syncAIAssistantContext = () => {
+  const roomName = roomInfo.value?.name || 'Unknown room'
+  const reactionText = gameState.value?.current_reaction || 'No current reaction'
+  const playersText = Array.isArray(playersInfo.value) && playersInfo.value.length > 0
+    ? playersInfo.value.slice(0, 4).map((player: any) => player.nickname || player.username || `UID ${player.uid}`).join(', ')
+    : 'No players loaded'
 
-// 移动端自动全屏
+  setGlobalAIAssistantContext({
+    surface: 'room',
+    title: roomName,
+    summary: `Room ${roomName} is currently ${roomInfo.value?.status || 'loading'}. Local player: ${user.value.nickname || user.value.username || 'Unknown'}. Current reaction: ${reactionText}. Visible players: ${playersText}.`,
+    hints: [
+      `Room status: ${roomInfo.value?.status || 'loading'}`,
+      `Current reaction: ${reactionText}`,
+      `Visible players: ${playersText}`,
+    ],
+  })
+}
+
+// 绉诲姩绔嚜鍔ㄥ叏灞?
 const requestFullscreen = () => {
   if (!isMobile.value) return
   const el = document.documentElement as any
@@ -113,7 +133,7 @@ const requestFullscreen = () => {
   }
 }
 
-// 移动端退出全屏
+// 绉诲姩绔€€鍑哄叏灞?
 const exitFullscreen = () => {
   if (!isMobile.value) return
   const doc = document as any
@@ -125,28 +145,33 @@ const exitFullscreen = () => {
   }
 }
 
-// 输入框焦点管理：移动端打开化学键盘，桌面端退出全屏
+// 杈撳叆妗嗙劍鐐圭鐞嗭細绉诲姩绔墦寮€鍖栧閿洏锛屾闈㈢閫€鍑哄叏灞?
 const handleInputFocus = () => {
+  if (tutorialLockActive.value) {
+    showTutorialLockToast()
+    return
+  }
+
   if (isMobile.value || user.value.enable_element_input) {
-    // 移动端或启用了元素输入法：打开化学键盘
+    // 绉诲姩绔垨鍚敤浜嗗厓绱犺緭鍏ユ硶锛氭墦寮€鍖栧閿洏
     showChemicalKeyboard.value = true
   }
   
   if (!isMobile.value) {
-    // 桌面端：退出全屏（除非在教学模式）
+    // 妗岄潰绔細閫€鍑哄叏灞忥紙闄ら潪鍦ㄦ暀瀛︽ā寮忥級
     if (!isTutorialMode.value) {
       exitFullscreen()
     }
   }
 }
 const handleInputBlur = () => {
-  // 桌面端：恢复全屏（除非在教学模式）
+  // 妗岄潰绔細鎭㈠鍏ㄥ睆锛堥櫎闈炲湪鏁欏妯″紡
   if (!isMobile.value && !isTutorialMode.value) {
     requestFullscreen()
   }
 }
 
-// 自动滚动到当前行动玩家
+// 鑷姩婊氬姩鍒板綋鍓嶈鍔ㄧ帺
 const scrollToActivePlayer = () => {
   if (!playersContainer.value || gameState.value?.current_player == null) return
   const container = playersContainer.value
@@ -194,6 +219,10 @@ const fetchReactionHints = async () => {
 }
 
 const viewCurrentDeckConfig = () => {
+  if (tutorialLockActive.value) {
+    showTutorialLockToast()
+    return
+  }
   if (roomInfo.value?.deck_config) {
     showDeckDetailModal.value = true
   }
@@ -206,14 +235,14 @@ const isReady = computed(() => {
 const handleToggleReady = async () => {
   if (!roomInfo.value || !user.value.uid) {
     if (!roomInfo.value) {
-      showToast('房间信息未加载，请刷新页面', '错误', 'error')
+      showToast('鎴块棿淇℃伅鏈姞杞斤紝璇峰埛鏂伴〉闈?, '閿欒', 'error')
     } else if (!user.value.uid) {
-      showToast('用户信息异常，请重新登录', '错误', 'error')
+      showToast('鐢ㄦ埛淇℃伅寮傚父锛岃閲嶆柊鐧诲綍', '閿欒', 'error')
     }
     return
   }
 
-  // 乐观更新：立即切换状态
+  // 涔愯鏇存柊锛氱珛鍗冲垏鎹㈢姸鎬?
   const uidNum = Number(user.value.uid)
   const isCurrentlyReady = roomInfo.value.ready_uids.includes(uidNum)
 
@@ -225,12 +254,12 @@ const handleToggleReady = async () => {
 
   try {
     await gameAPI.ready(id)
-    // 状态也会通过 WebSocket 更新，但手动标记一下提高体验
+    // 鐘舵€佷篃浼氶€氳繃 WebSocket 鏇存柊锛屼絾鎵嬪姩鏍囪涓€涓嬫彁楂樹綋
     await loadGameState(true)
     feedback.success()
   } catch (error: any) {
     console.error('Ready API error:', error)
-    // 恢复状态
+    // 鎭㈠鐘?
     if (isCurrentlyReady) {
       if (!roomInfo.value.ready_uids.includes(uidNum)) {
         roomInfo.value.ready_uids.push(uidNum)
@@ -238,7 +267,7 @@ const handleToggleReady = async () => {
     } else {
       roomInfo.value.ready_uids = roomInfo.value.ready_uids.filter((id: number) => id !== uidNum)
     }
-    showToast(error.response?.data?.error || '操作失败', '错误', 'error')
+    showToast(error.response?.data?.error || '鎿嶄綔澶辫触', '閿欒', 'error')
     feedback.error()
   }
 }
@@ -247,26 +276,26 @@ const isFriend = (uid: number) => {
   return friendMap.value.has(Number(uid))
 }
 
-// 获取玩家显示名称（优先显示备注）
+// 鑾峰彇鐜╁鏄剧ず鍚嶇О锛堜紭鍏堟樉绀哄娉級
 const getPlayerDisplayName = (player: any) => {
-  if (!player) return '研究员'
+  if (!player) return '鐮旂┒鍛?
 
-  // 如果是 AI 玩家，显示其分配到的科学家姓名
+  // 濡傛灉AI 鐜╁锛屾樉绀哄叾鍒嗛厤鍒扮殑绉戝瀹跺
   if (player.uid < 0 || player.is_ai) {
     return player.nickname || 'AI'
   }
 
-  // 查找好友备注
+  // 鏌ユ壘濂藉弸澶囨敞
   const friend = friendMap.value.get(Number(player.uid))
   if (friend?.remark) {
     return friend.remark
   }
 
-  // 否则返回昵称或用户名
-  return player.nickname || player.username || '研究员'
+  // 鍚﹀垯杩斿洖鏄电О鎴栫敤鎴峰悕
+  return player.nickname || player.username || '鐮旂┒鍛?
 }
 
-// 检查是否应该用蓝色显示（有备注的好友）
+// 妫€鏌ユ槸鍚﹀簲璇ョ敤钃濊壊鏄剧ず锛堟湁澶囨敞鐨勫ソ鍙嬶級
 const shouldShowInBlue = (player: any) => {
   if (!player) return false
   const friend = friendMap.value.get(Number(player.uid))
@@ -274,30 +303,29 @@ const shouldShowInBlue = (player: any) => {
 }
 
 // Friends logic removed in offline mode
-const handleAddFriend = () => {}
+const handleAddFriend = (_player?: any) => {}
 
 // Chat system
 const showPlayers = ref(false)
 const showChat = ref(false)
 const hasNewMessage = ref(false)
-const showQrModal = ref(false)
 const showInviteFriendsModal = ref(false)
 
-// 动画状态管理
+// 鍔ㄧ敾鐘舵€佺
 const drawAnimatingUIDs = ref<Set<number>>(new Set())
 const playerCardCounts = ref<Record<number, number>>({})
 
-// 计算属性：只监听players的关键变化（uid + card_count）
+// 璁＄畻灞炴€э細鍙洃鍚琾layers鐨勫叧閿彉鍖栵紙uid + card_count?
 const playersCardState = computed(() => {
   return gameState.value?.players?.map((p: any) => `${p.uid}:${p.card_count}`).join(',') || ''
 })
 
-// 改为监听简化版本而不是deep watch
-watch(playersCardState, (newState) => {
+// 鏀逛负鐩戝惉绠€鍖栫増鏈€屼笉鏄痙eep watch
+watch(playersCardState, (_newState) => {
   if (!gameState.value?.players) return
   gameState.value.players.forEach((p: any) => {
     const oldVal = playerCardCounts.value[p.uid]
-    // 只有当牌数增加且不是初始发牌（处于游戏中）时触发
+    // 鍙湁褰撶墝鏁板鍔犱笖涓嶆槸鍒濆鍙戠墝锛堝浜庢父鎴忎腑锛夋椂瑙﹀彂
     if (gameState.value?.status === 'playing' && typeof oldVal !== 'undefined' && p.card_count > oldVal) {
       drawAnimatingUIDs.value.add(p.uid)
       setTimeout(() => {
@@ -310,18 +338,18 @@ watch(playersCardState, (newState) => {
 
 const pushRoomNotice = (
   message: string,
-  title = '实验动态',
+  title = '瀹為獙鍔ㄦ€?,
   type: RoomNoticeTone = 'info',
   duration = 3200,
 ) => {
   gameToastRef.value?.showToast(message, title, type, duration)
 }
 
-// startPrivateChat 已被弃用，实验室内禁止私聊
+// startPrivateChat 宸茶寮冪敤锛屽疄楠屽鍐呯姝㈢
 
 
 // Game invites removed in offline mode
-const sendGameInvite = () => {}
+const sendGameInvite = (_friend?: any) => {}
 
 
 
@@ -351,7 +379,7 @@ watch(showHints, (val) => {
     if (randomHints.value.length === 0) {
       fetchRandomHints()
     }
-    // 如果是玩家回合且提示为空，尝试获取提示（延迟检查，避免 computed 未初始化）
+    // 濡傛灉鏄帺瀹跺洖鍚堜笖鎻愮ず涓虹┖锛屽皾璇曡幏鍙栨彁绀猴紙寤惰繜妫€鏌ワ紝閬垮厤 computed 鏈垵濮嬪寲
     nextTick(() => {
       if (isMyTurn.value && turnReadySubstances.value.length === 0) {
         fetchTurnSubstances()
@@ -360,27 +388,27 @@ watch(showHints, (val) => {
   }
 }, { immediate: true })
 
-// 移动端自动关闭提示面板
+// 绉诲姩绔嚜鍔ㄥ叧闂彁绀洪潰
 watch(isMobile, (val) => {
   if (val) {
     showHints.value = false
   }
 })
 
-// 教学模式：监听选择物质和双元素模式变化
+// 鏁欏妯″紡锛氱洃鍚€夋嫨鐗╄川鍜屽弻鍏冪礌妯″紡鍙樺寲
 watch([selectedSubstance, doubleMode], () => {
   if (isTutorialMode.value && isMyTurn.value) {
     generateTutorialHint()
   }
 })
 
-// 教学模式：监听游戏状态变化，游戏开始时提示
+// 鏁欏妯″紡锛氱洃鍚父鎴忕姸鎬佸彉鍖栵紝娓告垙寮€濮嬫椂鎻愮ず
 watch(() => gameState.value?.status, (newStatus, oldStatus) => {
   if (isTutorialMode.value && newStatus === 'playing' && oldStatus === 'waiting') {
     setTimeout(() => {
       showToast(
-        '游戏已开始！注意查看底部的橙色提示卡片，它会在你的回合时告诉你该做什么。',
-        '🎮 开始游戏',
+        '娓告垙宸插紑濮嬶紒娉ㄦ剰鏌ョ湅搴曢儴鐨勬鑹叉彁绀哄崱鐗囷紝瀹冧細鍦ㄤ綘鐨勫洖鍚堟椂鍛婅瘔浣犺鍋氫粈涔?,
+        '馃幃 寮€濮嬫父鎴?,
         'info',
         6000
       )
@@ -400,8 +428,8 @@ const allPlayers = computed(() => {
       const baseInfo = playersInfo.value.find(b => Number(b.uid) === Number(p.uid))
       return {
         ...p,
-        avatar: p.avatar || baseInfo?.avatar || '🧪',
-        // 强制显示昵称，回退到用户名
+        avatar: p.avatar || baseInfo?.avatar || '馃И',
+        // 寮哄埗鏄剧ず鏄电О锛屽洖閫€鍒扮敤鎴峰悕
         username: p.nickname || baseInfo?.nickname || p.username || baseInfo?.username,
         is_ready: roomInfo.value?.ready_uids?.includes(Number(p.uid)),
         is_offline: baseInfo?.is_offline
@@ -410,7 +438,7 @@ const allPlayers = computed(() => {
   }
   return playersInfo.value.map(p => ({
     ...p,
-    avatar: p.avatar || '🧪',
+    avatar: p.avatar || '馃И',
     username: p.nickname || p.username,
     is_ready: roomInfo.value?.ready_uids?.includes(Number(p.uid)),
     is_offline: p.is_offline
@@ -424,19 +452,19 @@ const currentPlayerObj = computed(() => {
 const isSpectator = computed(() => {
   if (!user.value?.uid) return false
   
-  // 优先检查根级别的 spectators 字段（用于房间等待状态）
+  // 浼樺厛妫€鏌ユ牴绾у埆spectators 瀛楁锛堢敤浜庢埧闂寸瓑寰呯姸鎬侊級
   if (roomInfo.value?.spectators) {
     const inRoomSpectators = (roomInfo.value.spectators as number[]).includes(Number(user.value.uid))
     if (inRoomSpectators) return true
   }
   
-  // 游戏运行时检查游戏状态中的观战者信息
+  // 娓告垙杩愯鏃舵鏌ユ父鎴忕姸鎬佷腑鐨勮鎴樿€呬俊
   if (gameState.value) {
-    // 已完成比赛的玩家
+    // 宸插畬鎴愭瘮璧涚殑鐜╁
     const isFinished = gameState.value.finished_players?.includes(user.value.uid)
-    // 直接加入的观战者
+    // 鐩存帴鍔犲叆鐨勮鎴?
     const inSpectatorsList = gameState.value.spectators?.includes(user.value.uid)
-    // 不在选手列表中的玩家也是观战者
+    // 涓嶅湪閫夋墜鍒楄〃涓殑鐜╁涔熸槸瑙傛垬
     const isNotPlayer = !gameState.value.players?.some((p: any) => Number(p.uid) === Number(user.value?.uid))
     
     if (isFinished || inSpectatorsList || isNotPlayer) return true
@@ -457,36 +485,36 @@ const hasTurnLimit = computed(() => {
 const tutorialStepDisplay = computed(() => Math.min(tutorialCurrentStep.value, TUTORIAL_TOTAL_STEPS))
 const tutorialProgressPercent = computed(() => Math.round((tutorialStepDisplay.value / TUTORIAL_TOTAL_STEPS) * 100))
 const roomStatusLabel = computed(() => {
-  if (isReplayBridgeMode.value) return '回放监看'
-  if (roomInfo.value?.status === 'waiting') return '等待开场'
-  if (gameState.value?.status === 'finished') return '实验结算'
-  if (isSpectator.value) return '观战模式'
-  if (isMyTurn.value) return '你的操作窗口'
-  if (currentPlayerObj.value) return `${getPlayerDisplayName(currentPlayerObj.value)} 行动中`
-  return '实验同步中'
+  if (isReplayBridgeMode.value) return '鍥炴斁鐩戠湅'
+  if (roomInfo.value?.status === 'waiting') return '绛夊緟寮€濮?
+  if (gameState.value?.status === 'finished') return '瀹為獙缁撶畻'
+  if (isSpectator.value) return '瑙傛垬妯″紡'
+  if (isMyTurn.value) return '浣犵殑鎿嶄綔绐楀彛'
+  if (currentPlayerObj.value) return `${getPlayerDisplayName(currentPlayerObj.value)} 琛屽姩涓璥
+  return '瀹為獙鍚屾'
 })
 const roomStatusMessage = computed(() => {
   if (isReplayBridgeMode.value) {
-    return `当前视角：${replayPerspectiveName.value}`
+    return `褰撳墠瑙嗚{replayPerspectiveName.value}`
   }
   if (roomInfo.value?.status === 'waiting') {
     const readyCount = roomInfo.value?.ready_uids?.length || 0
     const total = roomInfo.value?.max_players || allPlayers.value.length || 1
-    return `已就绪 ${readyCount}/${total}，保持界面清爽等待主持人开始`
+    return `宸插氨${readyCount}/${total}锛屼繚鎸佺晫闈㈡竻鐖界瓑寰呬富鎸佷汉寮€濮媊
   }
   if (gameState.value?.status === 'finished') {
-    return winner.value ? `本局已结束，${getPlayerDisplayName(winner.value)} 获胜` : '本局已结束，可查看结算并安全离开'
+    return winner.value ? `鏈眬宸茬粨鏉燂紝${getPlayerDisplayName(winner.value)} 鑾疯儨` : '鏈眬宸茬粨鏉燂紝鍙煡鐪嬬粨绠楀苟瀹夊叏绂诲紑'
   }
   if (isSpectator.value) {
-    return '仅观察关键信息，不遮挡主战场'
+    return '浠呰瀵熷叧閿俊鎭紝涓嶉伄鎸′富鎴樺満'
   }
   if (isMyTurn.value) {
-    return hasTurnLimit.value ? `请在 ${timeRemaining.value}s 内完成本轮操作` : '已为你展开输入与操作区'
+    return hasTurnLimit.value ? `璇峰湪 ${timeRemaining.value}s 鍐呭畬鎴愭湰杞搷浣渀 : '宸蹭负浣犲睍寮€杈撳叆涓庢搷浣滃尯'
   }
   if (currentPlayerObj.value) {
-    return `当前由 ${getPlayerDisplayName(currentPlayerObj.value)} 推进回合`
+    return `褰撳墠${getPlayerDisplayName(currentPlayerObj.value)} 鎺ㄨ繘鍥炲悎`
   }
-  return '正在同步房间状态'
+  return '姝ｅ湪鍚屾鎴块棿鐘舵€侊紝璇风◢鍊?
 })
 const roomStatusTone = computed<RoomNoticeTone>(() => {
   if (gameState.value?.status === 'finished') return 'success'
@@ -494,7 +522,14 @@ const roomStatusTone = computed<RoomNoticeTone>(() => {
   if (isMyTurn.value) return 'info'
   return 'info'
 })
-const tutorialAssistiveTitle = computed(() => tutorialScriptMode.value ? `教学步骤 ${tutorialStepDisplay.value}/${TUTORIAL_TOTAL_STEPS}` : '回合引导')
+const activeTutorialStep = computed(() => tutorialScriptMode.value ? getTutorialStep(tutorialCurrentStep.value) : undefined)
+const tutorialLockActive = computed(() => Boolean(
+  tutorialScriptMode.value &&
+  activeTutorialStep.value &&
+  gameState.value?.status === 'playing' &&
+  !isReplayBridgeMode.value,
+))
+const tutorialAssistiveTitle = computed(() => tutorialScriptMode.value ? `鏁欏姝ラ ${tutorialStepDisplay.value}/${TUTORIAL_TOTAL_STEPS}` : '鍥炲悎寮曞')
 const replayPerspectivePlayer = computed(() => {
   if (!isReplayBridgeMode.value || replayPerspectiveUID.value == null || !gameState.value?.players) {
     return null
@@ -506,7 +541,7 @@ const replayPerspectiveName = computed(() => {
   if (player) {
     return getPlayerDisplayName(player)
   }
-  return '系统视角'
+  return '绯荤粺瑙嗚'
 })
 const myData = computed(() => {
   if (!gameState.value) return null
@@ -539,11 +574,6 @@ const winner = computed(() => {
   }
   return gameState.value.players?.find((p: any) => p.card_count === 0)
 })
-const specialCards = new Set(['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr'])
-const isFunctionalLastCard = computed(() => {
-  if (!gameState.value?.last_card) return false
-  return specialCards.has(gameState.value.last_card.substance)
-})
 const isAnyPlayWindow = computed(() => gameState.value?.status === 'playing' && Number(gameState.value?.allowed_any_player) >= 0)
 const centerCard = computed(() => gameState.value?.last_card || null)
 const centerCardSubstance = computed(() => centerCard.value?.substance || '')
@@ -561,7 +591,7 @@ const sortedPointsChanges = computed(() => {
       player: gameState.value.players.find((p: any) => String(p.uid) === String(uid))
     }))
     .sort((a, b) => {
-      // 优先按照 finished_players 中的顺序（排名）排序
+      // 浼樺厛鎸夌収 finished_players 涓殑椤哄簭锛堟帓鍚嶏級鎺掑簭
       const rankA = gameState.value.finished_players?.indexOf(a.uid) ?? 999
       const rankB = gameState.value.finished_players?.indexOf(b.uid) ?? 999
       
@@ -569,52 +599,52 @@ const sortedPointsChanges = computed(() => {
         return rankA - rankB
       }
       
-      // 如果都没在 finished_players 中（比如中途退出的），按积分降序
+      // 濡傛灉閮芥病finished_players 涓紙姣斿涓€旈€€鍑虹殑锛夛紝鎸夌Н鍒嗛檷
       return b.points - a.points
     })
 })
 
 
 const ELEMENTS_DATA: Record<string, { name: string, class: string }> = {
-  'H': { name: '氢', class: 'element-H' },
-  'O': { name: '氧', class: 'element-O' },
-  'C': { name: '碳', class: 'element-C' },
-  'N': { name: '氮', class: 'element-N' },
-  'S': { name: '硫', class: 'element-S' },
-  'F': { name: '氟', class: 'element-F' },
-  'P': { name: '磷', class: 'element-P' },
-  'Cl': { name: '氯', class: 'element-Cl' },
-  'Br': { name: '溴', class: 'element-Br' },
-  'I': { name: '碘', class: 'element-I' },
-  'Na': { name: '钠', class: 'element-Na' },
-  'K': { name: '钾', class: 'element-K' },
-  'Mg': { name: '镁', class: 'element-Mg' },
-  'Ca': { name: '钙', class: 'element-Ca' },
-  'Ba': { name: '钡', class: 'element-Ba' },
-  'Al': { name: '铝', class: 'element-Al' },
-  'Fe': { name: '铁', class: 'element-Fe' },
-  'Zn': { name: '锌', class: 'element-Zn' },
-  'Ag': { name: '银', class: 'element-Ag' },
-  'Hg': { name: '汞', class: 'element-Hg' },
-  'Cu': { name: '铜', class: 'element-Cu' },
+  'H': { name: '姘?, class: 'element-H' },
+  'O': { name: '姘?, class: 'element-O' },
+  'C': { name: '纰?, class: 'element-C' },
+  'N': { name: '姘?, class: 'element-N' },
+  'S': { name: '纭?, class: 'element-S' },
+  'F': { name: '姘?, class: 'element-F' },
+  'P': { name: '纾?, class: 'element-P' },
+  'Cl': { name: '姘?, class: 'element-Cl' },
+  'Br': { name: '婧?, class: 'element-Br' },
+  'I': { name: '纰?, class: 'element-I' },
+  'Na': { name: '閽?, class: 'element-Na' },
+  'K': { name: '閽?, class: 'element-K' },
+  'Mg': { name: '闀?, class: 'element-Mg' },
+  'Ca': { name: '閽?, class: 'element-Ca' },
+  'Ba': { name: '閽?, class: 'element-Ba' },
+  'Al': { name: '閾?, class: 'element-Al' },
+  'Fe': { name: '閾?, class: 'element-Fe' },
+  'Zn': { name: '閿?, class: 'element-Zn' },
+  'Ag': { name: '閾?, class: 'element-Ag' },
+  'Hg': { name: '姹?, class: 'element-Hg' },
+  'Cu': { name: '閾?, class: 'element-Cu' },
 }
 
-// 物质名称映射（从 API 加载）
+// 鐗╄川鍚嶇О鏄犲皠锛堜粠 API 鍔犺浇
 const substanceNames = ref<Record<string, string>>({})
 
-// 加载物质名称映射
+// 鍔犺浇鐗╄川鍚嶇О鏄犲皠
 const loadSubstanceNames = async () => {
   try {
     const response = await substanceAPI.getSubstanceNames()
     substanceNames.value = response.data || {}
   } catch (error) {
     console.error('[GameRoom] Failed to load substance names:', error)
-    // 使用默认映射作为后备
+    // 浣跨敤榛樿鏄犲皠浣滀负鍚庡
     substanceNames.value = {
-      'H2O': '水', 'H2': '氢气', 'O2': '氧气', 'HCl': '盐酸', 'H2SO4': '硫酸',
-      'NaOH': '氢氧化钠', 'NaCl': '氯化钠', 'CO2': '二氧化碳', 'CaO': '氧化钙',
-      'CuO': '氧化铜', 'Fe2O3': '氧化铁', 'Fe': '铁', 'Cu': '铜', 'Zn': '锌',
-      'Mg': '镁', 'Al': '铝', 'C': '碳', 'S': '硫', 'Cl2': '氯气', 'AgNO3': '硝酸银'
+      'H2O': '姘?, 'H2': '姘㈡皵', 'O2': '姘ф皵', 'HCl': '鐩愰吀', 'H2SO4': '纭吀',
+      'NaOH': '姘㈡哀鍖栭挔', 'NaCl': '姘寲閽?, 'CO2': '浜屾哀鍖栫⒊', 'CaO': '姘у寲閽?,
+      'CuO': '姘у寲閾?, 'Fe2O3': '姘у寲閾?, 'Fe': '閾?, 'Cu': '閾?, 'Zn': '閿?,
+      'Mg': '闀?, 'Al': '閾?, 'C': '纰?, 'S': '纭?, 'Cl2': '姘皵', 'AgNO3': '纭濋吀閾?
     }
   }
 }
@@ -626,7 +656,7 @@ const formatFormula = (formula: string) => {
 
 const getSubstanceName = (formula: string) => {
   if (substanceNames.value[formula]) return substanceNames.value[formula]
-  // 回退到硬编码的元素数据
+  // 鍥為€€鍒扮‖缂栫爜鐨勫厓绱犳暟
   if (ELEMENTS_DATA[formula]) return ELEMENTS_DATA[formula].name
   return formula
 }
@@ -661,7 +691,7 @@ const getFormulaFontSize = (formula: string, type: 'single' | 'double' = 'single
   }
 }
 
-// 解析化学式，返回元素及其数量（与后端 parseSubstance 逻辑一致）
+// 瑙ｆ瀽鍖栧寮忥紝杩斿洖鍏冪礌鍙婂叾鏁伴噺锛堜笌鍚庣 parseSubstance 閫昏緫涓€鑷达級
 const parseSubstanceElements = (substance: string): Record<string, number> => {
   const formula = String(substance || '').trim()
   const result: Record<string, number> = {}
@@ -706,13 +736,13 @@ const parseSubstanceElements = (substance: string): Record<string, number> => {
   return result
 }
 
-// 检查玩家手牌是否包含合成该物质所需的所有元素
+// 妫€鏌ョ帺瀹舵墜鐗屾槸鍚﹀寘鍚悎鎴愯鐗╄川鎵€闇€鐨勬墍鏈夊厓
 const canPlayerMakeSubstance = (substance: string): boolean => {
   if (!myData.value?.hand_cards) return false
   if (!String(substance || '').trim()) return false
   const required = parseSubstanceElements(substance)
   if (Object.keys(required).length === 0) return false
-  // 统计手牌中各元素数量
+  // 缁熻鎵嬬墝涓悇鍏冪礌鏁伴噺
   const handElements: Record<string, number> = {}
   for (const card of myData.value.hand_cards) {
     handElements[card.type] = (handElements[card.type] || 0) + 1
@@ -723,12 +753,12 @@ const canPlayerMakeSubstance = (substance: string): boolean => {
   return true
 }
 
-// 过滤并随机取最多3个可接续反应物提示
+// 杩囨护骞堕殢鏈哄彇鏈€澶?3 涓彲鎺ョ画鍙嶅簲鐗╂彁绀?
 const filteredReactionHints = computed(() => {
   if (!reactionHints.value.length || !isMyTurn.value) return []
   const eligible = reactionHints.value.filter((hint: any) => canPlayerMakeSubstance(String(hint?.substance || hint?.formula || '')))
   if (eligible.length <= 3) return eligible
-  // 随机打乱后取前3个
+  // 闅忔満鎵撲贡鍚庡彇鍓?3 涓?
   const shuffled = [...eligible]
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -744,14 +774,14 @@ const getAchievementTier = (achievementName: string): 'normal' | 'milestone' | '
   // Map achievement names to tiers
   // 'rare' tier for rare achievements like synthesizing gold
   // 'normal' tier for basic achievements
-  if (achievementName.includes('炼金术士')) return 'rare'
+  if (achievementName.includes('鐐奸噾鏈＋')) return 'rare'
   return 'normal'
 }
 
 const checkAchievements = (substance: string) => {
   if (!substance) return
-  if (substance.includes('Au') && !achievements.value.includes('炼金术士')) {
-    achievements.value.push('炼金术士')
+  if (substance.includes('Au') && !achievements.value.includes('鐐奸噾鏈＋')) {
+    achievements.value.push('鐐奸噾鏈＋')
     const { t } = useI18n()
     const tier = getAchievementTier(substance)
     const title = t(`game.achievements.${tier}.title`)
@@ -766,13 +796,13 @@ const addExp = (amount: number) => {
   localStorage.setItem('chem_exp', exp.value.toString())
 }
 
-// 如果是积分赛，强制关闭提示并锁定
+// 濡傛灉鏄Н鍒嗚禌锛屽己鍒跺叧闂彁绀哄苟閿佸畾
 watch(() => roomInfo.value?.is_points_mode, (val) => {
   if (val) {
     showHints.value = false
   }
 })
-// --- 移植结束 ---
+// --- 绉绘缁撴潫 ---
 
 const startTimer = () => {
   if (timerRaf) cancelAnimationFrame(timerRaf)
@@ -789,10 +819,10 @@ const startTimer = () => {
     const now = Date.now()
     const diffMs = gameState.value.turn_end_time - now
     
-    // 进度条平滑更新（每帧）
+    // 杩涘害鏉″钩婊戞洿鏂帮紙姣忓抚
     timePercent.value = Math.max(0, Math.min(100, (diffMs / 30000) * 100))
     
-    // 秒数显示每秒更新一次
+    // 绉掓暟鏄剧ず姣忕鏇存柊涓€
     if (now - lastTimeUpdate >= 1000) {
       const diff = Math.max(0, Math.floor(diffMs / 1000))
       timeRemaining.value = diff
@@ -805,10 +835,10 @@ const startTimer = () => {
       timeRemaining.value = 0
       timePercent.value = 0
       
-      // 倒计时结束后自动摸牌（仅在我的回合且未触发过）
+      // 鍊掕鏃剁粨鏉熷悗鑷姩鎽哥墝锛堜粎鍦ㄦ垜鐨勫洖鍚堜笖鏈Е鍙戣繃
       if (isMyTurn.value && !hasTimeoutFired && !tutorialScriptMode.value) {
         hasTimeoutFired = true
-        console.log('⏰ 回合倒计时已到期，自动摸牌')
+        console.log('鍥炲悎鍊掕鏃跺凡鍒版湡锛岃嚜鍔ㄦ懜鐗?)
         handleDrawCard()
       }
     }
@@ -821,7 +851,7 @@ watch(() => gameState.value?.turn_end_time, () => {
   startTimer()
 })
 
-// 场上物质变化时，刷新反应提示
+// 鍦轰笂鐗╄川鍙樺寲鏃讹紝鍒锋柊鍙嶅簲鎻愮ず
 watch(() => gameState.value?.last_card?.substance, () => {
   if (gameState.value?.status === 'playing') {
     fetchReactionHints()
@@ -841,7 +871,7 @@ const fetchTurnSubstances = async () => {
     const response = await gameAPI.getAvailableSubstances(id)
     turnReadySubstances.value = response.data || []
   } catch (error) {
-    console.error('获取回合可用物质失败:', error)
+    console.error('鑾峰彇鍥炲悎鍙敤鐗╄川澶辫触:', error)
   }
 }
 
@@ -852,14 +882,14 @@ watch(() => isMyTurn.value, (val) => {
   }
   if (val) {
     fetchTurnSubstances()
-    // 回合开始反馈
+    // 鍥炲悎寮€濮嬪弽
     feedback.turnStart()
   } else {
     turnReadySubstances.value = []
   }
 }, { immediate: true })
 
-// 监听化学反应 - 播放反应音效
+// 鐩戝惉鍖栧鍙嶅簲 - 鎾斁鍙嶅簲闊虫晥
 watch(() => gameState.value?.current_reaction, (newReaction, oldReaction) => {
   if (newReaction && newReaction !== oldReaction) {
     feedback.reaction()
@@ -897,31 +927,31 @@ watch(
   }
 )
 
-// 监听游戏结束 - 播放胜利/失败音效并标记教学完成
+// 鐩戝惉娓告垙缁撴潫 - 鎾斁鑳滃埄/澶辫触闊虫晥骞舵爣璁版暀瀛﹀畬
 watch(() => gameState.value?.status, (newStatus) => {
   if (newStatus === 'finished' && gameState.value?.finished_players) {
-    // 教学模式：游戏结束时立即标记已完成
+    // 鏁欏妯″紡锛氭父鎴忕粨鏉熸椂绔嬪嵆鏍囪宸插畬
     if (isTutorialMode.value) {
       localStorage.setItem('chemistry-uno-tutorial-completed', 'true')
     }
     const finishedPlayers = gameState.value.finished_players
     const myUID = user.value.uid
     if (finishedPlayers.length > 0 && finishedPlayers[0] === myUID) {
-      // 我是第一名 - 胜利音效
+      // 鎴戞槸绗竴- 鑳滃埄闊虫晥
       feedback.win()
     } else if (finishedPlayers.includes(myUID)) {
-      // 我完成了但不是第一名 - 成功音效
+      // 鎴戝畬鎴愪簡浣嗕笉鏄涓€- 鎴愬姛闊虫晥
       feedback.success()
     }
   }
 })
 
 const handleGameUpdate = (message: any) => {
-  // 只有在手动结算且游戏尚未结束时才跳过更新
-  // 如果游戏已经结束（有points_changes），即使isManualSettlement也要更新以显示排名
+  // 鍙湁鍦ㄦ墜鍔ㄧ粨绠椾笖娓告垙灏氭湭缁撴潫鏃舵墠璺宠繃鏇存柊
+  // 濡傛灉娓告垙宸茬粡缁撴潫锛堟湁points_changes锛夛紝鍗充娇isManualSettlement涔熻鏇存柊浠ユ樉绀烘帓
   if (isManualSettlement.value && !message.data?.points_changes) return
 
-  // 如果收到的是完整的游戏状态对象
+  // 濡傛灉鏀跺埌鐨勬槸瀹屾暣鐨勬父鎴忕姸鎬佸
   if (message.data && typeof message.data === 'object') {
     gameState.value = message.data
     syncTutorialStateFromGameState()
@@ -932,7 +962,7 @@ const handleGameUpdate = (message: any) => {
       }
     }
   } else {
-    // 如果收到的是房间ID字符串，则重新拉取完整状态
+    // 濡傛灉鏀跺埌鐨勬槸鎴块棿ID瀛楃涓诧紝鍒欓噸鏂版媺鍙栧畬鏁寸姸
     loadGameState(true).then(() => {
       if (isMyTurn.value) {
         fetchTurnSubstances()
@@ -941,7 +971,7 @@ const handleGameUpdate = (message: any) => {
   }
 }
 
-// 处理升级事件
+// 澶勭悊鍗囩骇浜嬩欢
 const handleLevelUp = (data: any) => {
   const levelData = data.data || data
   if (levelUpAnimationRef.value) {
@@ -952,20 +982,20 @@ const handleLevelUp = (data: any) => {
 const handleActionToast = (msg: any) => {
   const content = msg.data || msg.message
   if (content) {
-    pushRoomNotice(content, roomInfo.value?.is_pve ? 'AI 动态' : '实验动态', 'info')
+    pushRoomNotice(content, roomInfo.value?.is_pve ? 'AI 鍔ㄤ綔' : '瀹為獙鍔ㄤ綔', 'info')
   }
 }
 
 const handleRoomTerminated = async (msg: any) => {
   isRedirecting.value = true
-  const reason = msg.message || '由于连接中断，实验室已关闭'
-  await showAlert(reason, '实验结束')
+  const reason = msg.message || '鐢变簬杩炴帴涓柇锛屽疄楠屽宸插叧闂?
+  await showAlert(reason, '瀹為獙缁撴潫')
   router.push('/')
 }
 
 const handlePlayerKicked = async (msg: any) => {
   isRedirecting.value = true
-  await showAlert(msg.message || '由于消极游戏，您已被踢出', '权限移除')
+  await showAlert(msg.message || '鐢变簬娑堟瀬娓告垙锛屾偍宸茶韪㈠嚭', '鏉冮檺绉婚櫎')
   router.push('/')
 }
 
@@ -975,7 +1005,7 @@ const handleChatNotify = () => {
   }
 }
 
-// 为 WebSocket 事件创建包装函数，确保类型匹配
+// 涓?WebSocket 浜嬩欢鍒涘缓鍖呰鍑芥暟锛岀‘淇濈被鍨嬪尮閰?
 const handlePlayerJoined = () => {
   loadGameState(true)
 }
@@ -997,14 +1027,14 @@ const syncTutorialStateFromGameState = () => {
   }
 }
 
-// 教学模式智能提示
+// 鏁欏妯″紡鏅鸿兘鎻愮ず
 const generateTutorialHint = () => {
   if (!gameState.value || !isMyTurn.value) {
     tutorialHintText.value = ''
     return
   }
 
-  // 脚本化教学模式：显示脚本中的提示
+  // 鑴氭湰鍖栨暀瀛︽ā寮忥細鏄剧ず鑴氭湰涓殑鎻愮ず
   if (tutorialScriptMode.value) {
     const currentStep = getTutorialStep(tutorialCurrentStep.value)
     if (currentStep && currentStep.player === 'human') {
@@ -1015,7 +1045,7 @@ const generateTutorialHint = () => {
     return
   }
 
-  // 原有的通用教学提示逻辑
+  // 鍘熸湁鐨勯€氱敤鏁欏鎻愮ず閫昏緫
   const myPlayer = gameState.value.players?.[gameState.value.current_player]
   if (!myPlayer) {
     tutorialHintText.value = ''
@@ -1025,17 +1055,17 @@ const generateTutorialHint = () => {
   const handSize = myPlayer.hand?.length || 0
   const topCard = gameState.value.discard_top
 
-  // 根据游戏状态生成提示
+  // 鏍规嵁娓告垙鐘舵€佺敓鎴愭彁
   if (!topCard) {
-    tutorialHintText.value = '💡 回合开始：你可以先在「化学库」中选择一个物质，然后点击「打出卡牌」开始游戏！'
+    tutorialHintText.value = '馃挕 鍥炲悎寮€濮嬶細浣犲彲浠ュ厛鍦ㄣ€屽寲瀛﹀簱銆嶄腑閫夋嫨涓€涓墿璐紝鐒跺悗鐐瑰嚮銆屾墦鍑哄崱鐗屻€嶅紑濮嬫父鎴忥紒'
   } else if (handSize === 0) {
-    tutorialHintText.value = '💡 手牌用完了！点击「摸牌」按钮抽一张新牌（你将失去这个回合）'
+    tutorialHintText.value = '馃挕 鎵嬬墝鐢ㄥ畬浜嗭紒鐐瑰嚮銆屾懜鐗屻€嶆寜閽娊涓€寮犳柊鐗岋紙浣犲皢澶卞幓杩欎釜鍥炲悎锛?
   } else if (doubleMode.value) {
-    tutorialHintText.value = '💡 双元素模式：选择第二个物质，两个物质将一起打出到战场中'
+    tutorialHintText.value = '馃挕 鍙屽厓绱犳ā寮忥細閫夋嫨绗簩涓墿璐紝涓や釜鐗╄川灏嗕竴璧锋墦鍑哄埌鎴樺満'
   } else if (selectedSubstance.value) {
-    tutorialHintText.value = '💡 已选择物质！点击「打出卡牌」按钮将它放到战场上，或点击「双元素」同时打出两张'
+    tutorialHintText.value = '馃挕 宸查€夋嫨鐗╄川锛佺偣鍑汇€屾墦鍑哄崱鐗屻€嶆寜閽皢瀹冩斁鍒版垬鍦轰笂锛屾垨鐐瑰嚮銆屽弻鍏冪礌銆嶅悓鏃舵墦鍑轰袱绉嶇墿璐ㄥ弽搴?
   } else {
-    tutorialHintText.value = '💡 轮到你了：在「化学库」中选择一个物质，让它与战场中央的卡牌发生化学反应！'
+    tutorialHintText.value = '馃挕 杞埌浣犱簡锛氬湪銆屽寲瀛﹀簱銆嶄腑閫夋嫨涓€涓墿璐紝璁╁畠涓庢垬鍦轰腑澶殑鍗＄墝鍙戠敓鍖栧鍙嶅簲'
   }
 }
 
@@ -1067,16 +1097,16 @@ const normalizeReplayEvents = (events: any[]) => {
 }
 
 const resolveReplayCardKeyForPlay = (payload: any) => {
-  return payload?.card_symbol || payload?.card_type || '未知卡'
+  return payload?.card_symbol || payload?.card_type || '鏈煡'
 }
 
 const resolveReplayCardKeysForDouble = (payload: any) => {
   if (Array.isArray(payload?.cards) && payload.cards.length) {
-    return payload.cards.map((card: any) => card?.card_symbol || card?.card_type || card?.type || '未知卡')
+    return payload.cards.map((card: any) => card?.card_symbol || card?.card_type || card?.type || '鏈煡')
   }
   const symbol = payload?.card_symbol || payload?.card_type
   if (symbol) return [symbol, symbol]
-  return [payload?.sub1 || payload?.substance_1 || '未知卡', payload?.sub2 || payload?.substance_2 || '未知卡']
+  return [payload?.sub1 || payload?.substance_1 || '鏈煡', payload?.sub2 || payload?.substance_2 || '鏈煡']
 }
 
 const replayEffectCardTypes = new Set(['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr'])
@@ -1239,8 +1269,8 @@ const normalizeReplaySpeedValue = (speed: number) => {
 
 const replayStatusText = computed(() => {
   if (!isReplayBridgeMode.value) return ''
-  if (replayGameOver.value) return '游戏结束'
-  return replayIsPlaying.value ? '播放中' : '已暂停'
+  if (replayGameOver.value) return '娓告垙缁撴潫'
+  return replayIsPlaying.value ? '鎾斁' : '宸叉殏鍋?
 })
 
 const replayProgressText = computed(() => {
@@ -1491,7 +1521,7 @@ const loadReplaySimulationState = async () => {
     await loadSubstanceNames()
 
     if (!replayHistoryQueryID.value) {
-      throw new Error('无效的回放编号')
+      throw new Error('鏃犳晥鐨勫洖鏀剧紪鍙?)
     }
 
     let response: any
@@ -1511,7 +1541,7 @@ const loadReplaySimulationState = async () => {
       uid: Number(p.uid),
       username: p.nickname || p.username || `UID ${p.uid}`,
       nickname: p.nickname || p.username || `UID ${p.uid}`,
-      avatar: p.avatar || '🧪',
+      avatar: p.avatar || '馃И',
       card_count: 0,
       hand_cards: [],
       index,
@@ -1532,7 +1562,7 @@ const loadReplaySimulationState = async () => {
       uid: Number(p.uid),
       username: p.username || p.nickname || `UID ${p.uid}`,
       nickname: p.nickname || p.username || `UID ${p.uid}`,
-      avatar: p.avatar || '🧪',
+      avatar: p.avatar || '馃И',
       is_ai: Number(p.uid) < 0,
       is_offline: false
     }))
@@ -1550,7 +1580,7 @@ const loadReplaySimulationState = async () => {
 
     roomInfo.value = {
       id: `replay-${replayHistoryQueryID.value}`,
-      name: `回放模拟 #${String(replayHistoryQueryID.value).padStart(4, '0')}`,
+      name: `鍥炴斁妯℃嫙 #${String(replayHistoryQueryID.value).padStart(4, '0')}`,
       players: players.map((p: any) => p.uid),
       spectators: [Number(user.value?.uid)],
       ready_uids: [],
@@ -1588,8 +1618,8 @@ const loadReplaySimulationState = async () => {
     replayEvents.value = normalizedReplayEvents
     startReplayPlayback(true)
   } catch (error: any) {
-    console.error('[GameRoom] 加载回放模拟失败:', error)
-    loadError.value = error?.response?.data?.error || error?.message || '回放模拟加载失败'
+    console.error('[GameRoom] 鍔犺浇鍥炴斁妯℃嫙澶辫触:', error)
+    loadError.value = error?.response?.data?.error || error?.message || '鍥炴斁妯℃嫙鍔犺浇澶辫触'
   } finally {
     loading.value = false
   }
@@ -1603,22 +1633,22 @@ const loadGameState = async (silent = false) => {
   try {
     if (!silent && !roomInfo.value) {
       loading.value = true
-      // 首次加载时加载物质名称映射
+      // 棣栨鍔犺浇鏃跺姞杞界墿璐ㄥ悕绉版槧
       await loadSubstanceNames()
     }
-    // 只在首次加载时尝试加入房间
+      // 鍙湪棣栨鍔犺浇鏃跺皾璇曞姞鍏ユ埧闂?
     if (!silent) {
       try {
-        // 从 URL 查询参数中获取访问密钥和观战模式
+        // 浠?URL 鏌ヨ鍙傛暟涓幏鍙栬闂瘑閽ュ拰瑙傛垬妯″紡
         const accessKey = route.query.key as string | undefined
         const asSpectator = route.query.spectator === 'true' || route.query.spectator === '1'
         await gameAPI.joinRoom(id, accessKey, asSpectator)
       } catch (joinError: any) {
-        // 如果加入失败（例如房间已满、被封禁等），显示错误并返回
+        // 濡傛灉鍔犲叆澶辫触锛堜緥濡傛埧闂村凡婊°€佽灏佺绛夛級锛屾樉绀洪敊璇苟杩斿洖
         console.error('[GameRoom] Failed to join room:', joinError)
-        const errorMsg = joinError.response?.data?.error || '无法加入该房间'
+        const errorMsg = joinError.response?.data?.error || '鏃犳硶鍔犲叆璇ユ埧闂?
         loadError.value = errorMsg
-        showToast(errorMsg, '加入失败', 'error')
+        showToast(errorMsg, '鍔犲叆澶辫触', 'error')
         loading.value = false
         router.push('/')
         return
@@ -1649,7 +1679,7 @@ const loadGameState = async (silent = false) => {
       gameState.value = data.game_state
       syncTutorialStateFromGameState()
 
-      // 教学模式提示生成
+      // 鏁欏妯″紡鎻愮ず鐢熸垚
       if (isTutorialMode.value && isMyTurn.value) {
         generateTutorialHint()
       }
@@ -1659,27 +1689,27 @@ const loadGameState = async (silent = false) => {
     
     loading.value = false
   } catch (error: any) {
-    console.error('加载游戏状态失败:', error)
+    console.error('鍔犺浇娓告垙鐘舵€佸け', error)
     loading.value = false
 
     if (error.response?.status === 404) {
-      loadError.value = '房间不存在或已被关闭'
+      loadError.value = '鎴块棿涓嶅瓨鍦ㄦ垨宸茶鍏抽棴'
       isRedirecting.value = true
-      showToast('房间不存在或已被关闭', '未知实验室', 'error')
+      showToast('鎴块棿涓嶅瓨鍦ㄦ垨宸茶鍏抽棴', '鏈煡瀹為獙', 'error')
       router.push('/')
     } else if (error.response?.status === 401) {
-      loadError.value = '身份验证失败，请重新登录'
+      loadError.value = '韬唤楠岃瘉澶辫触锛岃閲嶆柊鐧诲綍'
       isRedirecting.value = true
-      showToast('身份验证失败，请重新登录', '准入失败', 'error')
+      showToast('韬唤楠岃瘉澶辫触锛岃閲嶆柊鐧诲綍', '鍑嗗叆澶辫触', 'error')
       router.push('/login')
     } else if (error.response?.status === 403) {
-      loadError.value = '您不在该房间中'
+      loadError.value = '鎮ㄤ笉鍦ㄨ鎴块棿'
       isRedirecting.value = true
-      showToast('您不在该房间中', '准入失败', 'error')
+      showToast('鎮ㄤ笉鍦ㄨ鎴块棿', '鍑嗗叆澶辫触', 'error')
       router.push('/')
     } else {
-      loadError.value = '实验环境加载异常，请重试'
-      // 非致命错误不自动跳转，允许用户重试
+      loadError.value = '瀹為獙鐜鍔犺浇寮傚父锛岃閲嶈瘯'
+      // 闈炶嚧鍛介敊璇笉鑷姩璺宠浆锛屽厑璁哥敤鎴烽噸
       if (!silent) {
         isRedirecting.value = true
         router.push('/')
@@ -1689,17 +1719,17 @@ const loadGameState = async (silent = false) => {
 }
 
 onMounted(() => {
-  // 检测教学模式
+  // 妫€娴嬫暀瀛︽ā
   const tutorialMode = localStorage.getItem('chemistry-uno-tutorial-mode')
   if (tutorialMode === 'true') {
     isTutorialMode.value = true
-    tutorialScriptMode.value = true  // 启用脚本化教学
+    tutorialScriptMode.value = true  // 鍚敤鑴氭湰鍖栨暀
   }
 
-  // 设置浮窗提示组件引用
+  // 璁剧疆娴獥鎻愮ず缁勪欢寮曠敤
   setToastRef(gameToastRef)
 
-  // 重置状态，防止之前的错误状态影响
+  // 閲嶇疆鐘舵€侊紝闃叉涔嬪墠鐨勯敊璇姸鎬佸奖
   isRedirecting.value = false
 
   if (isReplayBridgeMode.value) {
@@ -1707,13 +1737,13 @@ onMounted(() => {
     return
   }
 
-  // 设置一个安全超时，如果15秒后还在loading状态，强制重置
+  // 璁剧疆涓€涓畨鍏ㄨ秴鏃讹紝濡傛灉15绉掑悗杩樺湪loading鐘舵€侊紝寮哄埗閲嶇疆
   const safetyTimeout = setTimeout(() => {
     if (loading.value) {
       console.error('Loading timeout - forcing reset')
       loading.value = false
-      loadError.value = '实验室初始化超时，请检查网络连接后重试'
-      showToast('实验室初始化超时，请检查网络连接后重试', '连接超时', 'error')
+      loadError.value = '瀹為獙瀹ゅ垵濮嬪寲瓒呮椂锛岃妫€鏌ョ綉缁滆繛鎺ュ悗閲嶈瘯'
+      showToast('瀹為獙瀹ゅ垵濮嬪寲瓒呮椂锛岃妫€鏌ョ綉缁滆繛鎺ュ悗閲嶈瘯', '杩炴帴瓒呮椂', 'error')
       router.push('/')
     }
   }, 15000)
@@ -1731,14 +1761,14 @@ onMounted(() => {
 
   loadGameState()
     .then(() => {
-      clearTimeout(safetyTimeout) // 成功加载后清除超时
+      clearTimeout(safetyTimeout) // 鎴愬姛鍔犺浇鍚庢竻闄よ秴
 
-      // 游戏状态加载成功后，获取提示信息（避免 setup 阶段的 API 调用失败导致提示为空）
+      // 娓告垙鐘舵€佸姞杞芥垚鍔熷悗锛岃幏鍙栨彁绀轰俊鎭紙閬垮厤 setup 闃舵API 璋冪敤澶辫触瀵艰嚧鎻愮ず涓虹┖
       if (showHints.value && randomHints.value.length === 0) {
         fetchRandomHints()
       }
 
-      // 确保WebSocket已连接
+      // 纭繚WebSocket宸茶繛
       if (!websocket.isConnected()) {
         websocket.connect()
       }
@@ -1754,22 +1784,22 @@ onMounted(() => {
       websocket.on('private_chat', handleChatNotify)
       websocket.on('level_up', handleLevelUp)
 
-      // 教学模式欢迎提示
+      // 鏁欏妯″紡娆㈣繋鎻愮ず
       if (isTutorialMode.value) {
         const tutorialWelcomeShown = localStorage.getItem('chemistry-uno-tutorial-welcome-shown')
         if (!tutorialWelcomeShown) {
           setTimeout(() => {
             if (tutorialScriptMode.value) {
               showToast(
-                '🎓 欢迎来到脚本化教学关卡！你将跟随系统指引，按照固定步骤学习游戏机制。请严格按照提示的顺序出牌。',
-                '📖 教学脚本已加载',
+                '馃帗 娆㈣繋鏉ュ埌鑴氭湰鍖栨暀瀛﹀叧鍗★紒浣犲皢璺熼殢绯荤粺鎸囧紩锛屾寜鐓у浐瀹氭楠ゅ涔犳父鎴忔満鍒躲€傝涓ユ牸鎸夌収鎻愮ず鐨勯『搴忓嚭鐗?,
+                '馃摉 鏁欏鑴氭湰宸插姞杞?,
                 'success',
                 9000
               )
             } else {
               showToast(
-                '💡 欢迎来到教学关卡！这是一场低难度的AI对战，在你的回合时会出现实时提示帮助你学习游戏。祝你玩得开心！',
-                '🎯 教学模式已开启',
+                '馃挕 娆㈣繋鏉ュ埌鏁欏鍏冲崱锛佽繖鏄竴鍦轰綆闅惧害鐨凙I瀵规垬锛屽湪浣犵殑鍥炲悎鏃朵細鍑虹幇瀹炴椂鎻愮ず甯姪浣犲涔犳父鎴忋€傜浣犵帺寰楀紑蹇冿紒',
+                '馃幆 鏁欏妯″紡宸插紑鍚?,
                 'success',
                 8000
               )
@@ -1780,8 +1810,8 @@ onMounted(() => {
       }
     })
     .catch(err => {
-      clearTimeout(safetyTimeout) // 捕获错误后也清除超时
-      // loadGameState 内部已经处理了错误，这里只是确保不会有未处理的promise rejection
+      clearTimeout(safetyTimeout) // 鎹曡幏閿欒鍚庝篃娓呴櫎瓒呮椂
+      // loadGameState 鍐呴儴宸茬粡澶勭悊浜嗛敊璇紝杩欓噷鍙槸纭繚涓嶄細鏈夋湭澶勭悊鐨刾romise rejection
       console.error('Failed to initialize game room:', err)
       loading.value = false
     })
@@ -1793,7 +1823,7 @@ onUnmounted(() => {
     window.clearTimeout(centerEffectTimer)
   }
 
-  // 清除教学模式标记，并记录已完成
+  // 娓呴櫎鏁欏妯″紡鏍囪锛屽苟璁板綍宸插畬
   if (isTutorialMode.value) {
     localStorage.removeItem('chemistry-uno-tutorial-mode')
     localStorage.removeItem('chemistry-uno-tutorial-welcome-shown')
@@ -1814,32 +1844,53 @@ onUnmounted(() => {
   websocket.off('private_chat', handleChatNotify)
 })
 
-const canRunTutorialAction = (action: 'play' | 'draw' | 'double') => {
+const canRunTutorialAction = (action: TutorialStep['action'], substance?: string) => {
   if (!tutorialScriptMode.value) return true
 
-  const currentStep = getTutorialStep(tutorialCurrentStep.value)
-  if (!currentStep) return true
-
-  if (currentStep.player !== 'human') {
-    showToast('当前是 AI 演示步骤，请等待 AI 操作', '⚠️ 教学模式', 'warning', 2500)
-    return false
-  }
-
-  if (currentStep.action !== action) {
-    showToast('当前步骤不支持该操作，请按提示执行', '⚠️ 教学模式', 'warning', 2500)
+  const check = getTutorialActionCheck(tutorialCurrentStep.value, action, substance)
+  if (!check.allowed) {
+    const expected = check.expectedSubstance
+      ? `${check.expectedAction || 'action'} ${check.expectedSubstance}`
+      : (check.expectedAction || 'the scripted action')
+    showToast(`Tutorial step is locked. Please perform ${expected}.`, 'Tutorial Mode', 'warning', 2500)
     return false
   }
 
   return true
 }
 
+const showTutorialLockToast = (message = 'Tutorial step is locked. Follow the current tutorial prompt.') => {
+  showToast(message, 'Tutorial Mode', 'warning', 2500)
+}
+
+const canUseTutorialLockedSurface = () => {
+  if (!tutorialLockActive.value) return true
+  showTutorialLockToast()
+  return false
+}
+
+const handleTutorialLockedSurface = (callback: () => void) => {
+  if (!canUseTutorialLockedSurface()) return
+  callback()
+}
+
+watch(tutorialLockActive, (locked) => {
+  if (!locked) return
+  showChat.value = false
+  showHints.value = false
+  showPlayers.value = false
+  showDeckDetailModal.value = false
+  showChemicalKeyboard.value = false
+  closeAIAssistant()
+})
+
 const handleCardClick = async (card: any) => {
   if (!isMyTurn.value) return
-  if (!canRunTutorialAction('play')) return
+  if (!canRunTutorialAction('play', card.type)) return
 
   feedback.click()
 
-  // 功能牌直接打出
+  // 鍔熻兘鐗岀洿鎺ユ墦
   const specialTypes = ['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr']
   if (specialTypes.includes(card.type) || card.effect) {
     try {
@@ -1850,45 +1901,45 @@ const handleCardClick = async (card: any) => {
       availableSubstances.value = []
       return
     } catch (error: any) {
-      showToast(error.response?.data?.error || '出牌失败', '反应中断', 'error')
+      showToast(error.response?.data?.error || '鍑虹墝澶辫触', '鍙嶅簲涓柇', 'error')
       feedback.error()
       return
     }
   }
 
-  // 元素牌：直接出牌该元素符号（单质）
-  // 例如：点击 H 手牌 → 出牌物质为 H（不管单质是 H 还是 H₂）
-  // 后端会进行物质合法性检测（substances表）和反应检查（reactions表）
+  // 鍏冪礌鐗岋細鐩存帴鍑虹墝璇ュ厓绱犵鍙凤紙鍗曡川
+  // 渚嬪锛氱偣H 鎵嬬墝 鍑虹墝鐗╄川H锛堜笉绠″崟璐ㄦ槸 H 杩樻槸 H鈧傦級
+  // 鍚庣浼氳繘琛岀墿璐ㄥ悎娉曟€ф娴嬶紙substances琛級鍜屽弽搴旀鏌ワ紙reactions琛級
   try {
     await gameAPI.playCard(id, card, card.type)
     feedback.playCard()
     selectedCard.value = null
     selectedSubstance.value = null
     availableSubstances.value = []
-    // 增加经验值
+    // 澧炲姞缁忛獙
     addExp(10)
     checkAchievements(card.type)
   } catch (error: any) {
-    showToast(error.response?.data?.error || '出牌失败', '反应中断', 'error')
+    showToast(error.response?.data?.error || '鍑虹墝澶辫触', '鍙嶅簲涓柇', 'error')
     feedback.error()
   }
 }
 
 const handlePlayCard = async () => {
-  if (!canRunTutorialAction('play')) return
   if (!selectedSubstance.value) {
-    showToast('请选择要合成或放置的化学物质', '未选择目标', 'warning')
+    showToast('璇烽€夋嫨瑕佸悎鎴愭垨鏀剧疆鐨勫寲瀛︾墿', '鏈€夋嫨鐩爣', 'warning')
     return
   }
+  if (!canRunTutorialAction('play', selectedSubstance.value)) return
 
-  // 脚本化教学模式：验证是否是正确的牌
+  // 鑴氭湰鍖栨暀瀛︽ā寮忥細楠岃瘉鏄惁鏄纭殑
   if (tutorialScriptMode.value) {
     const currentStep = getTutorialStep(tutorialCurrentStep.value)
     if (currentStep && currentStep.player === 'human') {
       if (selectedSubstance.value !== currentStep.substance) {
         showToast(
-          `请按照教学提示打出 <strong>${currentStep.substance}</strong>`,
-          '⚠️ 教学模式',
+          `璇锋寜鐓ф暀瀛︽彁绀烘墦<strong>${currentStep.substance}</strong>`,
+          '鈿狅笍 鏁欏妯″紡',
           'warning',
           3000
         )
@@ -1910,14 +1961,14 @@ const handlePlayCard = async () => {
   }
 
   try {
-    // 如果没有选中的卡片，则传递一个带类型的占位符，后端会根据物质消耗手牌
+    // 濡傛灉娌℃湁閫変腑鐨勫崱鐗囷紝鍒欎紶閫掍竴涓甫绫诲瀷鐨勫崰浣嶇锛屽悗绔細鏍规嵁鐗╄川娑堣€楁墜
     const cardToPlay = selectedCard.value || { type: selectedSubstance.value, count: 1, effect: '' }
     await gameAPI.playCard(id, cardToPlay, selectedSubstance.value)
 
-    // 播放打牌反馈
+    // 鎾斁鎵撶墝鍙嶉
     feedback.playCard()
 
-    // 增加经验值并检查成就
+    // 澧炲姞缁忛獙鍊煎苟妫€鏌ユ垚
     addExp(10)
     checkAchievements(selectedSubstance.value)
 
@@ -1925,24 +1976,24 @@ const handlePlayCard = async () => {
     selectedSubstance.value = null
     availableSubstances.value = []
   } catch (error: any) {
-    showToast(error.response?.data?.error || '出牌失败', '反应中断', 'error')
+    showToast(error.response?.data?.error || '鍑虹墝澶辫触', '鍙嶅簲涓柇', 'error')
   }
 }
 
 const handleDoublePlay = async () => {
-  if (!canRunTutorialAction('double')) return
   if (!firstDoubleSubstance.value || !secondDoubleSubstance.value) {
-    showToast('请选择参与双联反应的两种物质', '未就绪', 'warning')
+    showToast('璇烽€夋嫨鍙備笌鍙岃仈鍙嶅簲鐨勪袱绉嶇墿', '鏈氨缁?, 'warning')
     feedback.error()
     return
   }
+  if (!canRunTutorialAction('double', `${firstDoubleSubstance.value}+${secondDoubleSubstance.value}`)) return
 
   try {
     await gameAPI.playDouble(id, firstDoubleSubstance.value, secondDoubleSubstance.value)
 
     feedback.playCard()
 
-    // 增加经验值
+    // 澧炲姞缁忛獙
     addExp(25)
     checkAchievements(firstDoubleSubstance.value)
     checkAchievements(secondDoubleSubstance.value)
@@ -1954,14 +2005,15 @@ const handleDoublePlay = async () => {
     selectedSubstance.value = null
     availableSubstances.value = []
   } catch (error: any) {
-    showToast(error.response?.data?.error || '双联行动失败', '反应中断', 'error')
+    showToast(error.response?.data?.error || '鍙岃仈琛屽姩澶辫触', '鍙嶅簲涓柇', 'error')
     feedback.error()
   }
 }
 
 const toggleDoubleMode = () => {
+  if (!canRunTutorialAction('double')) return
   if (!myData.value?.double_action_available) {
-    showToast('双联反应尚未就绪，请先进行普通实验（行动）', '无法发动', 'warning')
+    showToast('鍙岃仈鍙嶅簲灏氭湭灏辩华锛岃鍏堣繘琛屾櫘閫氬疄楠岋紙琛屽姩锛?, '鏃犳硶鍙戝姩', 'warning')
     feedback.error()
     return
   }
@@ -1983,8 +2035,8 @@ const removeSubstance = (pos: number) => {
 }
 
 const handleInputPlay = async () => {
-  if (!canRunTutorialAction('play')) return
   if (!substanceInput.value) return
+  if (!canRunTutorialAction('play', substanceInput.value)) return
 
   if (doubleMode.value) {
     const sub = substanceInput.value
@@ -1998,12 +2050,12 @@ const handleInputPlay = async () => {
   }
 
   try {
-    // 为兼容原API，传一个空Card对象
+    // 涓哄吋瀹瑰師API锛屼紶涓€涓┖Card瀵硅薄
     await gameAPI.playCard(id, { type: '', count: 0, effect: '' }, substanceInput.value)
 
     feedback.playCard()
 
-    // 增加经验值并检查成就
+    // 澧炲姞缁忛獙鍊煎苟妫€鏌ユ垚
     addExp(10)
     checkAchievements(substanceInput.value)
 
@@ -2012,7 +2064,7 @@ const handleInputPlay = async () => {
     selectedSubstance.value = null
     availableSubstances.value = []
   } catch (error: any) {
-    showToast(error.response?.data?.error || '出牌失败', '反应中断', 'error')
+    showToast(error.response?.data?.error || '鍑虹墝澶辫触', '鍙嶅簲涓柇', 'error')
     feedback.error()
   }
 }
@@ -2023,34 +2075,45 @@ const handleDrawCard = async () => {
     await gameAPI.drawCard(id)
     feedback.drawCard()
   } catch (error: any) {
-    showToast(error.response?.data?.error || '摸牌失败', '系统异常', 'error')
+    showToast(error.response?.data?.error || '鎽哥墝澶辫触', '绯荤粺寮傚父', 'error')
     feedback.error()
   }
 }
 
-// 化学键盘确认处理
+// 鍖栧閿洏纭澶勭悊
 const handleKeyboardConfirm = async (formula: string) => {
+  if (tutorialLockActive.value) {
+    showTutorialLockToast()
+    showChemicalKeyboard.value = false
+    return
+  }
+
   substanceInput.value = formula
   showChemicalKeyboard.value = false
   await handleInputPlay()
 }
 
 const handleLeaveRoom = async () => {
+  if (tutorialLockActive.value) {
+    showTutorialLockToast()
+    return
+  }
+
   if (isReplayBridgeMode.value) {
     const scopeQuery = ''
     router.push(`/replay/${replayHistoryQueryID.value}${scopeQuery}`)
     return
   }
 
-  // 人机对战模式下，如果玩家已经完成（进入观战状态），点击退出改为“结算”
+  // 浜烘満瀵规垬妯″紡涓嬶紝濡傛灉鐜╁宸茬粡瀹屾垚锛堣繘鍏ヨ鎴樼姸鎬侊級锛岀偣鍑婚€€鍑烘敼涓衡€滅粨绠?
   if (roomInfo.value?.is_pve && isSpectator.value) {
     try {
-      // 调用API通知服务器玩家离开房间
+      // 璋冪敤API閫氱煡鏈嶅姟鍣ㄧ帺瀹剁寮€鎴块棿
       await gameAPI.leaveRoom(id)
     } catch (error) {
-      console.error('离开房间API调用失败:', error)
+      console.error('绂诲紑鎴块棿API璋冪敤澶辫触:', error)
     }
-    // 断开房间连接并停止监听（直接“关闭”房间逻辑）
+    // 鏂紑鎴块棿杩炴帴骞跺仠姝㈢洃鍚紙鐩存帴鈥滃叧闂€濇埧闂撮€昏緫
     websocket.leaveRoom()
     websocket.off('game_update', handleGameUpdate)
     websocket.off('player_joined', handlePlayerJoined)
@@ -2064,12 +2127,12 @@ const handleLeaveRoom = async () => {
     if (gameState.value) {
       isManualSettlement.value = true
       gameState.value.status = 'finished'
-      // 构造临时积分数据用于展示（如果尚未结算）
+      // 鏋勯€犱复鏃剁Н鍒嗘暟鎹敤浜庡睍绀猴紙濡傛灉灏氭湭缁撶畻
       if (!gameState.value.points_changes) {
         const changes: Record<string, number> = {}
         const finishers = gameState.value.finished_players || []
         
-        // 确保所有玩家都在列表中，即便有些还没打完
+        // 纭繚鎵€鏈夌帺瀹堕兘鍦ㄥ垪琛ㄤ腑锛屽嵆渚挎湁浜涜繕娌℃墦
         const allUIDs = gameState.value.players.map((p: any) => p.uid)
         const remainingUIDs = allUIDs.filter((id: number) => !finishers.includes(id))
         const fullFinishers = [...finishers, ...remainingUIDs]
@@ -2083,24 +2146,24 @@ const handleLeaveRoom = async () => {
           const rank = index + 1
           let points = 0
           
-          // 后端结算逻辑：
-          // 如果是最后一名且总人数大于1，给予固定参与分 5
+          // 鍚庣缁撶畻閫昏緫
+          // 濡傛灉鏄渶鍚庝竴鍚嶄笖鎬讳汉鏁板ぇ锛岀粰浜堝浐瀹氬弬涓庡垎 5
           if (index === fullFinishers.length - 1 && fullFinishers.length > 1) {
             points = 5
           } else {
             points = Math.floor(100 / rank)
           }
 
-          // 应用倍率 (受中途退出人数影响)
+          // 搴旂敤鍊嶇巼 (鍙椾腑閫旈€€鍑轰汉鏁板奖
           points = Math.floor(points * multiplier)
 
-          // PvE 模式积分修正
+          // PvE 妯″紡绉垎淇
           if (roomInfo.value?.is_pve) {
-            // 难度 < 50，无法获得积分
+            // 闅惧害 < 50锛屾棤娉曡幏寰楃Н
             if (difficulty < 50) {
               points = 0
             } else {
-              // 积分 = 原始积分 * (难度 / 100)
+              // 绉垎 = 鍘熷绉垎 * (闅惧害 / 100)
               points = Math.floor(points * (difficulty / 100.0))
             }
           }
@@ -2119,65 +2182,36 @@ const handleLeaveRoom = async () => {
   }
 
   try {
-    let message = '暂时离开实验室？你可以在被踢出前随时返回继续实验'
-    let title = '暂离实验'
+    let message = '鏆傛椂绂诲紑瀹為獙瀹わ紵浣犲彲浠ュ湪琚涪鍑哄墠闅忔椂杩斿洖缁х画瀹為獙'
+    let title = '鏆傜瀹為獙'
 
-    // 如果玩家已完成实验且是积分模式，提示已获得分值并可直接安全离开
+    // 濡傛灉鐜╁宸插畬鎴愬疄楠屼笖鏄Н鍒嗘ā寮忥紝鎻愮ず宸茶幏寰楀垎鍊煎苟鍙洿鎺ュ畨鍏ㄧ寮€
     if (isSpectator.value) {
       const rank = (gameState.value?.finished_players || []).indexOf(user.value?.uid) + 1
       const points = rank === 1 ? 100 : (rank === 2 ? 50 : (rank === 3 ? 33 : 25))
-      message = `实验已完成！你获得了第 ${rank} 名，系统已为你发放约 ${points} 燃素。确定现在结束这次实验吗？`
-      title = '实验结算'
+      message = `瀹為獙宸插畬鎴愶紒浣犺幏寰椾簡${rank} 鍚嶏紝绯荤粺宸蹭负浣犲彂鏀剧害 ${points} 鐕冪礌銆傜‘瀹氱幇鍦ㄧ粨鏉熻繖娆″疄楠屽悧锛焋
+      title = '瀹為獙缁撶畻'
     }
 
     const confirmed = await showConfirm(message, title)
     if (confirmed) {
       feedback.click()
-      // 调用API通知服务器玩家彻底离开房间
-      // 注意：即便是正在游戏中，用户点击“退出”也应该执行 leaveRoom 逻辑
-      // 以释放该用户的“同时只能进行一次游戏”锁定
+      // 璋冪敤API閫氱煡鏈嶅姟鍣ㄧ帺瀹跺交搴曠寮€鎴块棿
+      // 娉ㄦ剰锛氬嵆渚挎槸姝ｅ湪娓告垙涓紝鐢ㄦ埛鐐瑰嚮鈥滈€€鍑衡€濅篃搴旇鎵ц leaveRoom 閫昏緫
+      // 浠ラ噴鏀捐鐢ㄦ埛鐨勨€滃悓鏃跺彧鑳借繘琛屼竴娆℃父鎴忊€濋攣
       try {
         await gameAPI.leaveRoom(id)
       } catch (error) {
-        console.error('离开房间API调用失败:', error)
+        console.error('绂诲紑鎴块棿API璋冪敤澶辫触:', error)
       }
       
-      // 断开房间连接并停止监听
+      // 鏂紑鎴块棿杩炴帴骞跺仠姝㈢洃
       websocket.leaveRoom()
       router.push('/')
     }
   } catch (error) {
-    console.error('离开房间失败:', error)
+    console.error('绂诲紑鎴块棿澶辫触:', error)
     router.push('/')
-  }
-}
-
-// 生成分享链接（私密房间自动带密钥）
-const shareLink = computed(() => {
-  const currentUrl = window.location.href
-  // 如果是私密房间且有访问密钥，自动添加key参数
-  if (roomInfo.value?.is_private && roomInfo.value?.access_key) {
-    // 检查URL中是否已经包含key参数
-    if (!currentUrl.includes('?key=')) {
-      const separator = currentUrl.includes('?') ? '&' : '?'
-      return `${currentUrl}${separator}key=${roomInfo.value.access_key}`
-    }
-  }
-  return currentUrl
-})
-
-const handleCopyLink = async () => {
-  try {
-    await navigator.clipboard.writeText(shareLink.value)
-    feedback.success()
-    if (roomInfo.value?.is_private) {
-      showToast('私密房间邀请链接已复制（含访问密钥），快发送给你的科研伙伴吧！', '任务下达', 'success')
-    } else {
-      showToast('实验邀请链接已复制到剪贴板，快发送给你的科研伙伴吧！', '任务下达', 'success')
-    }
-  } catch (err) {
-    feedback.error()
-    showToast('链接复制失败，请手动复制浏览器地址栏', '设备故障', 'error')
   }
 }
 
@@ -2191,21 +2225,21 @@ const getDynamicCardClass = (card: any, formula?: string) => {
     return ''
   }
 
-  // 特殊性质卡牌优先
+  // 鐗规畩鎬ц川鍗＄墝浼樺厛
   const nobleGases = ['He', 'Ne', 'Ar', 'Kr']
   if (nobleGases.includes(card.type)) return 'card-noble'
   if (card.effect || card.type === 'Au') return 'card-func'
 
-  // 如果提供了分子式（通常是反应结果）
+  // 濡傛灉鎻愪緵浜嗗垎瀛愬紡锛堥€氬父鏄弽搴旂粨鏋滐級
   if (formula) {
     const elements = formula.match(/[A-Z][a-z]?/g) || []
-    // 判读是否为化合物（包含多种元素）
+    // 鍒よ鏄惁涓哄寲鍚堢墿锛堝寘鍚绉嶅厓绱狅級
     if (elements.length > 1) return 'card-reaction'
-    // 单质则使用该元素的颜色
+    // 鍗曡川鍒欎娇鐢ㄨ鍏冪礌鐨勯
     if (elements.length === 1 && ELEMENTS_DATA[elements[0]]) return ELEMENTS_DATA[elements[0]].class
   }
 
-  // 基础元素颜色
+  // 鍩虹鍏冪礌棰滆壊
   if (ELEMENTS_DATA[card.type]) return ELEMENTS_DATA[card.type].class
   
   return ''
@@ -2258,7 +2292,7 @@ const setupDraggable = (el: HTMLElement | null) => {
 onMounted(() => {
   isMobile.value = window.innerWidth < 640
 
-  // 移动端自动关闭提示面板
+  // 绉诲姩绔嚜鍔ㄥ叧闂彁绀洪潰
   if (isMobile.value) {
     showHints.value = false
   }
@@ -2268,9 +2302,9 @@ onMounted(() => {
   }
   window.addEventListener('resize', handleResize)
 
-  // 移动端自动全屏
+  // 绉诲姩绔嚜鍔ㄥ叏
   if (isMobile.value) {
-    // 用户首次交互后请求全屏
+    // 鐢ㄦ埛棣栨浜や簰鍚庤姹傚叏
     const onFirstInteraction = () => {
       requestFullscreen()
       document.removeEventListener('touchstart', onFirstInteraction)
@@ -2280,7 +2314,7 @@ onMounted(() => {
     document.addEventListener('click', onFirstInteraction, { once: true })
   }
 
-  // 初始化拖拽滑动
+  // 鍒濆鍖栨嫋鎷芥粦
   let cleanupHand: (() => void) | undefined
   let cleanupSubstances: (() => void) | undefined
   setTimeout(() => {
@@ -2295,17 +2329,19 @@ onMounted(() => {
   })
 })
 
-// 监听当前玩家变化，自动滚动到行动玩家
+// 鐩戝惉褰撳墠鐜╁鍙樺寲锛岃嚜鍔ㄦ粴鍔ㄥ埌琛屽姩鐜╁
 watch(() => gameState.value?.current_player, () => {
   nextTick(() => scrollToActivePlayer())
 })
+
+watch([roomInfo, gameState, playersInfo, user], syncAIAssistantContext, { deep: true, immediate: true })
 </script>
 
 <template>
-  <div class="console-app-shell h-[var(--app-height)] sm:h-screen w-full text-slate-900 dark:text-white overflow-y-auto sm:overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
+  <div data-testid="game-room-page" class="console-app-shell h-[var(--app-height)] max-h-[var(--app-height)] w-full text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
     <div class="console-grid-overlay"></div>
     <!-- Loading State -->
-    <div v-if="loading" class="min-h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div v-if="loading" class="h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <!-- Background Elements -->
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 dark:bg-blue-500/30 rounded-full blur-[120px] animate-pulse"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 dark:bg-purple-500/30 rounded-full blur-[120px]"></div>
@@ -2321,8 +2357,8 @@ watch(() => gameState.value?.current_player, () => {
           </div>
         </div>
         <div class="text-center space-y-3">
-          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase drop-shadow-lg">Initializing Lab / 初始化实验室</h2>
-          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">正在连接实验室... / Connecting to the lab...</p>
+          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase drop-shadow-lg">Initializing Lab / 鍒濆鍖栧疄楠屽</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">姝ｅ湪杩炴帴瀹為獙.. / Connecting to the lab...</p>
           <div class="flex items-center gap-1 justify-center">
              <span class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s] shadow-lg shadow-blue-500/50"></span>
              <span class="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s] shadow-lg shadow-blue-500/50"></span>
@@ -2332,8 +2368,8 @@ watch(() => gameState.value?.current_player, () => {
       </div>
     </div>
 
-    <!-- Error / No Data State - 防止黑屏 -->
-    <div v-else-if="!roomInfo" class="min-h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <!-- Error / No Data State - 闃叉榛戝睆 -->
+    <div v-else-if="!roomInfo" class="h-[var(--app-height)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-600/10 dark:bg-red-500/20 rounded-full blur-[120px]"></div>
       <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 dark:bg-purple-500/20 rounded-full blur-[120px]"></div>
 
@@ -2342,8 +2378,8 @@ watch(() => gameState.value?.current_player, () => {
           <Activity class="w-12 h-12 text-red-500 dark:text-red-400" />
         </div>
         <div class="text-center space-y-3">
-          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Connection Lost / 连接中断</h2>
-          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">{{ loadError || '实验室连接异常 / Lab connection interrupted' }}</p>
+          <h2 class="text-2xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Connection Lost / 杩炴帴涓柇</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 font-medium">{{ loadError || '瀹為獙瀹よ繛鎺ュ紓/ Lab connection interrupted' }}</p>
         </div>
         <div class="flex items-center gap-3 mt-4">
           <button
@@ -2351,14 +2387,14 @@ watch(() => gameState.value?.current_player, () => {
             :class="cn(consoleButton({ tone: 'primary', size: 'md' }), 'text-xs')"
           >
             <RefreshCw class="w-4 h-4" />
-            重新连接 / Reconnect
+            閲嶆柊杩炴帴 / Reconnect
           </button>
           <button
             @click="router.push('/')"
             :class="cn(consoleButton({ tone: 'secondary', size: 'md' }), 'text-xs')"
           >
             <ArrowLeft class="w-4 h-4" />
-            返回大厅 / Back to Lobby
+            杩斿洖澶у巺 / Back to Lobby
           </button>
         </div>
       </div>
@@ -2374,7 +2410,7 @@ watch(() => gameState.value?.current_player, () => {
         <div class="absolute top-0 left-0 w-full h-px bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-scan"></div>
       </div>
 
-      <!-- Compressed Header - 移动端优化 -->
+      <!-- Compressed Header - 绉诲姩绔紭鍖?-->
       <header class="h-11 sm:h-16 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
         <div class="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
@@ -2384,7 +2420,7 @@ watch(() => gameState.value?.current_player, () => {
             <ArrowLeft v-if="!(roomInfo?.is_pve && isSpectator)" class="icon-touch" />
             <Trophy v-else class="w-4 h-4 text-amber-500" />
             <span class="text-[10px] font-black uppercase tracking-widest">
-              <BilingualText :zh="isReplayBridgeMode ? '返回时间线' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '')" :en="isReplayBridgeMode ? 'Return Timeline' : ((roomInfo?.is_pve && isSpectator) ? 'Settlement' : '')" />
+              <BilingualText :zh="isReplayBridgeMode ? '返回时间轴' : ((roomInfo?.is_pve && isSpectator) ? '结算实验' : '')" :en="isReplayBridgeMode ? 'Return Timeline' : ((roomInfo?.is_pve && isSpectator) ? 'Settlement' : '')" />
             </span>
           </button>
           <div class="hidden xs:block">
@@ -2396,13 +2432,13 @@ watch(() => gameState.value?.current_player, () => {
 
         <!-- Center Area: Reaction Display & Turn Indicator -->
         <div class="flex-1 flex justify-center items-center gap-1.5 sm:gap-4 overflow-hidden">
-            <!-- Reaction Widget - 反应记录监控 -->
+            <!-- Reaction Widget - 鍙嶅簲璁板綍鐩戞帶 -->
             <transition name="reaction-slide">
               <div v-if="gameState?.current_reaction" class="flex items-center gap-1.5 sm:gap-3 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-400/20 shadow-sm backdrop-blur-md shrink-0 max-w-[150px] xs:max-w-[220px] sm:max-w-none group hover:border-emerald-500/40 transition-colors">
                   <div class="flex flex-col items-start leading-none gap-0.5 min-w-0">
                     <span class="text-[5px] sm:text-[7px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400 opacity-80 flex items-center gap-1">
                       <Binary class="w-1.5 h-1.5 sm:w-2 sm:h-2" />
-                      <BilingualText zh="反应同步" en="Reaction Sync" />
+                      <BilingualText zh="鍙嶅簲鍚屾" en="Reaction Sync" />
                     </span>
                     <span class="text-[8px] sm:text-[11px] font-mono font-black text-slate-700 dark:text-emerald-300 drop-shadow-sm truncate">
                       {{ gameState.current_reaction }}
@@ -2434,16 +2470,20 @@ watch(() => gameState.value?.current_player, () => {
 
         <!-- Global Status -->
         <div class="flex items-center gap-2 sm:gap-1.5 pl-3 border-l border-slate-200 dark:border-white/10 shrink-0">
-          <button data-testid="game-players-toggle" @click="feedback.click(); showPlayers = !showPlayers" class="btn-touch relative flex items-center justify-center gap-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+          <button data-testid="game-ai-assistant-toggle" @click="feedback.click(); handleTutorialLockedSurface(openAIAssistant)" class="btn-touch flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-cyan-500 touch-feedback">
+            <Bot class="icon-touch" />
+          </button>
+
+          <button data-testid="game-players-toggle" @click="feedback.click(); handleTutorialLockedSurface(() => { showPlayers = !showPlayers })" class="btn-touch relative flex items-center justify-center gap-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <Users class="icon-touch" :class="showPlayers && 'fill-current text-blue-500'" />
              <span class="text-[10px] sm:text-xs-mobile font-black text-slate-400">{{ allPlayers.length }}</span>
           </button>
 
-           <button v-if="!roomInfo?.is_points_mode && !isReplayBridgeMode" data-testid="game-hints-toggle" @click="feedback.click(); showHints = !showHints" class="btn-touch flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+           <button v-if="!roomInfo?.is_points_mode && !isReplayBridgeMode" data-testid="game-hints-toggle" @click="feedback.click(); handleTutorialLockedSurface(() => { showHints = !showHints })" class="btn-touch flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <Sparkles class="icon-touch" :class="showHints && 'fill-current text-blue-500'" />
           </button>
 
-           <button v-if="!isReplayBridgeMode" data-testid="game-chat-toggle" @click="feedback.click(); showChat = !showChat; hasNewMessage = false" class="btn-touch relative flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
+           <button v-if="!isReplayBridgeMode" data-testid="game-chat-toggle" @click="feedback.click(); handleTutorialLockedSurface(() => { showChat = !showChat; hasNewMessage = false })" class="btn-touch relative flex items-center justify-center bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 hover:text-blue-500 touch-feedback">
              <MessageCircle class="icon-touch" :class="showChat && 'fill-current text-blue-500'" />
              <div v-if="hasNewMessage" class="absolute -top-1 -right-1 w-3 h-3 sm:w-2.5 sm:h-2.5 bg-rose-500 border-2 border-white dark:border-[#0d0d10] rounded-full animate-pulse"></div>
           </button>
@@ -2453,14 +2493,14 @@ watch(() => gameState.value?.current_player, () => {
       <div v-if="isReplayBridgeMode" class="relative z-[80] px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 pointer-events-auto">
           <div class="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">
-            <BilingualText zh="回放模拟" en="Replay Simulation" />
+            <BilingualText zh="鍥炴斁妯℃嫙" en="Replay Simulation" />
             <span class="px-2 py-0.5 rounded-md bg-amber-500/20">{{ replayStatusText }}</span>
-            <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"><BilingualText zh="视角" en="Perspective" /> {{ replayPerspectiveName }}</span>
+            <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"><BilingualText zh="瑙嗚" en="Perspective" /> {{ replayPerspectiveName }}</span>
             <span class="text-amber-600/90 dark:text-amber-200"><BilingualText zh="输入选项已禁用" en="Input options disabled" /></span>
           </div>
 
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="倍速" en="Speed" /></span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="鍊嶉€? en="Speed" /></span>
             <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5">
               <button
                 v-for="speed in replaySpeedOptions"
@@ -2479,7 +2519,7 @@ watch(() => gameState.value?.current_player, () => {
               :disabled="replayGameOver"
               :class="cn('px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border', replayGameOver ? 'border-slate-300 text-slate-400 cursor-not-allowed' : 'border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15')"
             >
-              <BilingualText :zh="replayIsPlaying ? '暂停' : '继续'" :en="replayIsPlaying ? 'Pause' : 'Play'" />
+              <BilingualText :zh="replayIsPlaying ? '鏆傚仠' : '缁х画'" :en="replayIsPlaying ? 'Pause' : 'Play'" />
             </button>
 
             <button
@@ -2487,15 +2527,15 @@ watch(() => gameState.value?.current_player, () => {
               @click.stop.prevent="restartReplayPlayback"
               class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
             >
-              <BilingualText zh="重新播放" en="Restart" />
+              <BilingualText zh="閲嶆柊鎾斁" en="Restart" />
             </button>
 
-            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="进度" en="Progress" /> {{ replayProgressText }}</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="杩涘害" en="Progress" /> {{ replayProgressText }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Input box and Timer - 顶栏下方7px -->
+      <!-- Input box and Timer - 椤舵爮涓嬫柟7px -->
       <div v-if="isMyTurn" class="relative w-full flex justify-center px-4 z-[60] mt-2">
         <div class="flex flex-col items-center gap-2 animate-in slide-in-from-top-2">
           <div class="flex items-center bg-white/88 dark:bg-black/72 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 rounded-xl p-1 shadow-lg">
@@ -2505,6 +2545,7 @@ watch(() => gameState.value?.current_player, () => {
               @keyup.enter="handleInputPlay"
               @focus="handleInputFocus"
               @blur="handleInputBlur"
+              :readonly="tutorialLockActive"
               :placeholder="td('reactions.searchPlaceholder')"
               :inputmode="isMobile || user.enable_element_input ? 'none' : 'text'"
               autocomplete="off"
@@ -2536,7 +2577,7 @@ watch(() => gameState.value?.current_player, () => {
                   <Plus v-if="!(gameState?.pending_draw_count > 0)" class="w-3 h-3 sm:w-2.5 sm:h-2.5" />
                   <RefreshCw v-else class="w-3 h-3 sm:w-2.5 sm:h-2.5 animate-spin-slow" />
                   <span class="text-xs-mobile font-black uppercase tracking-widest whitespace-nowrap">
-                    摸牌{{ gameState?.pending_draw_count > 0 ? gameState.pending_draw_count : '2' }}张
+                    鎽哥墝{{ gameState?.pending_draw_count > 0 ? gameState.pending_draw_count : '2' }}?
                   </span>
                </button>
             </div>
@@ -2546,10 +2587,10 @@ watch(() => gameState.value?.current_player, () => {
             <div class="bg-blue-600/90 backdrop-blur-md px-4 sm:px-3 py-2 sm:py-1 rounded-full border border-white/20 shadow-md flex items-center gap-2.5 sm:gap-2">
               <Zap class="w-3 h-3 sm:w-2.5 sm:h-2.5 fill-current animate-pulse text-white" />
               <span class="text-xs-mobile font-black uppercase tracking-widest text-white">
-                操作 ({{ hasTurnLimit ? (timeRemaining + 's') : '无时限' }})
+                鎿嶄綔 ({{ hasTurnLimit ? (timeRemaining + 's') : '鏃犳椂' }})
               </span>
 
-              <!-- 双联行动按钮 -->
+              <!-- 鍙岃仈琛屽姩鎸夐挳 -->
               <button
                 v-if="myData?.double_action_available"
                 @click.stop="toggleDoubleMode"
@@ -2562,21 +2603,21 @@ watch(() => gameState.value?.current_player, () => {
               >
                  <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:animate-shimmer"></div>
                  <Activity :class="cn('w-4 h-4 sm:w-3.5 sm:h-3.5', doubleMode && 'animate-spin')" />
-                 <span class="text-[10px] font-black uppercase tracking-widest">{{ doubleMode ? '解除超限操作' : '发动超限双联' }}</span>
+                 <span class="text-[10px] font-black uppercase tracking-widest">{{ doubleMode ? '瑙ｉ櫎瓒呴檺鎿嶄綔' : '鍙戝姩瓒呴檺鍙岃仈' }}</span>
               </button>
 
-              <!-- 强制出牌提示 -->
+              <!-- 寮哄埗鍑虹墝鎻愮ず -->
               <div
                 v-if="isMyTurn && gameState?.pending_forced_plays > 0"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-blue-500/80 border border-blue-400/50 shadow-[0_0_12px_rgba(59,130,246,0.3)] animate-pulse pointer-events-none"
               >
                 <Zap class="w-3.5 h-3.5 fill-current text-white" />
-                <span class="text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">强制出牌 ×{{ gameState.pending_forced_plays }}</span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">寮哄埗鍑虹墝 脳{{ gameState.pending_forced_plays }}</span>
               </div>
             </div>
           </div>
 
-          <!-- 双联模式提示状态 -->
+          <!-- 鍙岃仈妯″紡鎻愮ず鐘?->
           <div v-if="doubleMode" class="mt-1 flex flex-wrap items-center justify-center gap-3 animate-in slide-in-from-top-4 duration-500">
             <div class="flex items-center gap-2">
               <div
@@ -2610,7 +2651,7 @@ watch(() => gameState.value?.current_player, () => {
                 @click="handleDoublePlay"
                 class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md animate-in zoom-in duration-300 group"
               >
-                <span class="text-[9px] font-black uppercase tracking-widest">启动反应</span>
+                <span class="text-[9px] font-black uppercase tracking-widest">鍚姩鍙嶅簲</span>
                 <Play class="w-3 h-3 fill-current group-hover:translate-x-0.5 transition-transform" />
               </button>
 
@@ -2618,7 +2659,7 @@ watch(() => gameState.value?.current_player, () => {
                 @click="toggleDoubleMode"
                 class="bg-slate-800/80 hover:bg-slate-700 text-white/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-white/10 shadow-md transition-all"
               >
-                <span class="text-[9px] font-black uppercase tracking-widest">取消</span>
+                <span class="text-[9px] font-black uppercase tracking-widest">鍙栨秷</span>
               </button>
             </div>
           </div>
@@ -2626,7 +2667,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Main Action Focus Area -->
-      <div class="absolute left-0 right-0 flex flex-col items-center overflow-hidden px-2 sm:px-4"
+      <div class="absolute left-0 right-0 flex flex-col items-center overflow-hidden px-2 sm:px-4 pointer-events-none"
            :style="{
              top: isMobile ? '44px' : '64px',
              bottom: showChemicalKeyboard ? '144px' : '0',
@@ -2636,22 +2677,22 @@ watch(() => gameState.value?.current_player, () => {
            }">
           <!-- Left Sidebar: Hint & Status -->
           <Teleport to="body" :disabled="!!roomInfo?.is_points_mode">
-             <div v-if="!roomInfo?.is_points_mode && showHints" class="fixed inset-0 bg-white/10 dark:bg-black/20 backdrop-blur-[2px] z-[95] lg:hidden clickable" @click="showHints = false"></div>
-             <div :class="cn(
+             <div v-if="!roomInfo?.is_points_mode && showHints" class="fixed inset-0 bg-white/10 dark:bg-black/20 backdrop-blur-[2px] z-[95] lg:hidden clickable" @click="handleTutorialLockedSurface(() => { showHints = false })"></div>
+             <div data-testid="game-hints-panel" :class="cn(
                'fixed left-0 top-0 bottom-0 w-full lg:w-80 z-[100] bg-white/95 dark:bg-slate-900/60 backdrop-blur-3xl border-r lg:border border-slate-200 dark:border-white/10 lg:rounded-[40px] lg:top-6 lg:bottom-52 lg:left-6 shadow-3xl transition-all duration-500 flex flex-col overflow-hidden',
                showHints ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
-             )">
+             )" class="pointer-events-auto">
              <div class="p-4 py-3 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50/50 dark:bg-white/[0.02]">
                 <div class="flex items-center gap-2">
                    <div class="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center">
                       <Trophy class="w-3.5 h-3.5 text-blue-500" />
                    </div>
                    <div>
-                      <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white">实验辅助情报</h3>
+                      <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-800 dark:text-white">瀹為獙杈呭姪鎯呮姤</h3>
                       <p class="text-[8px] font-mono text-slate-400 uppercase tracking-tighter">Intelligence_Protocol</p>
                    </div>
                 </div>
-                <button @click="feedback.click(); showHints = false" class="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-white">
+                <button @click="feedback.click(); handleTutorialLockedSurface(() => { showHints = false })" class="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-white">
                    <ArrowLeft class="w-4 h-4" />
                 </button>
              </div>
@@ -2662,57 +2703,57 @@ watch(() => gameState.value?.current_player, () => {
                    <div v-if="allowedAny" class="bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl animate-pulse">
                       <div class="flex items-center gap-1.5 text-amber-500 mb-0.5">
                          <Zap class="w-3 h-3 fill-current" />
-                         <span class="text-[9px] font-black uppercase tracking-wider">AU 特权激活</span>
+                         <span class="text-[9px] font-black uppercase tracking-wider">AU 鐗规潈婵€</span>
                       </div>
-                      <p class="text-[8px] font-bold text-slate-500">已跳过所有反应规则限制</p>
+                      <p class="text-[8px] font-bold text-slate-500">宸茶烦杩囨墍鏈夊弽搴旇鍒欓檺</p>
                    </div>
 
                    <div v-if="gameState?.pending_draw_count > 0" class="bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl animate-bounce">
                       <div class="flex items-center gap-1.5 text-red-500 mb-0.5">
                          <RefreshCw class="w-3 h-3 animate-spin-slow" />
-                         <span class="text-[9px] font-black uppercase tracking-wider">正在加牌</span>
+                         <span class="text-[9px] font-black uppercase tracking-wider">姝ｅ湪鍔犵墝</span>
                       </div>
-                      <p class="text-[8px] font-bold text-slate-500">需结算或叠加累计: {{ gameState.pending_draw_count }}</p>
+                      <p class="text-[8px] font-bold text-slate-500">闇€缁撶畻鎴栧彔鍔犵疮 {{ gameState.pending_draw_count }}</p>
                    </div>
                 </div>
 
                 <div v-if="roomInfo?.status === 'waiting'" class="space-y-3">
-                   <!-- 燃素模式提示 -->
+                   <!-- 鐕冪礌妯″紡鎻愮ず -->
                    <div v-if="roomInfo?.is_points_mode" class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
                       <PhlogistonIcon :size="16" color="#f59e0b" class="shrink-0" />
                       <div class="text-left">
                          <p class="text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500">Competitive Mode</p>
-                         <p class="text-[8px] font-bold text-slate-500 mt-0.5">燃素竞技模式：胜者获得燃素，败者扣除燃素。</p>
+                         <p class="text-[8px] font-bold text-slate-500 mt-0.5">鐕冪礌绔炴妧妯″紡锛氳儨鑰呰幏寰楃噧绱狅紝璐ヨ€呮墸闄ょ噧绱?/p>
                       </div>
                    </div>
 
                    <div class="p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl flex flex-col items-center text-center">
                       <Users class="w-5 h-5 text-blue-500 mb-1.5" />
-                      <span class="text-[9px] font-black uppercase tracking-widest text-blue-500">准备就绪?</span>
-                      <p class="text-[8px] font-bold text-slate-500 mt-0.5">当前连接数 {{ allPlayers.length }}/{{ roomInfo?.max_players }}，等待就绪后自动开启。</p>
+                      <span class="text-[9px] font-black uppercase tracking-widest text-blue-500">鍑嗗灏辩华</span>
+                      <p class="text-[8px] font-bold text-slate-500 mt-0.5">褰撳墠杩炴帴{{ allPlayers.length }}/{{ roomInfo?.max_players }}锛岀瓑寰呭氨缁悗鑷姩寮€鍚?/p>
                    </div>
                    <div class="p-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
                       <div class="flex items-center gap-1.5 mb-1.5">
                          <QrCode class="w-3 h-3 text-blue-500" />
-                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">快速邀请</span>
+                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">蹇€熼個</span>
                       </div>
                       <p class="text-[7px] font-bold text-slate-400 leading-relaxed uppercase">
-                         点击中间区域的"招募伙伴"按钮可快速复制链接，或点击二维码图标让好友扫码加入反应室。
+                         鐐瑰嚮涓棿鍖哄煙鎷涘嫙浼欎即"鎸夐挳鍙揩閫熷鍒堕摼鎺ワ紝鎴栫偣鍑讳簩缁寸爜鍥炬爣璁╁ソ鍙嬫壂鐮佸姞鍏ュ弽搴斿
                       </p>
                    </div>
                 </div>
                 
                 <div v-else class="py-8 flex flex-col items-center justify-center opacity-20 text-center">
                    <Timer class="w-6 h-6 mb-2" />
-                   <p class="text-[9px] font-black uppercase tracking-widest">等待其他研究员行动</p>
+                   <p class="text-[9px] font-black uppercase tracking-widest">绛夊緟鍏朵粬鐮旂┒鍛樿</p>
                 </div>
 
-                <!-- Reaction-based Hints (场上物质反应提示) -->
+                <!-- Reaction-based Hints (鍦轰笂鐗╄川鍙嶅簲鎻愮ず) -->
                 <div v-if="filteredReactionHints.length > 0 && gameState?.status === 'playing' && isMyTurn" class="pt-3 border-t border-slate-200 dark:border-white/10">
                    <div class="flex items-center justify-between mb-3">
                       <div class="flex items-center gap-1.5">
                          <Activity class="w-3 h-3 text-emerald-500" />
-                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">可接续反应物</span>
+                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">鍙帴缁弽搴旂墿</span>
                       </div>
                       <button @click="feedback.click(); fetchReactionHints()" class="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 hover:text-emerald-500">
                          <RefreshCw class="w-2.5 h-2.5" />
@@ -2742,7 +2783,7 @@ watch(() => gameState.value?.current_player, () => {
                    <div class="flex items-center justify-between mb-3">
                       <div class="flex items-center gap-1.5">
                          <Sparkles class="w-3 h-3 text-blue-500" />
-                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">实验小贴士</span>
+                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">瀹為獙灏忚创</span>
                       </div>
                       <button @click="feedback.click(); fetchRandomHints()" class="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors text-slate-400 hover:text-blue-500">
                          <RefreshCw class="w-2.5 h-2.5" />
@@ -2807,7 +2848,7 @@ watch(() => gameState.value?.current_player, () => {
              </div>
              <div class="text-center relative z-10">
                 <h3 class="text-lg sm:text-xl font-black uppercase tracking-[0.2em]" :class="shouldShowInBlue(allPlayers[gameState?.current_player]) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-800 dark:text-white'">
-                   等待 <span>{{ getPlayerDisplayName(allPlayers[gameState?.current_player]) }}</span> 出牌
+                   绛夊緟 <span>{{ getPlayerDisplayName(allPlayers[gameState?.current_player]) }}</span> 鍑虹墝
                 </h3>
                 <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase italic tracking-tighter">
                    {{ isAnyPlayWindow ? 'Field Cleared _ Free Deployment Window Open' : 'Reaction Reactor Reseted _ New Deployment Window Open' }}
@@ -2822,7 +2863,7 @@ watch(() => gameState.value?.current_player, () => {
                 <div v-if="isSpectator && gameState?.status === 'playing'" class="absolute -top-32 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 pointer-events-none whitespace-nowrap">
                   <div class="bg-indigo-600/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full shadow-lg border border-white/20 flex items-center gap-2">
                       <Trophy class="w-3.5 h-3.5 text-yellow-300" />
-                      <span class="text-[10px] font-bold uppercase tracking-widest">已完成比赛 - 观战模式</span>
+                      <span class="text-[10px] font-bold uppercase tracking-widest">宸插畬鎴愭瘮- 瑙傛垬妯″紡</span>
                   </div>
                 </div>
                 <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-[24px] sm:rounded-[32px] border-2 border-dashed border-blue-500/30 flex items-center justify-center rotate-45 group hover:rotate-0 transition-all duration-700 backdrop-blur-md bg-blue-500/5">
@@ -2844,7 +2885,7 @@ watch(() => gameState.value?.current_player, () => {
 
              <div class="flex flex-col items-center gap-3">
                 <div class="flex flex-col items-center gap-2">
-                  <h3 class="text-base sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-[0.1em] text-center">{{ roomInfo?.name || '实验室准备中' }}</h3>
+                  <h3 class="text-base sm:text-lg font-black text-slate-800 dark:text-white uppercase tracking-[0.1em] text-center">{{ roomInfo?.name || '瀹為獙瀹ゅ噯澶囦腑' }}</h3>
 
                   <!-- Compact Ready Button -->
                   <button
@@ -2858,17 +2899,17 @@ watch(() => gameState.value?.current_player, () => {
                     <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shimmer"></div>
                     <div class="flex items-center gap-2">
                       <Zap :class="cn('w-3.5 h-3.5 sm:w-4 sm:h-4', isReady ? 'fill-current' : 'animate-pulse')" />
-                      <span>{{ isReady ? '已就绪' : '手动准备' }}</span>
+                      <span>{{ isReady ? '宸插氨 : '鎵嬪姩鍑嗗' }}</span>
                     </div>
                   </button>
 
                   <!-- Countdown Tip -->
                   <div v-if="roomInfo?.countdown > 0" class="flex flex-col items-center gap-0.5 mt-1">
                     <p class="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 animate-pulse">
-                      实验即将开始: <span class="text-base">{{ roomInfo.countdown }}</span>S
+                      瀹為獙鍗冲皢寮€ <span class="text-base">{{ roomInfo.countdown }}</span>S
                     </p>
                     <p class="text-[6px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-tighter italic">
-                      实验室压力充盈中，即将开启研究循环...
+                      瀹為獙瀹ゅ帇鍔涘厖鐩堜腑锛屽嵆灏嗗紑鍚爺绌跺惊..
                     </p>
                   </div>
                 </div>
@@ -2878,17 +2919,17 @@ watch(() => gameState.value?.current_player, () => {
                     <div class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10">
                       <Users class="w-2.5 h-2.5 text-blue-500" />
                       <span class="text-[7px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">
-                        研究员: {{ allPlayers.length }} / {{ roomInfo?.max_players }}
+                        鐮旂┒ {{ allPlayers.length }} / {{ roomInfo?.max_players }}
                       </span>
                     </div>
                     <div
                       @click="viewCurrentDeckConfig"
                       class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-white/5 rounded-lg border border-slate-200 dark:border-white/10 cursor-pointer hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
-                      title="点击查看牌组详情"
+                      title="鐐瑰嚮鏌ョ湅鐗岀粍璇︽儏"
                     >
                       <FlaskConical class="w-2.5 h-2.5 text-emerald-500" />
                       <span class="text-[7px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">
-                        方案: {{ roomInfo?.deck_config?.name || '基础协议' }}
+                        鏂规: {{ roomInfo?.deck_config?.name || '鍩虹鍗忚' }}
                       </span>
                     </div>
                   </div>
@@ -2925,13 +2966,13 @@ watch(() => gameState.value?.current_player, () => {
            <div ref="handContainer" class="hand-container-mobile w-full custom-scrollbar-hidden">
             <div v-if="isReplayBridgeMode && replayPerspectivePlayer" class="mb-1 flex items-center justify-center">
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-xl border border-cyan-500/20 bg-cyan-500/10 text-[10px] font-black uppercase tracking-widest text-cyan-700 dark:text-cyan-300">
-                <span>当前视角 / Perspective</span>
+                <span>褰撳墠瑙嗚 / Perspective</span>
                 <span>{{ replayPerspectiveName }}</span>
               </div>
             </div>
             <div v-if="roomInfo?.status === 'waiting'" class="flex flex-col items-center justify-center opacity-30 pb-1 min-w-full">
               <Loader2 class="w-8 h-8 sm:w-6 sm:h-6 mb-1 animate-spin text-blue-500" />
-              <p class="font-black uppercase tracking-widest text-xs-mobile text-slate-500 text-center">正在同步量子状态并等待开场就绪... / Syncing quantum state and waiting for the round to begin...</p>
+              <p class="font-black uppercase tracking-widest text-xs-mobile text-slate-500 text-center">姝ｅ湪鍚屾閲忓瓙鐘舵€佸苟绛夊緟寮€鍦哄氨.. / Syncing quantum state and waiting for the round to begin...</p>
             </div>
             <template v-else-if="myData?.hand_cards?.length > 0">
               <div
@@ -2948,18 +2989,18 @@ watch(() => gameState.value?.current_player, () => {
                   transform: selectedCard === card ? (isMobile ? 'translateY(-10px)' : 'translateY(-12px)') : 'none'
                 }"
               >
-                <div class="absolute top-1 left-1 text-xs-mobile sm:text-[6px] font-black opacity-30 uppercase tracking-tighter">{{ ELEMENTS_DATA[card.type] ? 'Elem / 元素' : 'Spec / 特殊' }}</div>
+                <div class="absolute top-1 left-1 text-xs-mobile sm:text-[6px] font-black opacity-30 uppercase tracking-tighter">{{ ELEMENTS_DATA[card.type] ? 'Elem / 鍏冪礌' : 'Spec / 鐗规畩' }}</div>
                 <div class="flex flex-col items-center justify-center">
                   <div class="text-base sm:text-base font-black font-mono italic tracking-tighter leading-none">{{ card.type }}</div>
                   <div v-if="card.effect || ['He','Ne','Ar','Kr'].includes(card.type)" class="mt-1 px-1.5 sm:px-1 py-0.5 bg-black/10 rounded-md text-xs-mobile sm:text-[8px] font-black uppercase tracking-tighter">
-                    {{ ['He','Ne','Ar','Kr'].includes(card.type) ? '转向 / Reverse' : card.effect === 'Au' ? '跳过 / Skip' : card.effect === '+2' ? '+2 / Draw 2' : card.effect === '+4' ? '+4 / Draw 4' : card.effect }}
+                    {{ ['He','Ne','Ar','Kr'].includes(card.type) ? '杞悜 / Reverse' : card.effect === 'Au' ? '璺宠繃 / Skip' : card.effect === '+2' ? '+2 / Draw 2' : card.effect === '+4' ? '+4 / Draw 4' : card.effect }}
                   </div>
                   <div v-else-if="ELEMENTS_DATA[card.type]" class="text-xs-mobile sm:text-[8px] font-bold opacity-80 mt-0.5 uppercase tracking-tighter font-serif italic text-black/40">
                     {{ getSubstanceName(card.type) }}
                   </div>
                 </div>
                 <div class="absolute bottom-1 right-1 text-xs-mobile sm:text-[6px] font-mono opacity-40 uppercase tracking-tighter">
-                  {{ card.effect ? 'Func / 作用' : 'Pass / 普通' }}
+                  {{ card.effect ? 'Func / 浣滅敤' : 'Pass / 鏅?}}
                 </div>
               </div>
             </template>
@@ -3001,25 +3042,25 @@ watch(() => gameState.value?.current_player, () => {
                 <div class="px-2">
                   <template v-if="winner?.uid === user.uid">
                     <h2 class="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-slate-900 to-slate-600 dark:from-white dark:to-blue-200 tracking-tighter leading-tight mb-1">
-                      实验大成功
+                      瀹為獙澶ф垚
                     </h2>
                     <p class="text-[11px] text-slate-500 dark:text-blue-400/60 font-medium">
-                      恭喜首席研究员！量子反应核心已稳定。
+                      鎭枩棣栧腑鐮旂┒鍛橈紒閲忓瓙鍙嶅簲鏍稿績宸茬ǔ瀹?
                     </p>
                   </template>
                   <template v-else>
                     <h2 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight mb-1">
-                      反应已终止
+                      鍙嶅簲宸茬粓
                     </h2>
                     <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      本次实验由 <span class="font-black text-blue-600 dark:text-blue-400">{{ getPlayerDisplayName(winner) }}</span> 成功收官。
+                      鏈瀹為獙<span class="font-black text-blue-600 dark:text-blue-400">{{ getPlayerDisplayName(winner) }}</span> 鎴愬姛鏀跺畼
                     </p>
                   </template>
                 </div>
 
                 <div class="w-full mt-2 bg-slate-50/50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-2xl p-3 shadow-inner relative overflow-hidden group/board">
                    <div class="flex items-center justify-between mb-2 px-1 relative z-10">
-                      <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">实验数据摘要</span>
+                      <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">瀹為獙鏁版嵁鎽樿</span>
                       <div class="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 rounded-md border border-blue-500/10">
                          <span class="text-[7px] font-black text-blue-500 font-mono">SYNC_OK</span>
                       </div>
@@ -3073,7 +3114,7 @@ watch(() => gameState.value?.current_player, () => {
                 @click="feedback.click(); router.push('/')"
                 class="flex-1 h-12 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 group"
               >
-                 <span class="uppercase tracking-widest text-xs">回到主页</span>
+                 <span class="uppercase tracking-widest text-xs">鍥炲埌涓婚〉</span>
                  <ChevronRight class="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
            </div>
@@ -3084,28 +3125,28 @@ watch(() => gameState.value?.current_player, () => {
         <div class="w-full max-w-xl bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden mobile-modal-shell">
           <div class="px-6 py-5 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03]">
             <p class="text-[10px] font-black uppercase tracking-widest text-blue-500">Replay Result</p>
-            <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">游戏结束</h3>
-            <p class="text-xs text-slate-500 mt-1">{{ replayEndType === 'game_terminated_invalid' ? '本次对局判定为无效结算' : '本次对局已完成回放' }}</p>
+            <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1">娓告垙缁撴潫</h3>
+            <p class="text-xs text-slate-500 mt-1">{{ replayEndType === 'game_terminated_invalid' ? '鏈瀵瑰眬鍒ゅ畾涓烘棤鏁堢粨 : '鏈瀵瑰眬宸插畬鎴愬洖 }}</p>
           </div>
 
           <div class="p-6 space-y-4">
             <div class="grid grid-cols-3 gap-2">
               <div class="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3 text-center">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">回合数</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">鍥炲悎</p>
                 <p class="text-lg font-black text-slate-900 dark:text-white">{{ replaySummary.roundCount }}</p>
               </div>
               <div class="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3 text-center">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">出牌总和</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">鍑虹墝鎬诲拰</p>
                 <p class="text-lg font-black text-slate-900 dark:text-white">{{ replaySummary.totalPlays }}</p>
               </div>
               <div class="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3 text-center">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">事件总数</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">浜嬩欢鎬绘暟</p>
                 <p class="text-lg font-black text-slate-900 dark:text-white">{{ replayEvents.length }}</p>
               </div>
             </div>
 
             <div class="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
-              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">各卡牌数目</p>
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">鍚勫崱鐗屾暟</p>
               <div v-if="replayCardCountEntries.length > 0" class="max-h-40 overflow-y-auto space-y-1 pr-1">
                 <div
                   v-for="entry in replayCardCountEntries"
@@ -3116,7 +3157,7 @@ watch(() => gameState.value?.current_player, () => {
                   <span class="text-xs font-black text-blue-600 dark:text-blue-300">{{ entry[1] }}</span>
                 </div>
               </div>
-              <div v-else class="text-xs text-slate-400">无可统计的出牌记录</div>
+              <div v-else class="text-xs text-slate-400">鏃犲彲缁熻鐨勫嚭鐗岃</div>
             </div>
 
             <div class="flex items-center gap-3 pt-1">
@@ -3124,13 +3165,13 @@ watch(() => gameState.value?.current_player, () => {
                 @click="restartReplayPlayback"
                 class="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-xs transition-all"
               >
-                重新播放
+                閲嶆柊鎾斁
               </button>
               <button
                 @click="router.push(`/replay/${replayHistoryQueryID}`)"
                 class="flex-1 h-11 rounded-xl border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-200 font-black uppercase tracking-widest text-xs hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
               >
-                返回时间线
+                杩斿洖鏃堕棿
               </button>
             </div>
           </div>
@@ -3142,18 +3183,18 @@ watch(() => gameState.value?.current_player, () => {
 
     <!-- Invite Friends Modal -->
     <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="showInviteFriendsModal = false"></div>
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="handleTutorialLockedSurface(() => { showInviteFriendsModal = false })"></div>
       <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300 mobile-modal-shell">
         <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
                 <UserPlus class="w-6 h-6 text-blue-500" />
-                邀请好友加入
+                閭€璇峰ソ鍙嬪姞
               </h3>
-              <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em] mt-2">选择一位好友发送游戏邀请</p>
+              <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em] mt-2">閫夋嫨涓€浣嶅ソ鍙嬪彂閫佹父鎴忛個</p>
             </div>
-            <button @click="showInviteFriendsModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
+            <button @click="handleTutorialLockedSurface(() => { showInviteFriendsModal = false })" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
               <X class="w-6 h-6 text-slate-400" />
             </button>
           </div>
@@ -3162,8 +3203,8 @@ watch(() => gameState.value?.current_player, () => {
         <div class="p-8 max-h-[500px] overflow-y-auto custom-scrollbar">
           <div v-if="friendsList.length === 0" class="flex flex-col items-center justify-center py-16 opacity-20 grayscale">
             <Users class="w-16 h-16 mb-4" />
-            <p class="text-sm font-black uppercase tracking-[0.2em]">暂无好友</p>
-            <p class="text-[10px] mt-2 italic font-medium uppercase">请先添加好友后再邀请</p>
+            <p class="text-sm font-black uppercase tracking-[0.2em]">鏆傛棤濂藉弸</p>
+            <p class="text-[10px] mt-2 italic font-medium uppercase">璇峰厛娣诲姞濂藉弸鍚庡啀閭€</p>
           </div>
           <div v-else class="space-y-3">
             <button
@@ -3197,17 +3238,18 @@ watch(() => gameState.value?.current_player, () => {
     </div>
 
     <!-- Players Floating Panel -->
-    <div
-      v-if="showPlayers"
-      class="fixed right-0 top-0 bottom-0 w-[85%] sm:w-80 z-[110] bg-white/95 dark:bg-[#09131d]/96 border-l lg:border border-slate-300/60 dark:border-white/10 lg:rounded-[28px] lg:top-6 lg:bottom-52 lg:right-6 shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
-    >
+      <div
+        data-testid="game-players-panel"
+        v-if="showPlayers"
+        class="fixed right-0 top-0 bottom-0 w-[85%] sm:w-80 z-[110] bg-white/95 dark:bg-[#09131d]/96 border-l lg:border border-slate-300/60 dark:border-white/10 lg:rounded-[28px] lg:top-6 lg:bottom-52 lg:right-6 shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl"
+      >
       <div class="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between sticky top-0 z-20 bg-inherit pb-6 lg:pb-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
             <Users class="w-5 h-5 text-blue-500" />
           </div>
           <div>
-            <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 dark:text-white leading-none">研究员列表</h3>
+            <h3 class="text-sm font-black uppercase tracking-widest text-slate-800 dark:text-white leading-none">鐮旂┒鍛樺垪</h3>
             <div class="flex items-center gap-2 mt-2">
                <span class="text-[9px] font-mono font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded">
                   POS: {{ allPlayers.length }}/{{ roomInfo?.max_players }}
@@ -3217,7 +3259,7 @@ watch(() => gameState.value?.current_player, () => {
           </div>
         </div>
         <button
-          @click="showPlayers = false"
+          @click="handleTutorialLockedSurface(() => { showPlayers = false })"
           class="p-2.5 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-slate-900 dark:hover:text-white active:scale-90"
         >
           <X class="w-5 h-5" />
@@ -3347,20 +3389,21 @@ watch(() => gameState.value?.current_player, () => {
     <div
       v-if="showPlayers"
       class="fixed inset-0 bg-white/10 dark:bg-black/20 backdrop-blur-[2px] z-[95] lg:hidden clickable"
-      @click="showPlayers = false"
+      @click="handleTutorialLockedSurface(() => { showPlayers = false })"
     ></div>
 
     <!-- Chat Floating Sidebar -->
     <div
+      data-testid="game-chat-panel"
       v-if="showChat && !isReplayBridgeMode"
       class="fixed right-0 top-0 bottom-0 w-full lg:w-80 z-[100] lg:top-6 lg:bottom-52 lg:right-6 flex flex-col"
     >
       <ChatBox
         :roomId="id"
-        title="实验内通信线程"
+        title="瀹為獙鍐呴€氫俊绾跨▼"
         maxHeight="100%"
         class="h-full !bg-white/95 dark:!bg-[#09131d]/96 backdrop-blur-2xl shadow-3xl lg:rounded-[28px] border-l lg:border border-slate-300/60 dark:border-white/10"
-        @close="showChat = false"
+        @close="handleTutorialLockedSurface(() => { showChat = false })"
         @input-focus="handleInputFocus"
         @input-blur="handleInputBlur"
       />
@@ -3370,22 +3413,23 @@ watch(() => gameState.value?.current_player, () => {
     <div
       v-if="showChat && !isReplayBridgeMode"
       class="fixed inset-0 bg-white/10 dark:bg-black/20 backdrop-blur-[2px] z-[95] lg:hidden clickable"
-      @click="showChat = false"
+      @click="handleTutorialLockedSurface(() => { showChat = false })"
     ></div>
 
-    <!-- 化学键盘 -->
+    <!-- 鍖栧閿洏 -->
     <ChemicalKeyboard
+      data-testid="game-chemical-keyboard"
       v-if="showChemicalKeyboard && !isReplayBridgeMode"
       v-model="substanceInput"
       :deckCards="roomInfo?.deck_config?.cards || {}"
       :myHand="myData?.hand_cards || []"
       @confirm="handleKeyboardConfirm"
-      @close="showChemicalKeyboard = false"
+      @close="handleTutorialLockedSurface(() => { showChemicalKeyboard = false })"
     />
 
-    <!-- 牌组详情查看模态框 -->
+    <!-- 鐗岀粍璇︽儏鏌ョ湅妯℃€佹 -->
     <div v-if="showDeckDetailModal && roomInfo?.deck_config" class="fixed inset-0 z-[200] flex items-center justify-center p-4 mobile-modal-overlay">
-      <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md clickable" @click="showDeckDetailModal = false" />
+      <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md clickable" @click="handleTutorialLockedSurface(() => { showDeckDetailModal = false })" />
       <div class="relative w-full max-w-2xl bg-white/95 dark:bg-[#09131d]/96 border border-slate-300/60 dark:border-white/10 rounded-[28px] shadow-2xl overflow-hidden backdrop-blur-xl mobile-modal-shell">
          <div class="px-5 py-4 border-b border-slate-200/70 dark:border-white/8 flex items-center justify-between bg-sky-700/[0.04]">
             <div class="flex items-center gap-3">
@@ -3397,32 +3441,32 @@ watch(() => gameState.value?.current_player, () => {
                 <p class="text-[8px] text-slate-400 dark:text-slate-500 font-mono uppercase tracking-widest mt-1">Deck_Configuration</p>
               </div>
             </div>
-            <button @click="showDeckDetailModal = false" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white">
+            <button @click="handleTutorialLockedSurface(() => { showDeckDetailModal = false })" class="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white">
               <X class="w-4 h-4" />
             </button>
          </div>
          <div class="p-5 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div class="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
-                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">牌组名称</p>
+                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">鐗岀粍鍚嶇О</p>
                 <p class="text-[11px] font-black text-slate-900 dark:text-white">{{ roomInfo.deck_config.name }}</p>
               </div>
               <div class="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
-                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">元素种类</p>
-                <p class="text-[11px] font-black text-blue-600 dark:text-blue-400">{{ Object.keys(roomInfo.deck_config.cards || {}).length }} 种</p>
+                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">鍏冪礌绉嶇被</p>
+                <p class="text-[11px] font-black text-blue-600 dark:text-blue-400">{{ Object.keys(roomInfo.deck_config.cards || {}).length }} </p>
               </div>
               <div class="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
-                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">总卡牌数</p>
-                <p class="text-[11px] font-black text-slate-900 dark:text-white">{{ (Object.values(roomInfo.deck_config.cards || {}) as number[]).reduce((a, b) => a + b, 0) }} 张</p>
+                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">鎬诲崱鐗屾暟</p>
+                <p class="text-[11px] font-black text-slate-900 dark:text-white">{{ (Object.values(roomInfo.deck_config.cards || {}) as number[]).reduce((a, b) => a + b, 0) }} </p>
               </div>
               <div class="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
-                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">起始手牌</p>
-                <p class="text-[11px] font-black text-slate-900 dark:text-white">{{ roomInfo.deck_config.initial_cards || 10 }} 张</p>
+                <p class="text-[8px] text-slate-400 mb-1 uppercase tracking-wider">璧峰鎵嬬墝</p>
+                <p class="text-[11px] font-black text-slate-900 dark:text-white">{{ roomInfo.deck_config.initial_cards || 10 }} </p>
               </div>
             </div>
             <div class="p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">卡牌配置</span>
+                <span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">鍗＄墝閰嶇疆</span>
                 <span class="text-[8px] text-blue-500/40 font-mono">CARD_LIST</span>
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
@@ -3433,15 +3477,15 @@ watch(() => gameState.value?.current_player, () => {
                 >
                   <div class="flex items-center justify-between">
                     <span class="text-[10px] font-black text-slate-900 dark:text-white font-mono" v-html="String(formula).replace(/(\d+)/g, '<sub>$1</sub>')"></span>
-                    <span class="text-[9px] font-black text-blue-600 dark:text-blue-400">×{{ count }}</span>
+                    <span class="text-[9px] font-black text-blue-600 dark:text-blue-400">脳{{ count }}</span>
                   </div>
                 </div>
               </div>
             </div>
          </div>
          <div class="px-5 py-3 border-t border-slate-100 dark:border-white/5 flex justify-end">
-            <button @click="showDeckDetailModal = false" class="px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all uppercase tracking-widest text-[10px] border border-slate-200 dark:border-white/5">
-              关闭
+            <button @click="handleTutorialLockedSurface(() => { showDeckDetailModal = false })" class="px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all uppercase tracking-widest text-[10px] border border-slate-200 dark:border-white/5">
+              鍏抽棴
             </button>
          </div>
       </div>
@@ -3454,8 +3498,9 @@ watch(() => gameState.value?.current_player, () => {
   <!-- Game Toast -->
   <GameToast ref="gameToastRef" />
 
-  <!-- Feedback Settings - 仅在准备阶段显示 -->
+  <!-- Feedback Settings - 浠呭湪鍑嗗闃舵鏄剧ず -->
   <FeedbackSettings v-if="roomInfo?.status === 'waiting'" />
 </template>
 
 <style scoped src="./GameRoom.css"></style>
+

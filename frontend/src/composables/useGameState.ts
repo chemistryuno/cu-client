@@ -1,5 +1,5 @@
 /**
- * 游戏状态管�?Composable
+ * 游戏状态管理 Composable
  * 负责管理游戏状态、房间信息和玩家数据
  */
 
@@ -7,14 +7,14 @@ import { ref, computed } from 'vue'
 import { gameAPI } from '../utils/api'
 
 export function useGameState(roomId: string) {
-  // 状�?
+  // 状态
   const gameState = ref<any>(null)
   const roomInfo = ref<any>(null)
   const playersInfo = ref<any[]>([])
   const loading = ref(true)
   const loadError = ref<string | null>(null)
 
-  // 计算属�?
+  // 计算属性
   const allPlayers = computed(() => {
     if (gameState.value?.players) {
       return gameState.value.players.map((p: any) => {
@@ -58,7 +58,7 @@ export function useGameState(roomId: string) {
       loading.value = false
       return true
     } catch (error: any) {
-      console.error('加载游戏状态失�?', error)
+      console.error('加载游戏状态失败', error)
       loadError.value = error.response?.data?.error || '加载失败'
       loading.value = false
       return false
@@ -74,14 +74,14 @@ export function useGameState(roomId: string) {
   }
 
   return {
-    // 状�?
+    // 状态
     gameState,
     roomInfo,
     playersInfo,
     loading,
     loadError,
 
-    // 计算属�?
+    // 计算属性
     allPlayers,
     isMyTurn,
     currentPlayerObj,

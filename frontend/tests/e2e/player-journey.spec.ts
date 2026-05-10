@@ -21,6 +21,41 @@ test('creates a local identity through the real login UI', async ({ page }) => {
   await expect(page.getByTestId('lobby-user-chip')).toContainText('JourneyLogin')
 })
 
+test('login lobby and room stay inside the mobile viewport without page scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+
+  await page.goto('/#/login')
+  await expect(page.locator('body')).toHaveCSS('overflow-x', 'hidden')
+  await expect(page.locator('body')).toHaveCSS('overflow-y', 'hidden')
+  await expect(page.locator('html')).toHaveCSS('overflow', 'hidden')
+  await expect(page.locator('body')).toHaveCSS('height', '844px')
+  await expect(page.locator('document.documentElement')).toBeHidden().catch(() => {})
+
+  await seedLocalIdentity(page, 'ViewportLock', 'flask')
+  await skipLobbyTutorial(page)
+  await expect(page.getByTestId('lobby-page')).toBeVisible()
+  const lobbyScroll = await page.evaluate(() => ({
+    bodyScrollHeight: document.body.scrollHeight,
+    bodyClientHeight: document.body.clientHeight,
+    htmlScrollHeight: document.documentElement.scrollHeight,
+    htmlClientHeight: document.documentElement.clientHeight,
+  }))
+  expect(lobbyScroll.bodyScrollHeight).toBeLessThanOrEqual(lobbyScroll.bodyClientHeight + 2)
+  expect(lobbyScroll.htmlScrollHeight).toBeLessThanOrEqual(lobbyScroll.htmlClientHeight + 2)
+
+  await openAiArenaAndStart(page, 'Viewport Lock Arena')
+  await waitForGameRoomReady(page)
+  await expect(page.getByTestId('game-room-page').or(page.getByTestId('game-substance-input'))).toBeVisible()
+  const roomScroll = await page.evaluate(() => ({
+    bodyScrollHeight: document.body.scrollHeight,
+    bodyClientHeight: document.body.clientHeight,
+    htmlScrollHeight: document.documentElement.scrollHeight,
+    htmlClientHeight: document.documentElement.clientHeight,
+  }))
+  expect(roomScroll.bodyScrollHeight).toBeLessThanOrEqual(roomScroll.bodyClientHeight + 2)
+  expect(roomScroll.htmlScrollHeight).toBeLessThanOrEqual(roomScroll.htmlClientHeight + 2)
+})
+
 test('auto-generates a nickname when entering without one', async ({ page }) => {
   await page.goto('/#/login')
   await page.getByTestId('login-submit-button').click()
@@ -95,6 +130,42 @@ test('tutorial room AI follows the scripted HCl, Br2, and draw sequence', async 
     return data.game_state?.tutorial_current_step === 7 && data.game_state?.last_card?.substance === 'Ar'
   })
   expect(roomStateStep7.game_state.players[1].card_count).toBeGreaterThan(aiHandBeforeDraw)
+})
+
+test('tutorial room blocks invalid room actions until the scripted action is used', async ({ page }) => {
+  await seedLocalIdentity(page, 'JourneyLock', 'flask')
+  await completeLobbyTutorial(page)
+  await waitForGameRoomReady(page)
+
+  const roomId = await getCurrentRoomId(page)
+  expect(roomId).toBeTruthy()
+
+  await page.getByTestId('game-chat-toggle').click()
+  await expect(page.getByTestId('game-chat-panel')).toHaveCount(0)
+
+  await page.getByTestId('game-players-toggle').click()
+  await expect(page.getByTestId('game-players-panel')).toHaveCount(0)
+
+  await page.getByTestId('game-hints-toggle').click()
+  await expect(page.getByTestId('game-hints-panel')).toHaveCount(0)
+
+  const initialState = await callOfflineApi(page, `/rooms/${roomId}`, 'GET')
+  expect(initialState.status).toBe(200)
+  expect(initialState.data.game_state.tutorial_current_step).toBe(1)
+
+  const invalidPlay = await callOfflineApi(page, `/rooms/${roomId}/play`, 'POST', { substance: 'NaOH' })
+  expect(invalidPlay.status).toBe(400)
+  expect(String(invalidPlay.data?.error || '')).toContain('Tutorial step is locked')
+
+  const afterInvalid = await callOfflineApi(page, `/rooms/${roomId}`, 'GET')
+  expect(afterInvalid.data.game_state.tutorial_current_step).toBe(1)
+
+  const validPlay = await callOfflineApi(page, `/rooms/${roomId}/play`, 'POST', { substance: 'Mg' })
+  expect(validPlay.status).toBe(200)
+  const step3State = await waitForOfflineRoomState(page, roomId!, (data: any) => {
+    return data.game_state?.tutorial_current_step === 3
+  })
+  expect(step3State.game_state.tutorial_current_step).toBe(3)
 })
 
 test('starts a real playable match from the lobby and exposes core controls', async ({ page }) => {
