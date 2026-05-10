@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
 import websocket from './websocket'
 import { buildApiURL } from './runtimeConfig'
+import { createRandomNickname, hasUsableNickname } from './playerNickname'
 
 const OAUTH_REDIRECT_KEY = 'oauth_redirect'
 const STARTUP_AUTH_TIMEOUT_MS = 8000
@@ -41,6 +42,9 @@ export const sanitizeStoredUser = (value: any): StoredUser => {
   if (normalized.id && !normalized.uid) {
     normalized.uid = normalized.id
   }
+  if ((normalized.uid || normalized.id) && !hasUsableNickname(normalized.nickname)) {
+    normalized.nickname = createRandomNickname()
+  }
   return normalized
 }
 
@@ -62,7 +66,12 @@ export const getStoredUser = (): StoredUser => {
   if (!rawUser) return null
 
   try {
-    return sanitizeStoredUser(JSON.parse(rawUser))
+    const parsed = JSON.parse(rawUser)
+    const sanitized = sanitizeStoredUser(parsed)
+    if (sanitized && !hasUsableNickname(parsed?.nickname) && hasUsableNickname(sanitized.nickname)) {
+      localStorage.setItem('user', JSON.stringify(sanitized))
+    }
+    return sanitized
   } catch (error) {
     console.error('[Auth] Failed to parse stored user', error)
     localStorage.removeItem('user')

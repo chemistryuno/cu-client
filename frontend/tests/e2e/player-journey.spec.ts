@@ -21,6 +21,41 @@ test('creates a local identity through the real login UI', async ({ page }) => {
   await expect(page.getByTestId('lobby-user-chip')).toContainText('JourneyLogin')
 })
 
+test('auto-generates a nickname when entering without one', async ({ page }) => {
+  await page.goto('/#/login')
+  await page.getByTestId('login-submit-button').click()
+
+  await expect(page).toHaveURL(/#\/$/)
+  await expect(page.getByTestId('lobby-page')).toBeVisible()
+
+  const user = await page.evaluate(() => JSON.parse(window.localStorage.getItem('user') || '{}'))
+  expect(String(user.nickname || '')).toMatch(/^[a-zA-Z0-9_\u4e00-\u9fa5]{1,20}$/)
+  await expect(page.getByTestId('lobby-user-chip')).toContainText(user.nickname)
+})
+
+test('repairs legacy local users that are missing nicknames on main entry', async ({ page }) => {
+  await seedLocalIdentity(page, 'LegacySeed', 'flask')
+  await page.evaluate(() => {
+    const rawState = window.localStorage.getItem('chemistry-uno-offline-state-v2')
+    if (!rawState) throw new Error('Missing offline state')
+
+    const state = JSON.parse(rawState)
+    state.users = (state.users || []).map((user: any) => user.uid === state.session_uid ? { ...user, nickname: '' } : user)
+    window.localStorage.setItem('chemistry-uno-offline-state-v2', JSON.stringify(state))
+
+    const rawUser = window.localStorage.getItem('user')
+    if (!rawUser) throw new Error('Missing stored user')
+    window.localStorage.setItem('user', JSON.stringify({ ...JSON.parse(rawUser), nickname: '' }))
+  })
+
+  await page.reload()
+  await expect(page.getByTestId('lobby-page')).toBeVisible()
+
+  const user = await page.evaluate(() => JSON.parse(window.localStorage.getItem('user') || '{}'))
+  expect(String(user.nickname || '')).toMatch(/^[a-zA-Z0-9_\u4e00-\u9fa5]{1,20}$/)
+  await expect(page.getByTestId('lobby-user-chip')).toContainText(user.nickname)
+})
+
 test('completes the tutorial flow and enters the tutorial-backed room', async ({ page }) => {
   await seedLocalIdentity(page, 'JourneyTutorial', 'flask')
   await completeLobbyTutorial(page)

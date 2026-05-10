@@ -27,6 +27,7 @@ import type {
   User,
 } from './clientRuntimeTypes'
 import { TUTORIAL_INITIAL_STATE, getTutorialStep, type TutorialStep } from './tutorialScript'
+import { createRandomNickname, hasUsableNickname } from './playerNickname'
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
@@ -1026,6 +1027,15 @@ const resetOfflineState = () => {
 }
 const currentUser = (state: State) => userRepository.current(state)
 
+const ensureRuntimeUserNickname = (state: State, user: User) => {
+  if (hasUsableNickname(user.nickname)) return false
+  user.nickname = createRandomNickname()
+  userRepository.upsert(state, user)
+  writeState(state)
+  updateStoredUser(user)
+  return true
+}
+
 const ensureCurrentSession = (user: User) => {
   sessionRepository.pruneExpired(nowMs())
   const currentSessionId = sessionRepository.getCurrentSessionId()
@@ -1051,6 +1061,7 @@ const requireAuth = (state: State) => {
     sessionRepository.clearStoredTokens()
     throw { status: 401, data: { error: 'Session expired' } }
   }
+  ensureRuntimeUserNickname(state, user)
   return user
 }
 
@@ -1885,9 +1896,8 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       return buildSecurityGateResponse(path)
     }
     if (method === 'POST' && path === '/auth/offline-profile') {
-      const nickname = String(body.nickname || '').trim()
+      const nickname = String(body.nickname || '').trim() || createRandomNickname()
       const avatar = String(body.avatar || 'flask').trim() || 'flask'
-      if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
 
       // Thoroughly clear any previous legacy data before initializing a new profile
       const newState = resetOfflineState()
@@ -1909,9 +1919,8 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       return dispatchOfflineRequestSync({ ...config, method: 'POST', url: '/auth/offline-profile', data: config.data })
     }
     if (method === 'POST' && path === '/auth/login') {
-      const nickname = String(body.nickname || body.identifier || body.username || '').trim()
-      if (!nickname) throw { status: 400, data: { error: 'Nickname is required' } }
-      
+      const nickname = String(body.nickname || body.identifier || body.username || '').trim() || createRandomNickname()
+
       // Thoroughly clear any previous legacy data before initializing a new session
       const newState = resetOfflineState()
       

@@ -9,6 +9,7 @@ import { AVATAR_PRESETS } from '../utils/avatarPresets'
 import { useI18n } from '../utils/i18n'
 import { cn } from '../utils/cn'
 import { consoleButton, consolePanel } from '../utils/ui'
+import { createRandomNickname, isValidNickname, MAX_NICKNAME_LENGTH, NICKNAME_REGEX } from '../utils/playerNickname'
 
 const router = useRouter()
 const { locale, t, td, setLocale } = useI18n()
@@ -19,23 +20,22 @@ const loading = ref(false)
 const error = ref('')
 
 const avatarOptions = computed(() => Object.keys(AVATAR_PRESETS))
-const nicknameRegex = /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/
 
 const handleSubmit = async () => {
-  const trimmedNickname = nickname.value.trim()
+  let trimmedNickname = nickname.value.trim()
   error.value = ''
 
   if (!trimmedNickname) {
-    error.value = td('login.errors.empty')
-    return
+    randomizeNickname()
+    trimmedNickname = nickname.value.trim()
   }
 
-  if (trimmedNickname.length > 20) {
+  if (trimmedNickname.length > MAX_NICKNAME_LENGTH) {
     error.value = td('login.errors.tooLong')
     return
   }
 
-  if (!nicknameRegex.test(trimmedNickname)) {
+  if (!isValidNickname(trimmedNickname) || !NICKNAME_REGEX.test(trimmedNickname)) {
     error.value = td('login.errors.invalid')
     return
   }
@@ -61,21 +61,7 @@ const handleSubmit = async () => {
 }
 
 const randomizeNickname = () => {
-  if (locale.value === 'zh-CN') {
-    const prefixes = ['元素', '量子', '轨道', '催化', '离子', '星焰', '裂变', '晶格', '燃素', '极光', '反应', '分子']
-    const suffixes = ['旅人', '术士', '猎手', '行者', '学徒', '骑士', '使者', '工匠', '指挥官', '观察者', '调和者', '先驱']
-    const extra = ['甲', '乙', '零', 'X', 'Z', 'Nova', 'Prime']
-    const useExtra = Math.random() > 0.55
-    nickname.value = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${suffixes[Math.floor(Math.random() * suffixes.length)]}${useExtra ? extra[Math.floor(Math.random() * extra.length)] : ''}${Math.floor(Math.random() * 90 + 10)}`
-    return
-  }
-
-  const prefixes = ['Element', 'Quantum', 'Orbital', 'Catalyst', 'Ion', 'Photon', 'Nebula', 'Plasma', 'Nova', 'Rune', 'Echo', 'Fusion']
-  const suffixes = ['Walker', 'Crafter', 'Hunter', 'Voyager', 'Knight', 'Weaver', 'Pilot', 'Striker', 'Sage', 'Smith', 'Spark', 'Rider']
-  const extras = ['X', 'Prime', 'Nova', 'Zero', 'Core', 'Flux']
-  const connector = Math.random() > 0.6 ? '_' : ''
-  const useExtra = Math.random() > 0.5
-  nickname.value = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${connector}${suffixes[Math.floor(Math.random() * suffixes.length)]}${useExtra ? extras[Math.floor(Math.random() * extras.length)] : ''}${Math.floor(Math.random() * 90 + 10)}`
+  nickname.value = createRandomNickname(locale.value)
 }
 
 const previewUser = computed(() => ({
@@ -174,7 +160,6 @@ const previewUser = computed(() => ({
                   data-testid="login-nickname-input"
                   type="text"
                   maxlength="20"
-                  required
                   class="w-full bg-slate-50 dark:bg-[#0b1420] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 pl-10 pr-3 py-3 rounded-2xl focus:ring-2 focus:ring-sky-700/20 focus:border-sky-700 dark:focus:border-sky-400 outline-none transition-all placeholder:text-slate-500/50 text-sm font-bold"
                   :placeholder="td('login.nicknamePlaceholder')"
                 />
