@@ -8,6 +8,7 @@ type TableName = 'announcements' | 'reactions' | 'substances' | 'configs' | 'lea
 
 const SQLITE_STORAGE_KEY = 'chemistry-uno-runtime-sqlite-v1'
 const SQLITE_SCHEMA_VERSION_KEY = 'chemistry-uno-runtime-sqlite-schema-v1'
+const SQLITE_EQUATIONS_VERSION_KEY = 'chemistry-uno-equations-v1'
 
 const TABLES: TableName[] = ['announcements', 'reactions', 'substances', 'configs', 'leaderboard']
 
@@ -266,7 +267,13 @@ const extractChemicalFormula = (substance: string): string => {
 }
 
 const seedHardcodedEquations = (db: Database) => {
-  if (tableCount(db, 'reactions') > 0) return
+  const equationsLoaded = clientRuntimeStorage.getItem(SQLITE_EQUATIONS_VERSION_KEY)
+  if (equationsLoaded === '1') return
+
+  const currentCount = tableCount(db, 'reactions')
+  if (currentCount > 0 && currentCount >= 168) return
+
+  db.run('DELETE FROM reactions')
 
   CHEMICAL_EQUATIONS.forEach((equation, index) => {
     const parts = equation.split('=')
@@ -288,6 +295,8 @@ const seedHardcodedEquations = (db: Database) => {
     }
     insertReaction(db, record, index)
   })
+
+  clientRuntimeStorage.setItem(SQLITE_EQUATIONS_VERSION_KEY, '1')
 }
 
 const createDatabase = async () => {
