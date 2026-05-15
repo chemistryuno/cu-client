@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Bot, Loader2, Send, X, Globe, KeyRound, LibraryBig, Sparkles } from 'lucide-vue-next'
-import { buildAssistantMessages, getStoredAIAssistantConfig, isAIAssistantConfigured, sendAIAssistantChat, type AIAssistantContext, type AIAssistantMessage } from '../utils/aiAssistant'
+import { buildAssistantMessages, getStoredAIAssistantConfig, isAIAssistantConfigured, sendAIAssistantChat, type AIAssistantContext, type AIAssistantMessage, getRateLimitStatus, RATE_LIMIT_CONFIG } from '../utils/aiAssistant'
 import { getGlobalAIAssistantContext } from '../utils/aiAssistantContext'
 
 const props = defineProps<{
@@ -18,11 +18,12 @@ const input = ref('')
 const busy = ref(false)
 const error = ref('')
 const messages = ref<Array<AIAssistantMessage & { id: number }>>([])
-const config = ref(getStoredAIAssistantConfig())
+const config = ref(getStoredAIAssistantConfig() as any)
 const context = ref<AIAssistantContext>(getGlobalAIAssistantContext())
+const rateLimitStatus = ref(getRateLimitStatus(RATE_LIMIT_CONFIG))
 
 const configured = computed(() => isAIAssistantConfigured(config.value))
-const canSend = computed(() => isAIAssistantConfigured(config.value) && input.value.trim().length > 0 && !busy.value)
+const canSend = computed(() => isAIAssistantConfigured(config.value) && input.value.trim().length > 0 && !busy.value && !rateLimitStatus.value.isLimited)
 
 const systemPrompt = computed(() => [
   'You are a concise in-app chemistry game assistant.',
@@ -30,9 +31,10 @@ const systemPrompt = computed(() => [
   'Be short, practical, and grounded in the current app context.',
 ].join(' '))
 
-const refreshContext = () => {
+const refreshContext = async () => {
   context.value = getGlobalAIAssistantContext()
-  config.value = getStoredAIAssistantConfig()
+  config.value = await getStoredAIAssistantConfig()
+  rateLimitStatus.value = getRateLimitStatus(RATE_LIMIT_CONFIG)
 }
 
 const close = () => {
@@ -62,6 +64,7 @@ const send = async () => {
       }),
     })
     messages.value.push({ id: nextId + 1, role: 'assistant', content: reply.content })
+    rateLimitStatus.value = getRateLimitStatus(RATE_LIMIT_CONFIG)
   } catch (err: any) {
     error.value = err?.message || 'Assistant request failed'
   } finally {
@@ -151,6 +154,15 @@ watch(visible, (next) => {
 
           <div v-if="error" class="rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-300">
             {{ error }}
+          </div>
+
+          <div v-if="rateLimitStatus.isLimited" class="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-200">
+            <div class="mb-1">Request limit reached</div>
+            <div class="text-[11px] opacity-80">请稍候 {{ Math.ceil(rateLimitStatus.resetIn / 1000) }} 秒后重试 / Retry in {{ Math.ceil(rateLimitStatus.resetIn / 1000) }}s</div>
+          </div>
+
+          <div v-if="configured && !rateLimitStatus.isLimited" class="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-400">
+            Requests: {{ rateLimitStatus.remaining }} / {{ RATE_LIMIT_CONFIG.maxRequests }} remaining
           </div>
 
           <div v-if="!configured" class="rounded-xl border border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-200">

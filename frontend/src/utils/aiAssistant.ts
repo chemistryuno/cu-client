@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage } from './clientRuntimeStorage'
+import { encryptText, decryptText, isEncrypted } from './aiEncryption'
+import { isRateLimited, recordRequest, getRateLimitStatus, RATE_LIMIT_CONFIG } from './aiRateLimit'
 
 export type AIAssistantConfig = {
   baseUrl: string
@@ -24,10 +26,11 @@ export type AIAssistantReply = {
   raw: any
 }
 
+// DeepSeek API配置
 export const DEFAULT_AI_ASSISTANT_CONFIG: AIAssistantConfig = {
-  baseUrl: '',
-  apiKey: '',
-  model: '',
+  baseUrl: 'https://api.deepseek.com',
+  apiKey: 'sk-2339cb1123884da6b6baa4d2ec7f7b3e',
+  model: 'deepseek-chat',
 }
 
 const CONFIG_STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.aiAssistantConfig
@@ -50,15 +53,36 @@ const normalizeConfig = (config: Partial<AIAssistantConfig> | null | undefined):
   model: String(config?.model || '').trim(),
 })
 
-export const getStoredAIAssistantConfig = (): AIAssistantConfig => {
-  return normalizeConfig(safeParse(clientRuntimeStorage.getItem(CONFIG_STORAGE_KEY), DEFAULT_AI_ASSISTANT_CONFIG))
+export const getStoredAIAssistantConfig = async (): Promise<AIAssistantConfig> => {
+  const stored = safeParse(clientRuntimeStorage.getItem(CONFIG_STORAGE_KEY), DEFAULT_AI_ASSISTANT_CONFIG)
+  const normalized = normalizeConfig(stored)
+
+  // 如果API密钥是加密的，尝试解密
+  if (isEncrypted(normalized.apiKey)) {
+    try {
+      normalized.apiKey = await decryptText(normalized.apiKey)
+    } catch (error) {
+      console.error('Failed to decrypt API key:', error)
+      normalized.apiKey = ''
+    }
+  }
+
+  return normalized
 }
 
-aiAssistantConfigState.value = getStoredAIAssistantConfig()
+aiAssistantConfigState.value = getStoredAIAssistantConfig() as any
 
-export const setStoredAIAssistantConfig = (config: Partial<AIAssistantConfig>) => {
+export const setStoredAIAssistantConfig = async (config: Partial<AIAssistantConfig>) => {
   const next = normalizeConfig(config)
-  clientRuntimeStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(next))
+
+  // 对API密钥进行加密存储
+  const encryptedApiKey = await encryptText(next.apiKey)
+  const encryptedConfig = {
+    ...next,
+    apiKey: encryptedApiKey,
+  }
+
+  clientRuntimeStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(encryptedConfig))
   aiAssistantConfigState.value = next
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('ai-assistant-config-changed'))
@@ -124,6 +148,15 @@ export const sendAIAssistantChat = async ({
     throw new Error('AI assistant is not configured')
   }
 
+  // 检查速率限制
+  if (isRateLimited(RATE_LIMIT_CONFIG)) {
+    const status = getRateLimitStatus(RATE_LIMIT_CONFIG)
+    const resetSeconds = Math.ceil(status.resetIn / 1000)
+    throw new Error(
+      `请求过于频繁，请在 ${resetSeconds} 秒后再试 / Too many requests, please try again in ${resetSeconds} seconds`
+    )
+  }
+
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   signal?.addEventListener('abort', () => controller.abort(), { once: true })
@@ -143,6 +176,9 @@ export const sendAIAssistantChat = async ({
       }),
       signal: controller.signal,
     })
+
+    // 请求成功后，记录这次请求
+    recordRequest()
   } catch (error: any) {
     if (error?.name === 'AbortError') {
       throw new Error('AI request timed out')
@@ -193,3 +229,6 @@ export const buildAssistantMessages = ({
     { role: 'user', content: userPrompt },
   ]
 }
+
+// 导出速率限制相关的函数
+export { getRateLimitStatus, getRemainingRequests, RATE_LIMIT_CONFIG } from './aiRateLimit'

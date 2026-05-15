@@ -218,6 +218,9 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
+  width: 100%;
+  min-height: 130px;
+  max-height: 130px;
 }
 
 /* 单张手牌 */

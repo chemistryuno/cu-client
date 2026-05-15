@@ -2539,10 +2539,9 @@ watch(() => gameState.value?.current_player, () => {
       <div class="absolute left-0 right-0 flex flex-col items-center overflow-hidden px-2 sm:px-4"
            :style="{
              top: isMobile ? '44px' : '64px',
-             bottom: showChemicalKeyboard ? '144px' : '0',
-             paddingBottom: showChemicalKeyboard ? '0' : (isMobile ? '4rem' : '5rem'),
-             justifyContent: 'center',
-             transform: 'translateY(-100px)'
+             bottom: showChemicalKeyboard ? '144px' : (isMobile ? '140px' : '160px'),
+             paddingBottom: showChemicalKeyboard ? '0' : '0',
+             justifyContent: 'center'
            }">
           <!-- Left Sidebar: Hint & Status -->
           <Teleport to="body" :disabled="!!roomInfo?.is_points_mode">
@@ -2814,7 +2813,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Hand / Deck Area -->
-      <div class="fixed bottom-0 left-0 right-0 z-[70] bg-white/70 dark:bg-black/60 backdrop-blur-2xl border-t border-slate-200 dark:border-white/5 flex flex-col items-center">
+      <div class="fixed bottom-0 left-0 right-0 z-[70] bg-white/70 dark:bg-black/60 backdrop-blur-2xl border-t border-slate-200 dark:border-white/5 flex flex-col items-center" :style="{ height: showChemicalKeyboard ? '144px' : (isMobile ? '140px' : '160px') }">
         <div v-if="isTutorialMode && tutorialHintText && isMyTurn" class="absolute bottom-full mb-4 left-0 right-0 flex justify-center px-4 z-50 pointer-events-none animate-in slide-in-from-bottom-2">
           <div class="room-assistive-card max-w-md w-full">
             <div class="room-assistive-card__header">
