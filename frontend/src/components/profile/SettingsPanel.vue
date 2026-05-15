@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Sun, Moon, Monitor, Palette, Volume2, Smartphone, Keyboard, Save, FileText, ChevronRight, ShieldCheck, X } from 'lucide-vue-next'
+import { Sun, Moon, Monitor, Palette, Volume2, Smartphone, Keyboard, Save, FileText, ChevronRight, ShieldCheck, X, Globe } from 'lucide-vue-next'
 import { authAPI } from '../../utils/api'
 import { useDialog } from '../../utils/dialog'
 import { feedback } from '../../utils/feedback'
@@ -10,6 +10,7 @@ import {
   setStoredThemeColor,
   type ThemeColor,
 } from '../../utils/themeColor'
+import { getLanguagePreference, setLanguagePreference, initLanguagePreference, type Language } from '../../utils/languagePreference'
 import AIAssistantSettings from './AIAssistantSettings.vue'
 
 const props = defineProps<{
@@ -31,6 +32,7 @@ const currentThemeColor = ref<ThemeColor>(getStoredThemeColor())
 const soundVolume = ref(feedback.getVolume())
 const vibrationEnabled = ref(feedback.getVibrationEnabled())
 const enableElementInput = ref(props.user.enable_element_input ?? true)
+const currentLanguage = ref<Language>('en')
 
 const themes = [
   { id: 'system', name: '系统跟随 / AUTO', icon: Monitor },
@@ -39,6 +41,11 @@ const themes = [
 ]
 
 const themeColors = THEME_COLOR_OPTIONS
+
+const languages = [
+  { id: 'en' as Language, name: '英文 / English', flag: '🇺🇸' },
+  { id: 'zh' as Language, name: '中文 / Chinese', flag: '🇨🇳' }
+]
 
 const applyTheme = (theme: string) => {
   localStorage.setItem('theme', theme)
@@ -84,6 +91,8 @@ const loadAgreements = async () => {
 }
 
 onMounted(() => {
+  initLanguagePreference()
+  currentLanguage.value = getLanguagePreference()
   applyTheme(currentTheme.value)
   loadAgreements()
 })
@@ -102,6 +111,10 @@ watch(soundVolume, (newVolume) => {
 
 watch(vibrationEnabled, (newValue) => {
   feedback.setVibrationEnabled(newValue)
+})
+
+watch(currentLanguage, (newLanguage) => {
+  setLanguagePreference(newLanguage)
 })
 
 watch(() => props.user, (newUser) => {
@@ -206,6 +219,35 @@ watch(() => props.user, (newUser) => {
               <span class="min-w-0 text-[10px] font-black uppercase tracking-tight leading-none">{{ color.name.split('/')[0].trim() }}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- 语言偏好设置 -->
+      <div class="bg-white dark:bg-[#111114] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm dark:shadow-none transition-all">
+        <h3 class="text-base font-black uppercase tracking-widest mb-5 flex items-center gap-2.5 text-slate-800 dark:text-white">
+          <Globe class="w-4 h-4 text-cyan-500" />
+          语言偏好 <span class="text-[10px] font-mono opacity-30">/ LANGUAGE</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          <button
+            v-for="lang in languages"
+            :key="lang.id"
+            @click="currentLanguage = lang.id"
+            :class="[
+              'flex items-center gap-2.5 p-3 rounded-xl border transition-all group backdrop-blur-md',
+              currentLanguage === lang.id
+                ? 'border-[color:rgb(var(--theme-rgb)/0.5)] bg-[color:rgb(var(--theme-rgb)/0.1)] dark:bg-[color:rgb(var(--theme-rgb)/0.2)] text-[var(--theme-text)] dark:text-[var(--theme-text-soft)] shadow-[0_4px_12px_rgb(var(--theme-rgb)/0.1)]'
+                : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] text-slate-400 hover:border-slate-200 dark:hover:border-white/10'
+            ]"
+          >
+            <span class="text-lg">{{ lang.flag }}</span>
+            <span class="text-[10px] font-black uppercase tracking-tight text-left leading-none">{{ lang.name.split('/')[0].trim() }}</span>
+          </button>
+        </div>
+
+        <div class="mt-4 px-3 py-2.5 bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 rounded-lg text-[9px] text-slate-500 dark:text-slate-400">
+          <p>AI助手将使用选定的语言进行回复 / The AI assistant will respond in the selected language</p>
         </div>
       </div>
 

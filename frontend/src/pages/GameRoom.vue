@@ -13,6 +13,7 @@ import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
 import GameLogPanel from '../components/GameLogPanel.vue'
+import AIGameAssistant from '../components/AIGameAssistant.vue'
 import LevelUpAnimation from '../components/LevelUpAnimation.vue'
 import GameToast from '../components/GameToast.vue'
 import ChemicalKeyboard from '../components/ChemicalKeyboard.vue'
@@ -20,7 +21,10 @@ import FeedbackSettings from '../components/FeedbackSettings.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { getTutorialStep, TUTORIAL_TOTAL_STEPS } from '../utils/tutorialScript'
 import { initializeGameLogs, clearGameLogs, recordPlayerCardPlay, recordOpponentCardPlay, recordCardDraw, recordPlayerPass, recordOpponentPass, recordGameEnd, getGameLogs } from '../utils/gameLogCollector'
-import { initializeGameContextForAI } from '../utils/gameContextForAI'
+import { initializeGameContextForAI, getGameContextForAI, updateGameContextForAI } from '../utils/gameContextForAI'
+import { createGameHistory, recordGameEvent, updateGameHistoryScores, endGameHistory, saveGameHistory, getCurrentGameHistory } from '../utils/gameHistoryStorage'
+import { saveGameSession, loadGameSession, listUserSessions } from '../utils/sessionStorage'
+import { serializeGameState, deserializeGameState } from '../utils/gameStateSerialization'
 import '../styles/mobile-game.css'
 import type { GameLogEntry } from '../types/gameLog'
 
@@ -30,6 +34,7 @@ const { td } = useI18n()
 const { showAlert, showConfirm, showToast } = useDialog()
 const gameToastRef = ref()
 const id = route.params.id as string
+const resumeSessionId = computed(() => route.query.resume as string | undefined)
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
 const isReplayBridgeMode = computed(() => Number.isFinite(replayHistoryQueryID.value) && replayHistoryQueryID.value > 0)
 // Replay scope logic removed
@@ -50,6 +55,29 @@ const gameState = ref<any>(null)
 const roomInfo = ref<any>(null)
 const playersInfo = ref<any[]>([])
 const availableSubstances = ref<string[]>([])
+
+// Auto-save handler (defined at module level so it's accessible in both onMounted and onUnmounted)
+const handleBeforeUnload = () => {
+  if (gameState.value && !isReplayBridgeMode.value && gameState.value.status !== 'finished') {
+    try {
+      const stateSnapshot = serializeGameState({
+        availableSubstances: availableSubstances.value,
+        playersInfo: playersInfo.value,
+        gameState: gameState.value,
+      })
+      saveGameSession(stateSnapshot, user.value.uid, 'paused', {
+        id: id,
+        name: roomInfo.value?.name || 'Game',
+        max_players: roomInfo.value?.max_players || 2,
+        current_players: playersInfo.value.map((p: any) => p.username || `Player ${p.uid}`),
+      }).catch(err => {
+        console.error('Failed to auto-save game session:', err)
+      })
+    } catch (error) {
+      console.error('Error serializing game state for save:', error)
+    }
+  }
+}
 
 // 教学模式检测
 const isTutorialMode = ref(false)
@@ -104,6 +132,8 @@ const levelUpAnimationRef = ref<InstanceType<typeof LevelUpAnimation> | null>(nu
 // Game logging for single-player mode
 const gameLogs = ref<GameLogEntry[]>([])
 const isSinglePlayerMode = ref(false)
+const gameContext = ref<any>(null)
+const gameHistory = ref<any>(null)
 
 // 移动端自动全屏
 const requestFullscreen = () => {
@@ -882,6 +912,32 @@ const handleGameUpdate = (message: any) => {
   if (message.data && typeof message.data === 'object') {
     gameState.value = message.data
     syncTutorialStateFromGameState()
+    // Update game context for AI in single-player mode
+    if (isSinglePlayerMode.value) {
+      gameContext.value = getGameContextForAI()
+    }
+    // Update game history scores
+    if (gameHistory.value) {
+      updateGameHistoryScores(
+        gameState.value.my_data?.score || 0,
+        gameState.value.players_info?.[0]?.score || gameState.value.opponent_data?.score || 0
+      )
+    }
+    // Handle game end
+    if (gameState.value?.status === 'finished' && gameHistory.value) {
+      const myScore = gameState.value.my_data?.score || 0
+      const opponentScore = gameState.value.players_info?.[0]?.score || gameState.value.opponent_data?.score || 0
+      let winner: 'player' | 'opponent' | 'tie'
+      if (myScore > opponentScore) {
+        winner = 'player'
+      } else if (opponentScore > myScore) {
+        winner = 'opponent'
+      } else {
+        winner = 'tie'
+      }
+      endGameHistory(winner)
+      saveGameHistory(gameHistory.value)
+    }
     if (isMyTurn.value) {
       fetchTurnSubstances()
       if (isTutorialMode.value) {
@@ -1606,6 +1662,49 @@ const loadGameState = async (silent = false) => {
       gameState.value = data.game_state
       syncTutorialStateFromGameState()
 
+      // If resuming from saved session, overlay the saved state onto current state
+      if (resumeSessionId.value) {
+        try {
+          const savedSession = await loadGameSession(resumeSessionId.value)
+          if (savedSession) {
+            const restoredState = {
+              ...gameState.value,
+              ...savedSession.gameState,
+              current_player: savedSession.gameState.currentTurn === 'player' ? 0 : 1,
+              player_card_list: savedSession.gameState.playerHand,
+              center_card: savedSession.gameState.centerCard,
+              score_player: savedSession.gameState.playerScore,
+              score_opponent: savedSession.gameState.opponentScore,
+            }
+            gameState.value = restoredState
+            availableSubstances.value = savedSession.gameState.boardSubstances
+            playersInfo.value = savedSession.gameState.aiConfigs.map((config) => ({
+              uid: config.id,
+              username: config.name,
+              difficulty: config.difficulty,
+              is_ready: savedSession.gameState.aiCompletionStatus[config.id] || false,
+            }))
+            showToast(td('sessionRecovery.gameResumed'), 'Success', 'success')
+
+            // Re-save with "in_progress" status (session is now active again)
+            const updatedStateSnapshot = serializeGameState({
+              availableSubstances: availableSubstances.value,
+              playersInfo: playersInfo.value,
+              gameState: restoredState,
+            })
+            await saveGameSession(updatedStateSnapshot, user.value.uid, 'in_progress', savedSession.roomInfo)
+
+            // Delete the original paused session after successful resume
+            await deleteGameSession(resumeSessionId.value).catch(err => {
+              console.error('Failed to delete resumed session:', err)
+            })
+          }
+        } catch (error) {
+          console.error('Failed to resume saved session:', error)
+          showAlert(td('sessionRecovery.failedResume'), td('sessionRecovery.error'))
+        }
+      }
+
       // 教学模式提示生成
       if (isTutorialMode.value && isMyTurn.value) {
         generateTutorialHint()
@@ -1695,8 +1794,19 @@ onMounted(() => {
       if (isSinglePlayerMode.value) {
         clearGameLogs()
         initializeGameContextForAI()
+        gameContext.value = getGameContextForAI()
         gameLogs.value = []
       }
+
+      // Create game history for analytics/replay
+      gameHistory.value = createGameHistory(
+        user.value.uid,
+        isSinglePlayerMode.value ? 'single_player' : 'multiplayer',
+        {
+          roomId: id,
+          roomName: roomInfo.value?.room_name || 'Game'
+        }
+      )
 
       websocket.joinRoom(id)
       websocket.on('game_update', handleGameUpdate)
@@ -1740,6 +1850,9 @@ onMounted(() => {
       console.error('Failed to initialize game room:', err)
       loading.value = false
     })
+
+  // Register auto-save handler
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
@@ -1747,6 +1860,9 @@ onUnmounted(() => {
   if (centerEffectTimer != null) {
     window.clearTimeout(centerEffectTimer)
   }
+
+  // Remove auto-save handler
+  window.removeEventListener('beforeunload', handleBeforeUnload)
 
   // 清除教学模式标记，并记录已完成
   if (isTutorialMode.value) {
@@ -2228,7 +2344,7 @@ watch(() => gameState.value?.current_player, () => {
 </script>
 
 <template>
-  <div class="console-app-shell h-screen w-full text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell">
+  <div class="console-app-shell h-screen w-full text-slate-900 dark:text-white overflow-hidden flex flex-col font-sans selection:bg-blue-500/30 game-console-shell pt-11 sm:pt-16">
     <div class="console-grid-overlay"></div>
     <!-- Loading State -->
     <div v-if="loading" class="h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -2301,7 +2417,7 @@ watch(() => gameState.value?.current_player, () => {
       </div>
 
       <!-- Compressed Header - 移动端优化 -->
-      <header class="h-11 sm:h-16 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 sticky top-0 overflow-x-auto custom-scrollbar-hidden">
+      <header class="h-11 sm:h-16 bg-white/72 dark:bg-[#071019]/84 backdrop-blur-2xl border-b border-slate-300/60 dark:border-white/8 px-2 sm:px-5 flex items-center gap-2 sm:gap-3 z-50 fixed top-0 left-0 right-0 overflow-x-auto custom-scrollbar-hidden">
         <div class="flex items-center gap-2 sm:gap-4 shrink-0">
           <button
             @click="handleLeaveRoom"
@@ -2554,7 +2670,7 @@ watch(() => gameState.value?.current_player, () => {
       <!-- Main Action Focus Area -->
       <div class="absolute left-0 right-0 flex flex-col items-center overflow-hidden px-2 sm:px-4"
            :style="{
-             top: isMobile ? '44px' : '64px',
+             top: isMobile ? '56px' : '80px',
              bottom: showChemicalKeyboard ? '144px' : (isMobile ? '140px' : '160px'),
              paddingBottom: showChemicalKeyboard ? '0' : '0',
              justifyContent: 'center'
@@ -3219,31 +3335,14 @@ watch(() => gameState.value?.current_player, () => {
       v-if="showChat && !isReplayBridgeMode"
       class="fixed right-0 top-0 bottom-0 w-full lg:w-80 z-[100] lg:top-6 lg:bottom-52 lg:right-6 flex flex-col"
     >
-      <GameLogPanel
-        v-if="isSinglePlayerMode"
+      <AIGameAssistant
         :game-logs="gameLogs"
-        maxHeight="100%"
-        class="h-full !bg-white/95 dark:!bg-[#09131d]/96 backdrop-blur-2xl shadow-3xl lg:rounded-[28px] border-l lg:border border-slate-300/60 dark:border-white/10"
-        @log-entry-clicked="(entry) => {
-          const aiTab = document.querySelector('.ai-input') as any
-          if (aiTab) {
-            const card = entry.card
-            const question = card
-              ? `Why did I play ${card.color}·${card.element} (${card.reaction}) at step ${entry.step}?`
-              : `Why did I take this action at step ${entry.step}?`
-            aiTab.value = question
-          }
-        }"
-      />
-      <ChatBox
-        v-else
-        :roomId="id"
-        title="实验内通信线程"
+        :current-game-context="gameContext"
+        :room-id="id"
+        :is-multiplayer="!isSinglePlayerMode"
         maxHeight="100%"
         class="h-full !bg-white/95 dark:!bg-[#09131d]/96 backdrop-blur-2xl shadow-3xl lg:rounded-[28px] border-l lg:border border-slate-300/60 dark:border-white/10"
         @close="showChat = false"
-        @input-focus="handleInputFocus"
-        @input-blur="handleInputBlur"
       />
     </div>
 

@@ -29,6 +29,38 @@ export interface GameLogEntry {
   result?: GameLogActionResult
 }
 
+export interface GameEvent {
+  id: string
+  gameId: string
+  timestamp: number
+  turn: number
+  actor: 'player' | 'opponent' | 'system'
+  action: string
+  card?: CardInfo
+  metadata: {
+    playerHand: CardInfo[]
+    opponentHandCount: number
+    centerCard: CardInfo | null
+    playerScore: number
+    opponentScore: number
+  }
+}
+
+export interface GameHistory {
+  id: string
+  userId: number
+  gameMode: 'single_player' | 'multiplayer'
+  opponent?: string
+  startTime: number
+  endTime?: number
+  winner?: 'player' | 'opponent' | 'tie'
+  playerScore: number
+  opponentScore: number
+  duration?: number
+  events: GameEvent[]
+  metadata: Record<string, any>
+}
+
 export interface PlayerState {
   hand: CardInfo[]
   score: number

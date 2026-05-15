@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage } from './clientRuntimeStorage'
 import { encryptText, decryptText, isEncrypted } from './aiEncryption'
 import { isRateLimited, recordRequest, getRateLimitStatus, RATE_LIMIT_CONFIG } from './aiRateLimit'
+import { getLanguagePreference, type Language } from './languagePreference'
+import { buildGameLogAnalysisPromptWithLanguage, buildGameStrategyPromptWithLanguage } from './systemPromptBuilder'
 
 export type AIAssistantConfig = {
   baseUrl: string
@@ -137,18 +139,19 @@ export const sendAIAssistantChat = async ({
   messages,
   signal,
   timeoutMs = 30000,
+  language,
 }: {
   config: AIAssistantConfig
   messages: AIAssistantMessage[]
   signal?: AbortSignal
   timeoutMs?: number
+  language?: Language
 }): Promise<AIAssistantReply> => {
   const normalized = normalizeConfig(config)
   if (!isAIAssistantConfigured(normalized)) {
     throw new Error('AI assistant is not configured')
   }
 
-  // 检查速率限制
   if (isRateLimited(RATE_LIMIT_CONFIG)) {
     const status = getRateLimitStatus(RATE_LIMIT_CONFIG)
     const resetSeconds = Math.ceil(status.resetIn / 1000)
@@ -168,6 +171,7 @@ export const sendAIAssistantChat = async ({
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${normalized.apiKey}`,
+        'X-User-Language': language || getLanguagePreference(),
       },
       body: JSON.stringify({
         model: normalized.model,
@@ -177,7 +181,6 @@ export const sendAIAssistantChat = async ({
       signal: controller.signal,
     })
 
-    // 请求成功后，记录这次请求
     recordRequest()
   } catch (error: any) {
     if (error?.name === 'AbortError') {
@@ -242,15 +245,18 @@ export const buildGameLogAnalysisPrompt = (params: {
   opponentHandCount: number
   playerScore: number
   opponentScore: number
+  language?: Language
 }): AIAssistantMessage[] => {
-  const systemPrompt = `You are a Chemistry Uno strategy coach. The player is asking why they played a specific card at a specific moment in the game.
-
-Analyze ONLY that single decision, not what happened before or after. Explain the reasoning based on:
-- The cards available to play
-- The current board state
-- Tactical considerations
-
-Keep your explanation concise and focused on that one move.`
+  const language = params.language || getLanguagePreference()
+  const systemPrompt = buildGameLogAnalysisPromptWithLanguage(language, {
+    logStep: params.logStep,
+    cardPlayed: params.cardPlayed,
+    playerHand: params.playerHand,
+    centerCard: params.centerCard,
+    opponentHandCount: params.opponentHandCount,
+    playerScore: params.playerScore,
+    opponentScore: params.opponentScore,
+  })
 
   const contextBlock = `
 Game State at this decision:
@@ -277,10 +283,10 @@ export const buildGameStrategyPrompt = (params: {
   gameContext: string
   userQuestion: string
   conversationHistory: AIAssistantMessage[]
+  language?: Language
 }): AIAssistantMessage[] => {
-  const systemPrompt = `You are a Chemistry Uno strategy coach. Help the player make the best decisions based on their current game state.
-
-Be concise, practical, and grounded in the actual game situation. Reference specific cards and tactical options.`
+  const language = params.language || getLanguagePreference()
+  const systemPrompt = buildGameStrategyPromptWithLanguage(language, params.userQuestion)
 
   return [
     { role: 'system', content: systemPrompt },

@@ -45,6 +45,15 @@ const builtinDeck: Record<string, number> = {
   '+2': 8, '+4': 4, Au: 4, He: 1, Ne: 1, Ar: 1, Kr: 1
 }
 
+const singleToMoleculeMap: Record<string, string> = {
+  H: 'H2', O: 'O2', N: 'N2', Cl: 'Cl2', Br: 'Br2', I: 'I2', F: 'F2', S: 'S2'
+}
+
+const convertToValidSubstance = (substance: string): string => {
+  const normalized = normalizeFormula(substance)
+  return singleToMoleculeMap[normalized] || normalized
+}
+
 const substanceNames: Record<string, string> = {
   H2: 'Hydrogen Gas', O2: 'Oxygen Gas', N2: 'Nitrogen Gas', F2: 'Fluorine Gas', C: 'Carbon', Cl2: 'Chlorine Gas', Br2: 'Bromine', I2: 'Iodine', S2: 'Sulfur', P: 'Phosphorus',
   Na: 'Sodium', Mg: 'Magnesium', Al: 'Aluminum', Si: 'Silicon', K: 'Potassium', Ca: 'Calcium', Mn: 'Manganese', Fe: 'Iron', Cu: 'Copper', Zn: 'Zinc', Ag: 'Silver',
@@ -1443,6 +1452,9 @@ const runTutorialAiTurn = (state: State, room: Room) => {
     drawCardsForPlayer(game, game.current_player, drawCount)
     game.pending_draw_count = 0
     game.pending_draw_types = []
+    game.discard_pile = []
+    game.last_card = null
+    game.current_reaction = ''
     maybeAdvanceTutorialForAiAction(room)
     emit('action_toast', { type: 'action_toast', data: currentStep.aiMessage || `${player.nickname} drew cards.` })
     advanceTurn(state, room)
@@ -1590,6 +1602,9 @@ const runAiTurn = (state: State, room: Room) => {
     drawCardsForPlayer(game, game.current_player, drawCount)
     game.pending_draw_count = 0
     game.pending_draw_types = []
+    game.discard_pile = []
+    game.last_card = null
+    game.current_reaction = ''
     emit('action_toast', { type: 'action_toast', data: `${player.nickname} drew cards.` })
   }
   advanceTurn(state, room)
@@ -1629,10 +1644,19 @@ const scheduleTurnTimer = (_state: State, room: Room) => {
     if (!targetRoom?.game_state || targetRoom.game_state.status !== 'playing') return
     const player = targetRoom.game_state.players[targetRoom.game_state.current_player]
     if (!player || player.uid !== current.uid) return
-    drawCardsForPlayer(targetRoom.game_state, targetRoom.game_state.current_player, Math.max(1, targetRoom.game_state.pending_draw_count || 1))
+    const currentPlayerIndex = targetRoom.game_state.current_player
+    drawCardsForPlayer(targetRoom.game_state, currentPlayerIndex, Math.max(1, targetRoom.game_state.pending_draw_count || 1))
     targetRoom.game_state.pending_draw_count = 0
     targetRoom.game_state.pending_draw_types = []
+    targetRoom.game_state.discard_pile = []
+    targetRoom.game_state.last_card = null
+    targetRoom.game_state.current_reaction = ''
     targetRoom.game_state.current_player = nextActivePlayerIndex(targetRoom.game_state)
+    // If this player was marked by Au card, skip the next player too
+    if (targetRoom.game_state.allowed_any_player === currentPlayerIndex) {
+      targetRoom.game_state.current_player = nextActivePlayerIndex(targetRoom.game_state)
+      targetRoom.game_state.allowed_any_player = -1
+    }
     writeState(latest)
     emit('action_toast', { type: 'action_toast', data: `${player.nickname} auto-drew due to timeout.` })
     emitGameUpdate(targetRoom)
@@ -1652,7 +1676,9 @@ const appendFinishedPlayer = (game: GameState, uid: number) => {
 const applyPlay = (_state: State, room: Room, playerIndex: number, substance: string, reactants?: string[]) => {
   const game = ensureGame(room)
   const player = game.players[playerIndex]
-  const normalized = normalizeFormula(substance)
+  const converted = convertToValidSubstance(substance)
+  const normalized = normalizeFormula(converted)
+  const convertedReactants = reactants?.map(r => convertToValidSubstance(r))
   const isFreeDeployTurn = game.allowed_any_player === playerIndex
   if (!normalized) throw { status: 400, data: { error: 'Substance is required' } }
   if (!canFormSubstance(player.hand_cards, normalized)) {
@@ -1674,7 +1700,7 @@ const applyPlay = (_state: State, room: Room, playerIndex: number, substance: st
     card: { type: normalized, count: 1, effect: isSpecial ? normalized : undefined },
     substance: normalized,
     player_uid: player.uid,
-    reactants
+    reactants: convertedReactants
   }
 
   game.discard_pile.push(playedCard)
@@ -2253,6 +2279,9 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       drawCardsForPlayer(game, index, drawCount)
       game.pending_draw_count = 0
       game.pending_draw_types = []
+      game.discard_pile = []
+      game.last_card = null
+      game.current_reaction = ''
       maybeAdvanceTutorialForHumanAction(room, index, 'draw')
       advanceTurn(state, room)
       writeState(state)

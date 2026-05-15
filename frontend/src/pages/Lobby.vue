@@ -6,13 +6,19 @@ import { clearClientAuthState, getStoredUser, sanitizeStoredUser } from '../util
 import { useDialog } from '../utils/dialog'
 import UserAvatar from '../components/UserAvatar.vue'
 import TutorialGuide from '../components/TutorialGuide.vue'
+import SessionRecoveryModal from '../components/SessionRecoveryModal.vue'
+import PageLayout from '../components/layouts/PageLayout.vue'
+import ModalContainer from '../components/modals/ModalContainer.vue'
 import { Beaker, Bot, BookOpen, Database, Loader2, Play, RotateCcw, Settings, Swords, UserRound, X } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { useI18n } from '../utils/i18n'
 import { consoleButton } from '../utils/ui'
 import { openAIAssistant } from '../utils/aiAssistantUI'
 import { setGlobalAIAssistantContext } from '../utils/aiAssistantContext'
+import { listUserSessions, loadGameSession, deleteGameSession, getActiveGames } from '../utils/sessionStorage'
+import { deserializeGameState } from '../utils/gameStateSerialization'
 import '../styles/lobby.css'
+import type { GameSessionMetadata } from '../types/gameSaveState'
 
 const router = useRouter()
 const { showAlert, showConfirm } = useDialog()
@@ -32,6 +38,8 @@ const isPointsMode = ref(false)
 const pveDifficulty = ref(50)
 const aiCount = ref(1)
 const showTutorial = ref(false)
+const showSessionRecoveryModal = ref(false)
+const savedSessions = ref<GameSessionMetadata[]>([])
 
 const LOBBY_TUTORIAL_COMPLETED_KEY = 'chemistry-uno-lobby-tutorial-completed'
 const LOBBY_TUTORIAL_SKIPPED_KEY = 'chemistry-uno-lobby-tutorial-skipped'
@@ -117,6 +125,53 @@ const loadVersion = async () => {
     }
   } catch (error) {
     console.error('Failed to load version:', error)
+  }
+}
+
+const loadSavedSessions = async () => {
+  try {
+    const sessions = await getActiveGames(user.value.uid)
+    savedSessions.value = sessions
+    if (sessions.length > 0) {
+      showSessionRecoveryModal.value = true
+    }
+  } catch (error) {
+    console.error('Failed to load saved sessions:', error)
+  }
+}
+
+const handleResumeSession = async (sessionId: string) => {
+  try {
+    const session = await loadGameSession(sessionId)
+    if (!session) {
+      showAlert(td('sessionRecovery.sessionNotFound'), td('sessionRecovery.error'))
+      return
+    }
+    router.push({ name: 'game-room', params: { id: session.id }, query: { resume: sessionId } })
+  } catch (error) {
+    console.error('Failed to resume session:', error)
+    showAlert(td('sessionRecovery.failedResume'), td('sessionRecovery.error'))
+  }
+}
+
+const handleAbandonSession = async (sessionId: string) => {
+  try {
+    await deleteGameSession(sessionId)
+    savedSessions.value = savedSessions.value.filter(s => s.id !== sessionId)
+  } catch (error) {
+    console.error('Failed to abandon session:', error)
+  }
+}
+
+const handleAbandonAllSessions = async () => {
+  try {
+    for (const session of savedSessions.value) {
+      await deleteGameSession(session.id)
+    }
+    savedSessions.value = []
+    showSessionRecoveryModal.value = false
+  } catch (error) {
+    console.error('Failed to abandon all sessions:', error)
   }
 }
 
@@ -261,6 +316,11 @@ onMounted(() => {
   void loadDecks()
   void loadVersion()
   checkFirstTimeLobby()
+
+  // Load and show saved sessions if available
+  if (user.value.uid) {
+    void loadSavedSessions()
+  }
 })
 
 watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: true, immediate: true })
@@ -274,44 +334,46 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
       <div class="lobby-bg-decor-pattern"></div>
     </div>
 
-    <div class="relative z-10 flex h-[var(--app-height)] max-h-[var(--app-height)] flex-col overflow-hidden">
-      <header class="lobby-header">
-        <div class="lobby-header-container">
-          <div class="lobby-brand">
-            <div class="lobby-brand-mark">
-              <Beaker class="w-5 h-5" />
-            </div>
-            <div class="lobby-brand-copy">
-              <h1 class="lobby-brand-title">CHEMISTRY UNO / 化学 UNO</h1>
-              <p class="lobby-brand-subtitle">LOCAL REACTION CONSOLE / 本地反应控制台</p>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <div data-tutorial="user-chip" data-testid="lobby-user-chip" @click="router.push('/profile')" class="user-identity-chip cursor-pointer">
-              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center text-base shadow-inner overflow-hidden border border-slate-200 dark:border-white/5">
-                <UserAvatar :avatar="user.avatar" />
+    <PageLayout custom-class="relative z-10">
+      <template #header>
+        <header class="lobby-header">
+          <div class="lobby-header-container">
+            <div class="lobby-brand">
+              <div class="lobby-brand-mark">
+                <Beaker class="w-5 h-5" />
               </div>
-              <div class="hidden sm:flex flex-col">
-                <span class="text-xs-mobile font-black text-slate-900 dark:text-white">{{ user.nickname || td('common.localPlayer') }}</span>
-                <span class="text-[9px] text-slate-500 font-mono uppercase">{{ td('common.localProfile') }}</span>
+              <div class="lobby-brand-copy">
+                <h1 class="lobby-brand-title">CHEMISTRY UNO / 化学 UNO</h1>
+                <p class="lobby-brand-subtitle">LOCAL REACTION CONSOLE / 本地反应控制台</p>
               </div>
             </div>
 
-            <div data-tutorial="desktop-nav" class="hidden md:flex items-center gap-2">
-              <button data-testid="lobby-data-button" @click="router.push('/data')" class="lobby-nav-link" :title="td('lobby.nav.decks')">
-                <Database class="w-4 h-4" />
-              </button>
-              <button data-testid="lobby-settings-button" @click="router.push('/profile/settings')" class="lobby-nav-link" :title="td('profile.categories.settings')">
-                <Settings class="w-4 h-4" />
-              </button>
-              <button data-testid="lobby-ai-assistant-launcher" @click="openAIAssistant" class="lobby-nav-link" title="AI Assistant">
-                <Bot class="w-4 h-4" />
-              </button>
+            <div class="flex items-center gap-3">
+              <div data-tutorial="user-chip" data-testid="lobby-user-chip" @click="router.push('/profile')" class="user-identity-chip cursor-pointer">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center text-base shadow-inner overflow-hidden border border-slate-200 dark:border-white/5">
+                  <UserAvatar :avatar="user.avatar" />
+                </div>
+                <div class="hidden sm:flex flex-col">
+                  <span class="text-xs-mobile font-black text-slate-900 dark:text-white">{{ user.nickname || td('common.localPlayer') }}</span>
+                  <span class="text-[9px] text-slate-500 font-mono uppercase">{{ td('common.localProfile') }}</span>
+                </div>
+              </div>
+
+              <div data-tutorial="desktop-nav" class="hidden md:flex items-center gap-2">
+                <button data-testid="lobby-data-button" @click="router.push('/data')" class="lobby-nav-link" :title="td('lobby.nav.decks')">
+                  <Database class="w-4 h-4" />
+                </button>
+                <button data-testid="lobby-settings-button" @click="router.push('/profile/settings')" class="lobby-nav-link" :title="td('profile.categories.settings')">
+                  <Settings class="w-4 h-4" />
+                </button>
+                <button data-testid="lobby-ai-assistant-launcher" @click="openAIAssistant" class="lobby-nav-link" title="AI Assistant">
+                  <Bot class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </template>
 
       <main class="lobby-main">
         <div class="hub-header-section">
@@ -487,21 +549,23 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
         </div>
       </main>
 
-      <footer class="lobby-footer p-4 shrink-0">
-        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-mono uppercase tracking-[0.15em] gap-4">
-          <div class="flex items-center gap-4 order-2 md:order-1">
-            <span class="lobby-footer-meta">Chemistry UNO / 化学 UNO · Mendeleef Protocol v{{ appVersion }}</span>
+      <template #footer>
+        <footer class="lobby-footer p-4">
+          <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-mono uppercase tracking-[0.15em] gap-4">
+            <div class="flex items-center gap-4 order-2 md:order-1">
+              <span class="lobby-footer-meta">Chemistry UNO / 化学 UNO · Mendeleef Protocol v{{ appVersion }}</span>
+            </div>
+            <div class="lobby-footer-copy text-center md:text-right order-1 md:order-2">
+              &copy; 2026 MENDELEEF PROTOCOL. LOCAL EDITION. / 2026 MENDELEEF 协议，本地版本。
+            </div>
           </div>
-          <div class="lobby-footer-copy text-center md:text-right order-1 md:order-2">
-            &copy; 2026 MENDELEEF PROTOCOL. LOCAL EDITION. / 2026 MENDELEEF 协议，本地版本。
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </template>
+    </PageLayout>
 
-    <div v-if="showAIArenaModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
-      <div class="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showAIArenaModal = false" />
-      <div class="lobby-modal-shell mobile-modal-shell relative w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+    <!-- AI Arena Modal -->
+    <ModalContainer v-if="showAIArenaModal" @close="showAIArenaModal = false">
+      <div class="lobby-modal-shell">
         <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="lobby-modal-badge w-10 h-10 rounded-xl flex items-center justify-center">
@@ -518,7 +582,7 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
         </div>
 
         <form @submit.prevent="handleCreateAIRoom" class="flex flex-col min-h-0" data-testid="ai-room-form">
-          <div class="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+          <div class="page-scroll p-6 space-y-6">
             <div class="space-y-3">
               <label class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">{{ td('lobby.modal.roomName') }}</label>
               <input
@@ -614,11 +678,11 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
           </div>
         </form>
       </div>
-    </div>
+    </ModalContainer>
 
-    <div v-if="showDeckDetailModal && selectedDeckConfig" class="fixed inset-0 z-[100] flex items-center justify-center p-4 mobile-modal-overlay">
-      <div class="absolute inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-md animate-in fade-in" @click="showDeckDetailModal = false" />
-      <div class="lobby-modal-shell mobile-modal-shell relative w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in slide-in-from-bottom-10 duration-500">
+    <!-- Deck Detail Modal -->
+    <ModalContainer v-if="showDeckDetailModal && selectedDeckConfig" @close="showDeckDetailModal = false">
+      <div class="lobby-modal-shell">
         <div class="lobby-modal-header px-6 py-5 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="lobby-modal-badge lobby-modal-badge--deck w-10 h-10 rounded-xl flex items-center justify-center">
@@ -634,7 +698,7 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
           </button>
         </div>
 
-        <div class="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        <div class="page-scroll p-6">
           <div class="space-y-4">
             <div class="p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
               <div class="grid grid-cols-2 gap-3">
@@ -650,7 +714,7 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
             </div>
 
             <div class="p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl">
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pr-2">
                 <div v-for="(count, formula) in selectedDeckConfig.cards" :key="formula" class="p-2.5 bg-white dark:bg-black/20 rounded-lg border border-slate-200 dark:border-white/10">
                   <div class="flex items-center justify-between">
                     <span class="text-[10px] font-black text-slate-900 dark:text-white font-mono" v-html="String(formula).replace(/(\d+)/g, '<sub>$1</sub>')"></span>
@@ -662,8 +726,17 @@ watch([user, rooms, selectedDeck, activeRoom], syncAIAssistantContext, { deep: t
           </div>
         </div>
       </div>
-    </div>
+    </ModalContainer>
 
     <TutorialGuide :show="showTutorial" :steps="lobbyTutorialSteps" @close="handleTutorialClose" @complete="handleTutorialComplete" />
+    <SessionRecoveryModal
+      :open="showSessionRecoveryModal"
+      :sessions="savedSessions"
+      @close="showSessionRecoveryModal = false"
+      @resume="handleResumeSession"
+      @abandon="handleAbandonSession"
+      @abandonAll="handleAbandonAllSessions"
+      @startNew="showSessionRecoveryModal = false"
+    />
   </div>
 </template>

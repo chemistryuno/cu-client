@@ -4,6 +4,28 @@ Chemistry UNO is now a frontend-only card game. All gameplay, AI turns, chemistr
 
 No Go backend, database server, Redis, or WebSocket server is required.
 
+---
+
+## 🎮 新增功能：游戏日志 & AI 顾问系统 (v1.0.0)
+
+✨ **刚刚发布！** 为单人游戏模式集成了完整的游戏追踪和 AI 决策分析系统。
+
+**📖 查看完整文档:**
+- 🏠 [主页与快速开始](./INDEX.md)
+- 📊 [实现报告](./IMPLEMENTATION_REPORT.md)
+- 🔧 [集成指南](./GAME_LOG_AI_INTEGRATION_GUIDE.md)
+- ✅ [完成总结](./PROJECT_COMPLETION_SUMMARY.md)
+
+**主要功能:**
+- 📋 实时游戏事件日志
+- 🤖 AI 决策分析
+- 💬 实时 AI 对话
+- 📱 响应式 UI
+- 🌍 双语支持
+- ✅ 生产就绪
+
+---
+
 ## Quick Start
 
 ```bash

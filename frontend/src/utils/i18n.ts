@@ -169,6 +169,26 @@ const messages = {
         },
       },
     },
+    sessionRecovery: {
+      savedGames: '进行中的游戏',
+      noSavedGames: '没有进行中的游戏',
+      actions: '操作',
+      resumeGame: '继续游戏',
+      abandonGame: '放弃游戏',
+      abandonAll: '放弃全部',
+      newGame: '开启新游戏',
+      close: '关闭',
+      singlePlayerGame: '单人游戏',
+      multiplayerGame: '多人游戏',
+      justNow: '刚刚',
+      confirmAbandon: '确定要放弃这局游戏吗？',
+      confirmAbandonAll: '确定要放弃全部',
+      games: '局游戏吗？',
+      sessionNotFound: '游戏会话不存在',
+      failedResume: '恢复游戏失败',
+      gameResumed: '游戏已恢复',
+      error: '错误',
+    }
   },
   'en-US': {
     common: {
@@ -333,8 +353,28 @@ const messages = {
           description: 'You have completed the final achievement',
         },
       },
+    },
+    sessionRecovery: {
+      savedGames: 'In-Progress Games',
+      noSavedGames: 'No in-progress games',
+      actions: 'Actions',
+      resumeGame: 'Resume',
+      abandonGame: 'Abandon',
+      abandonAll: 'Abandon All',
+      newGame: 'New Game',
+      close: 'Close',
+      singlePlayerGame: 'Single Player',
+      multiplayerGame: 'Multiplayer',
+      justNow: 'Just now',
+      confirmAbandon: 'Are you sure you want to abandon this game?',
+      confirmAbandonAll: 'Are you sure you want to abandon all',
+      games: 'games?',
+      sessionNotFound: 'Game session not found',
+      failedResume: 'Failed to resume game',
+      gameResumed: 'Game resumed',
+      error: 'Error',
     }
-  },
+  }
 } as const
 
 const detectBrowserLocale = (): SupportedLocale => {

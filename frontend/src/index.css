@@ -522,6 +522,38 @@ body {
 
 @layer utilities {
 
+  /* ========== Layout Specification System ========== */
+
+  /* 页面根容器：固定视口高度，防止默认滚动 */
+  .page-shell {
+    @apply h-[var(--app-height)] overflow-hidden flex flex-col relative;
+  }
+
+  /* 页面滚动区域：flex: 1 + min-h-0 是关键（释放高度约束） */
+  .page-scroll {
+    @apply flex-1 min-h-0 overflow-y-auto;
+  }
+
+  /* 页面固定区域（Header/Footer）*/
+  .page-fixed {
+    @apply shrink-0;
+  }
+
+  /* Grid 布局二级分割：用于侧边栏 + 主内容的组合 */
+  .page-grid {
+    @apply grid h-full w-full min-h-0;
+  }
+
+  /* Grid 子列：必须有 min-h-0 */
+  .page-grid-col {
+    @apply min-h-0 overflow-y-auto;
+  }
+
+  /* 模态框容器：采用固定最大宽度而非最大高度 */
+  .modal-adaptive {
+    @apply max-w-2xl w-full rounded-xl overflow-hidden flex flex-col max-h-[min(90vh,calc(var(--app-height)-2rem))] sm:max-h-[85vh];
+  }
+
   /* ========== Mobile Utility Classes ========== */
 
   /* Responsive typography */
