@@ -31,8 +31,8 @@ import { createRandomNickname, hasUsableNickname } from './playerNickname'
 
 const STORAGE_KEY = CLIENT_RUNTIME_STORAGE_KEYS.state
 const TURN_TIMEOUT_MS = 25000
-const AI_TURN_DELAY_MIN_MS = 60
-const AI_TURN_DELAY_MAX_MS = 140
+const AI_TURN_DELAY_MIN_MS = 1000
+const AI_TURN_DELAY_MAX_MS = 1000
 const eventBus = new EventTarget()
 const turnTimers = new Map<string, number>()
 const aiTimers = new Map<string, number>()
