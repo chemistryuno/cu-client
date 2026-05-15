@@ -12,13 +12,17 @@ import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, Chevro
 import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
+import GameLogPanel from '../components/GameLogPanel.vue'
 import LevelUpAnimation from '../components/LevelUpAnimation.vue'
 import GameToast from '../components/GameToast.vue'
 import ChemicalKeyboard from '../components/ChemicalKeyboard.vue'
 import FeedbackSettings from '../components/FeedbackSettings.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { getTutorialStep, TUTORIAL_TOTAL_STEPS } from '../utils/tutorialScript'
+import { initializeGameLogs, clearGameLogs, recordPlayerCardPlay, recordOpponentCardPlay, recordCardDraw, recordPlayerPass, recordOpponentPass, recordGameEnd, getGameLogs } from '../utils/gameLogCollector'
+import { initializeGameContextForAI } from '../utils/gameContextForAI'
 import '../styles/mobile-game.css'
+import type { GameLogEntry } from '../types/gameLog'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,6 +100,10 @@ const handContainer = ref<HTMLElement | null>(null)
 const substancesContainer = ref<HTMLElement | null>(null)
 const playersContainer = ref<HTMLElement | null>(null)
 const levelUpAnimationRef = ref<InstanceType<typeof LevelUpAnimation> | null>(null)
+
+// Game logging for single-player mode
+const gameLogs = ref<GameLogEntry[]>([])
+const isSinglePlayerMode = ref(false)
 
 // 移动端自动全屏
 const requestFullscreen = () => {
@@ -1682,6 +1690,14 @@ onMounted(() => {
         websocket.connect()
       }
 
+      // Initialize game logging for single-player mode
+      isSinglePlayerMode.value = roomInfo.value?.is_single_player === true
+      if (isSinglePlayerMode.value) {
+        clearGameLogs()
+        initializeGameContextForAI()
+        gameLogs.value = []
+      }
+
       websocket.joinRoom(id)
       websocket.on('game_update', handleGameUpdate)
       websocket.on('player_joined', handlePlayerJoined)
@@ -3198,12 +3214,29 @@ watch(() => gameState.value?.current_player, () => {
       @click="showPlayers = false"
     ></div>
 
-    <!-- Chat Floating Sidebar -->
+    <!-- Chat/Game Log Floating Sidebar -->
     <div
       v-if="showChat && !isReplayBridgeMode"
       class="fixed right-0 top-0 bottom-0 w-full lg:w-80 z-[100] lg:top-6 lg:bottom-52 lg:right-6 flex flex-col"
     >
+      <GameLogPanel
+        v-if="isSinglePlayerMode"
+        :game-logs="gameLogs"
+        maxHeight="100%"
+        class="h-full !bg-white/95 dark:!bg-[#09131d]/96 backdrop-blur-2xl shadow-3xl lg:rounded-[28px] border-l lg:border border-slate-300/60 dark:border-white/10"
+        @log-entry-clicked="(entry) => {
+          const aiTab = document.querySelector('.ai-input') as any
+          if (aiTab) {
+            const card = entry.card
+            const question = card
+              ? `Why did I play ${card.color}·${card.element} (${card.reaction}) at step ${entry.step}?`
+              : `Why did I take this action at step ${entry.step}?`
+            aiTab.value = question
+          }
+        }"
+      />
       <ChatBox
+        v-else
         :roomId="id"
         title="实验内通信线程"
         maxHeight="100%"

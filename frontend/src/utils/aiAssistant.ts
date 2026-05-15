@@ -230,5 +230,64 @@ export const buildAssistantMessages = ({
   ]
 }
 
+/**
+ * Build AI prompt for analyzing a specific game decision
+ * Focuses on explaining why a particular card was played at a moment in time
+ */
+export const buildGameLogAnalysisPrompt = (params: {
+  logStep: number
+  cardPlayed: string
+  playerHand: string
+  centerCard: string
+  opponentHandCount: number
+  playerScore: number
+  opponentScore: number
+}): AIAssistantMessage[] => {
+  const systemPrompt = `You are a Chemistry Uno strategy coach. The player is asking why they played a specific card at a specific moment in the game.
+
+Analyze ONLY that single decision, not what happened before or after. Explain the reasoning based on:
+- The cards available to play
+- The current board state
+- Tactical considerations
+
+Keep your explanation concise and focused on that one move.`
+
+  const contextBlock = `
+Game State at this decision:
+- You played: ${params.cardPlayed}
+- Your hand: ${params.playerHand}
+- Center card: ${params.centerCard}
+- Opponent's hand count: ${params.opponentHandCount}
+- Your score: ${params.playerScore}
+- Opponent's score: ${params.opponentScore}
+
+This was step ${params.logStep} of the game.
+  `.trim()
+
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: contextBlock }
+  ]
+}
+
+/**
+ * Build AI prompt for general strategy questions with full game context
+ */
+export const buildGameStrategyPrompt = (params: {
+  gameContext: string
+  userQuestion: string
+  conversationHistory: AIAssistantMessage[]
+}): AIAssistantMessage[] => {
+  const systemPrompt = `You are a Chemistry Uno strategy coach. Help the player make the best decisions based on their current game state.
+
+Be concise, practical, and grounded in the actual game situation. Reference specific cards and tactical options.`
+
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Game Context:\n${params.gameContext}\n\nQuestion: ${params.userQuestion}` },
+    ...params.conversationHistory
+  ]
+}
+
 // 导出速率限制相关的函数
 export { getRateLimitStatus, getRemainingRequests, RATE_LIMIT_CONFIG } from './aiRateLimit'
