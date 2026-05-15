@@ -2275,7 +2275,22 @@ const dispatchOfflineRequestSync = async (config: AxiosRequestConfig): Promise<D
       const index = findPlayerIndexByUid(game, user.uid)
       if (index !== game.current_player) throw { status: 400, data: { error: 'Not your turn' } }
       assertTutorialActionAllowed(room, index, 'draw')
-      const drawCount = Math.max(1, game.pending_draw_count || 1)
+
+      const requestedCount = body?.count ? Number(body.count) : undefined
+      let drawCount: number
+
+      if (requestedCount !== undefined) {
+        // Validate requested count against game state
+        const expectedCount = game.pending_draw_count > 0 ? game.pending_draw_count : 2
+        if (requestedCount !== expectedCount) {
+          throw { status: 400, data: { error: `Invalid draw count. Expected ${expectedCount}, got ${requestedCount}` } }
+        }
+        drawCount = requestedCount
+      } else {
+        // Backward compatibility: use default logic
+        drawCount = Math.max(1, game.pending_draw_count || 2)
+      }
+
       drawCardsForPlayer(game, index, drawCount)
       game.pending_draw_count = 0
       game.pending_draw_types = []

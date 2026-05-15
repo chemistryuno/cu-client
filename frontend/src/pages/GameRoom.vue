@@ -2091,7 +2091,8 @@ const handleInputPlay = async () => {
 const handleDrawCard = async () => {
   if (!canRunTutorialAction('draw')) return
   try {
-    await gameAPI.drawCard(id)
+    const count = gameState.value?.pending_draw_count > 0 ? gameState.value.pending_draw_count : 2
+    await gameAPI.drawCard(id, count)
     feedback.drawCard()
   } catch (error: any) {
     showToast(error.response?.data?.error || '摸牌失败', '系统异常', 'error')

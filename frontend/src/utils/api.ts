@@ -194,7 +194,7 @@ export const gameAPI = {
   getMyGameReplay: (historyId: number) => api.get(`/user/game-history/${historyId}/replay`),
   playCard: (roomId: string, card: any, substance: string) => api.post(`/rooms/${roomId}/play`, { card, substance }),
   playDouble: (roomId: string, sub1: string, sub2: string) => api.post(`/rooms/${roomId}/play-double`, { sub1, sub2 }),
-  drawCard: (roomId: string) => api.post(`/rooms/${roomId}/draw`),
+  drawCard: (roomId: string, count?: number) => api.post(`/rooms/${roomId}/draw`, count !== undefined ? { count } : {}),
   getAvailableSubstances: (roomId: string) => api.get(`/rooms/${roomId}/substances`),
   getReactionHints: (roomId: string) => api.get(`/rooms/${roomId}/reaction-hints`),
   checkReaction: (r1: string, r2: string) => api.post('/game/check-reaction', { r1, r2 }),
