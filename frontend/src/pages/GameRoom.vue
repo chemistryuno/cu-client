@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
 import BilingualText from '../components/BilingualText.vue'
 import { useI18n } from '../utils/i18n'
-import { gameAPI, authAPI, commonAPI, substanceAPI, friendAPI } from '../utils/api'
+import { gameAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
@@ -46,11 +46,6 @@ try {
 const gameState = ref<any>(null)
 const roomInfo = ref<any>(null)
 const playersInfo = ref<any[]>([])
-const friendsList = ref<any[]>([])
-const friendMap = computed(() => {
-  const entries = friendsList.value.map((friend) => [Number(friend.uid), friend] as const)
-  return new Map(entries)
-})
 const availableSubstances = ref<string[]>([])
 
 // 教学模式检测
@@ -243,45 +238,21 @@ const handleToggleReady = async () => {
   }
 }
 
-const isFriend = (uid: number) => {
-  return friendMap.value.has(Number(uid))
-}
-
-// 获取玩家显示名称（优先显示备注）
 const getPlayerDisplayName = (player: any) => {
   if (!player) return '研究员'
 
-  // 如果是 AI 玩家，显示其分配到的科学家姓名
   if (player.uid < 0 || player.is_ai) {
     return player.nickname || 'AI'
   }
 
-  // 查找好友备注
-  const friend = friendMap.value.get(Number(player.uid))
-  if (friend?.remark) {
-    return friend.remark
-  }
-
-  // 否则返回昵称或用户名
   return player.nickname || player.username || '研究员'
 }
-
-// 检查是否应该用蓝色显示（有备注的好友）
-const shouldShowInBlue = (player: any) => {
-  if (!player) return false
-  const friend = friendMap.value.get(Number(player.uid))
-  return !!(friend?.remark)
-}
-
-// Friends logic removed in offline mode
-const handleAddFriend = () => {}
 
 // Chat system
 const showPlayers = ref(false)
 const showChat = ref(false)
 const hasNewMessage = ref(false)
 const showQrModal = ref(false)
-const showInviteFriendsModal = ref(false)
 
 // 动画状态管理
 const drawAnimatingUIDs = ref<Set<number>>(new Set())
@@ -319,9 +290,6 @@ const pushRoomNotice = (
 
 // startPrivateChat 已被弃用，实验室内禁止私聊
 
-
-// Game invites removed in offline mode
-const sendGameInvite = () => {}
 
 
 
@@ -1706,16 +1674,6 @@ onMounted(() => {
     }
   }, 15000)
 
-  if (!OFFLINE_MODE) {
-    void friendAPI.getFriends()
-      .then(res => {
-        friendsList.value = res.data || []
-      })
-      .catch(err => {
-        console.error('Failed to load friends list:', err)
-        friendsList.value = []
-      })
-  }
 
   loadGameState()
     .then(() => {
@@ -2794,7 +2752,7 @@ watch(() => gameState.value?.current_player, () => {
                 </Transition>
              </div>
              <div class="text-center relative z-10">
-                <h3 class="text-lg sm:text-xl font-black uppercase tracking-[0.2em]" :class="shouldShowInBlue(allPlayers[gameState?.current_player]) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-800 dark:text-white'">
+                <h3 class="text-lg sm:text-xl font-black uppercase tracking-[0.2em]" :class="'text-slate-800 dark:text-white'">
                    等待 <span>{{ getPlayerDisplayName(allPlayers[gameState?.current_player]) }}</span> 出牌
                 </h3>
                 <p class="text-[8px] font-bold text-slate-500 mt-1 uppercase italic tracking-tighter">
@@ -3032,7 +2990,7 @@ watch(() => gameState.value?.current_player, () => {
                             </div>
                             
                             <div class="flex flex-col items-start leading-tight">
-                              <span class="text-xs font-black flex items-center gap-1.5" :class="shouldShowInBlue(item.player) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-100'">
+                              <span class="text-xs font-black flex items-center gap-1.5" :class="'text-slate-700 dark:text-slate-100'">
                                 <span class="truncate max-w-[100px]">{{ getPlayerDisplayName(item.player) }}</span>
                                 <span v-if="item.uid === user.uid" class="px-1 py-0.5 bg-blue-500 text-[6px] text-white rounded-md uppercase font-mono shrink-0">ME</span>
                               </span>
@@ -3128,61 +3086,6 @@ watch(() => gameState.value?.current_player, () => {
 
 
 
-    <!-- Invite Friends Modal -->
-    <div v-if="showInviteFriendsModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-md clickable" @click="showInviteFriendsModal = false"></div>
-      <div class="relative w-full max-w-lg bg-white dark:bg-[#121216] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-        <div class="p-8 border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-                <UserPlus class="w-6 h-6 text-blue-500" />
-                邀请好友加入
-              </h3>
-              <p class="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em] mt-2">选择一位好友发送游戏邀请</p>
-            </div>
-            <button @click="showInviteFriendsModal = false" class="p-2 hover:bg-slate-200 dark:hover:bg-white/5 rounded-full transition-colors">
-              <X class="w-6 h-6 text-slate-400" />
-            </button>
-          </div>
-        </div>
-
-        <div class="p-8 max-h-[500px] overflow-y-auto custom-scrollbar">
-          <div v-if="friendsList.length === 0" class="flex flex-col items-center justify-center py-16 opacity-20 grayscale">
-            <Users class="w-16 h-16 mb-4" />
-            <p class="text-sm font-black uppercase tracking-[0.2em]">暂无好友</p>
-            <p class="text-[10px] mt-2 italic font-medium uppercase">请先添加好友后再邀请</p>
-          </div>
-          <div v-else class="space-y-3">
-            <button
-              v-for="friend in friendsList"
-              :key="friend.uid"
-              @click="sendGameInvite(friend)"
-              class="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] flex items-center justify-between hover:border-blue-500/30 hover:bg-blue-500/5 transition-all group"
-            >
-              <div class="flex items-center gap-4">
-                <div class="relative">
-                  <div class="w-12 h-12 rounded-xl bg-white dark:bg-white/10 flex items-center justify-center text-2xl border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
-                    <UserAvatar :avatar="friend.avatar" />
-                  </div>
-                  <div v-if="friend.is_online" class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-3 border-white dark:border-[#121216] rounded-full shadow-lg shadow-emerald-500/20"></div>
-                </div>
-                <div class="text-left">
-                  <div class="text-base font-bold flex items-center gap-2" :class="friend.remark ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-white'">
-                    {{ friend.remark || friend.nickname || friend.username }}
-                    <span v-if="friend.is_online" class="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 text-[8px] font-black rounded uppercase tracking-widest">Online</span>
-                  </div>
-                  <div class="text-[9px] text-slate-400 font-mono mt-1">UID: {{ friend.uid }}</div>
-                </div>
-              </div>
-              <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500 transition-all">
-                <Send class="w-4 h-4 text-blue-500 group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Players Floating Panel -->
     <div
@@ -3273,7 +3176,7 @@ watch(() => gameState.value?.current_player, () => {
             <div class="flex-1 min-w-0 flex flex-col justify-center">
                <div class="flex items-center justify-between h-4">
                   <span class="text-xs sm:text-[11px] font-black truncate tracking-tight uppercase" :class="[
-                     gameState?.current_player === index ? 'text-white' : (shouldShowInBlue(player) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-800 dark:text-slate-200')
+                     gameState?.current_player === index ? 'text-white' : 'text-slate-800 dark:text-slate-200'
                   ]">{{ getPlayerDisplayName(player) }}</span>
                   <div class="flex items-center gap-1">
                      <Zap v-if="player.double_action_available" :class="cn('w-3 h-3 fill-current', gameState?.current_player === index ? 'text-amber-300' : 'text-amber-500')" />
@@ -3298,14 +3201,8 @@ watch(() => gameState.value?.current_player, () => {
                         </div>
                      </template>
                   </div>
-                  
+
                   <div class="flex items-center gap-0.5">
-                     <button v-if="Number(player.uid) !== Number(user.uid) && !isFriend(player.uid) && !isReplayBridgeMode"
-                             @click.stop="handleAddFriend(player)"
-                             :class="cn('p-0.5 rounded-md transition-all active:scale-90', gameState?.current_player === index ? 'bg-white/20 text-white' : 'bg-slate-200/50 dark:bg-white/5 text-slate-500')"
-                     >
-                       <UserPlus class="w-2.5 h-2.5" />
-                     </button>
 
                   </div>
                </div>

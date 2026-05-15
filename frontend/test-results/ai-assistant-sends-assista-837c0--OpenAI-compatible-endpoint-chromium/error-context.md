@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: player-journey.spec.ts >> login lobby and room stay inside the mobile viewport without page scrolling
-- Location: tests\e2e\player-journey.spec.ts:24:1
+- Name: ai-assistant.spec.ts >> sends assistant prompt through the configured OpenAI-compatible endpoint
+- Location: tests\e2e\ai-assistant.spec.ts:40:1
 
 # Error details
 
@@ -35,7 +35,7 @@ Call log:
       - <vite-error-overlay></vite-error-overlay> intercepts pointer events
     - retrying click action
       - waiting 100ms
-    104 × waiting for element to be visible, enabled and stable
+    102 × waiting for element to be visible, enabled and stable
         - element is visible, enabled and stable
         - scrolling into view if needed
         - done scrolling
@@ -57,129 +57,141 @@ Call log:
           - generic [ref=e13]:
             - heading "CHEMISTRY UNO / 化学 UNO" [level=1] [ref=e14]
             - paragraph [ref=e15]: LOCAL REACTION CONSOLE / 本地反应控制台
-        - img [ref=e19] [cursor=pointer]
-    - main [ref=e21]:
-      - generic [ref=e23]:
-        - generic [ref=e24]:
-          - generic [ref=e26]: 单机模式 / Local Mode
-          - generic [ref=e28]: Reactor Ready / 反应器就绪
-        - heading "本地 AI 对战大厅 / Local AI Battle Lobby" [level=2] [ref=e29]
-        - paragraph [ref=e30]: 当前版本仅保留玩家 VS AI 模式。昵称、头像、战绩和设置都会保存在当前设备中。 / This build focuses on Player vs AI. Your nickname, avatar, records, and settings are saved on this device.
-      - generic [ref=e31]:
-        - generic [ref=e32]:
-          - img [ref=e35]
-          - generic [ref=e38]:
-            - generic [ref=e39]:
-              - generic [ref=e40]:
-                - generic [ref=e41]:
-                  - generic [ref=e42]: 单机模式 / Local Mode
-                  - generic [ref=e43]: Compact Console / 紧凑控制台
-                - heading "AI 竞技场 / AI Arena" [level=3] [ref=e44]
-                - paragraph [ref=e45]: 本地 PvE 模式 / Local PvE Mode
-              - img [ref=e47]
-            - generic [ref=e50]:
-              - generic [ref=e51]:
-                - generic [ref=e52]: 牌组 / Deck
-                - generic [ref=e53]: Offline Default Deck
-              - generic [ref=e54]:
-                - generic [ref=e55]: 燃素 / Points
-                - generic [ref=e56]: "0"
+        - generic [ref=e16]:
+          - generic [ref=e17] [cursor=pointer]:
+            - img [ref=e19]
+            - generic [ref=e21]:
+              - generic [ref=e22]: AIAssistantUser
+              - generic [ref=e23]: 本地资料 / Local Profile
+          - generic [ref=e24]:
+            - button "本地牌组 / Local Decks" [ref=e25]:
+              - img [ref=e26]
+            - button "外观偏好 / Appearance" [ref=e30]:
+              - img [ref=e31]
+            - button "AI Assistant" [ref=e34]:
+              - img [ref=e35]
+    - main [ref=e38]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e43]: 单机模式 / Local Mode
+          - generic [ref=e45]: Reactor Ready / 反应器就绪
+        - heading "本地 AI 对战大厅 / Local AI Battle Lobby" [level=2] [ref=e46]
+        - paragraph [ref=e47]: 当前版本仅保留玩家 VS AI 模式。昵称、头像、战绩和设置都会保存在当前设备中。 / This build focuses on Player vs AI. Your nickname, avatar, records, and settings are saved on this device.
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - img [ref=e52]
+          - generic [ref=e55]:
+            - generic [ref=e56]:
               - generic [ref=e57]:
-                - generic [ref=e58]: Protocol / 协议
-                - generic [ref=e59]: 28 Elements / 元素
-            - generic [ref=e60]:
-              - generic [ref=e61]:
-                - paragraph [ref=e62]: 当前玩家 / Current Player
-                - generic [ref=e63]:
-                  - img [ref=e65]
-                  - generic [ref=e67]:
-                    - paragraph [ref=e68]: ViewportLock
-                    - paragraph [ref=e69]: 本机存档 / Local Save
-              - generic [ref=e70]:
-                - paragraph [ref=e71]: 牌组 / Deck
-                - button "Offline Default Deck 查看当前 AI 对战使用的牌组配置 / View the deck used for the current AI match" [ref=e72]:
-                  - paragraph [ref=e73]: Offline Default Deck
-                  - paragraph [ref=e74]:
-                    - img [ref=e75]
-                    - text: 查看当前 AI 对战使用的牌组配置 / View the deck used for the current AI match
+                - generic [ref=e58]:
+                  - generic [ref=e59]: 单机模式 / Local Mode
+                  - generic [ref=e60]: Compact Console / 紧凑控制台
+                - heading "AI 竞技场 / AI Arena" [level=3] [ref=e61]
+                - paragraph [ref=e62]: 本地 PvE 模式 / Local PvE Mode
+              - img [ref=e64]
+            - generic [ref=e67]:
+              - generic [ref=e68]:
+                - generic [ref=e69]: 牌组 / Deck
+                - generic [ref=e70]: Offline Default Deck
+              - generic [ref=e71]:
+                - generic [ref=e72]: 燃素 / Points
+                - generic [ref=e73]: "0"
+              - generic [ref=e74]:
+                - generic [ref=e75]: Protocol / 协议
+                - generic [ref=e76]: 28 Elements / 元素
             - generic [ref=e77]:
-              - button "AI 竞技场 / AI Arena" [ref=e78]:
-                - img [ref=e79]
-                - generic [ref=e81]: AI 竞技场 / AI Arena
-              - button "教学关卡 / Tutorial Match" [ref=e82]:
-                - img [ref=e83]
-                - generic [ref=e85]: 教学关卡 / Tutorial Match
-        - generic [ref=e86]:
-          - generic [ref=e87]:
-            - generic [ref=e89]:
-              - paragraph [ref=e90]: Run Status / 运行状态
-              - heading "Match Console / 对局控制台" [level=3] [ref=e91]
-            - generic [ref=e92]:
-              - generic [ref=e95]:
-                - paragraph [ref=e96]: 当前玩家 / Current Player
-                - paragraph [ref=e97]: ViewportLock
-              - generic [ref=e100]:
-                - paragraph [ref=e101]: 牌组 / Deck
-                - paragraph [ref=e102]: Offline Default Deck
-              - generic [ref=e105]:
-                - paragraph [ref=e106]: 燃素 / Points
-                - paragraph [ref=e107]: 0 / 28 Elements / 元素
-          - generic [ref=e108]:
-            - generic [ref=e110]:
-              - paragraph [ref=e111]: Quick Access / 快速入口
-              - heading "Control Deck / 控制台" [level=3] [ref=e112]
-            - paragraph [ref=e113]: 进入资料、牌组和设置，维持本地实验环境整洁、快速、可控。 / Open profile, decks, and settings to keep the local lab environment clean, fast, and manageable.
-            - generic [ref=e114]:
-              - button "本地资料 / Local Profile" [ref=e115]:
-                - img [ref=e116]
-                - generic [ref=e119]: 本地资料 / Local Profile
-              - button "本地牌组 / Local Decks" [ref=e120]:
-                - img [ref=e121]
-                - generic [ref=e125]: 本地牌组 / Local Decks
-              - button "外观偏好 / Appearance" [ref=e126]:
-                - img [ref=e127]
-                - generic [ref=e130]: 外观偏好 / Appearance
-              - button "重设本地资料 / Reset Local Profile" [ref=e131]:
-                - img [ref=e132]
-                - generic [ref=e135]: 重设本地资料 / Reset Local Profile
-    - contentinfo [ref=e136]:
-      - generic [ref=e137]:
-        - generic [ref=e139]: Chemistry UNO / 化学 UNO · Mendeleef Protocol vChemistry UNO Offline Local Build
-        - generic [ref=e140]: © 2026 MENDELEEF PROTOCOL. LOCAL EDITION. / 2026 MENDELEEF 协议，本地版本。
-  - generic [ref=e143]:
-    - generic [ref=e144]:
-      - generic [ref=e145]:
-        - img [ref=e147]
-        - generic [ref=e150]:
-          - paragraph [ref=e151]: Guide
-          - heading "欢迎来到单机模式 / Welcome to Local Mode" [level=3] [ref=e152]
-      - button "关闭引导" [ref=e153]:
-        - img [ref=e154]
-    - generic [ref=e158]:
-      - generic [ref=e159]: STEP 1 / 5
-      - generic [ref=e160]: 20%
-    - paragraph [ref=e163]: 这里是本地单机版的化学 UNO。你可以直接挑战 AI，或先进入教学关卡熟悉出牌和反应规则。 / This is the local single-player edition of Chemistry UNO. You can challenge AI directly or start with the tutorial.
-    - generic [ref=e164]:
-      - generic [ref=e165]: 键盘：← / → 切换
-      - generic [ref=e166]: Esc 跳过引导
-    - generic [ref=e167]:
-      - button "跳过引导" [ref=e168]
-      - button "下一步" [ref=e169]:
-        - generic [ref=e170]: 下一步
+              - generic [ref=e78]:
+                - paragraph [ref=e79]: 当前玩家 / Current Player
+                - generic [ref=e80]:
+                  - img [ref=e82]
+                  - generic [ref=e84]:
+                    - paragraph [ref=e85]: AIAssistantUser
+                    - paragraph [ref=e86]: 本机存档 / Local Save
+              - generic [ref=e87]:
+                - paragraph [ref=e88]: 牌组 / Deck
+                - button "Offline Default Deck 查看当前 AI 对战使用的牌组配置 / View the deck used for the current AI match" [ref=e89]:
+                  - paragraph [ref=e90]: Offline Default Deck
+                  - paragraph [ref=e91]:
+                    - img [ref=e92]
+                    - text: 查看当前 AI 对战使用的牌组配置 / View the deck used for the current AI match
+            - generic [ref=e94]:
+              - button "AI 竞技场 / AI Arena" [ref=e95]:
+                - img [ref=e96]
+                - generic [ref=e98]: AI 竞技场 / AI Arena
+              - button "教学关卡 / Tutorial Match" [ref=e99]:
+                - img [ref=e100]
+                - generic [ref=e102]: 教学关卡 / Tutorial Match
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - generic [ref=e106]:
+              - paragraph [ref=e107]: Run Status / 运行状态
+              - heading "Match Console / 对局控制台" [level=3] [ref=e108]
+            - generic [ref=e109]:
+              - generic [ref=e112]:
+                - paragraph [ref=e113]: 当前玩家 / Current Player
+                - paragraph [ref=e114]: AIAssistantUser
+              - generic [ref=e117]:
+                - paragraph [ref=e118]: 牌组 / Deck
+                - paragraph [ref=e119]: Offline Default Deck
+              - generic [ref=e122]:
+                - paragraph [ref=e123]: 燃素 / Points
+                - paragraph [ref=e124]: 0 / 28 Elements / 元素
+          - generic [ref=e125]:
+            - generic [ref=e127]:
+              - paragraph [ref=e128]: Quick Access / 快速入口
+              - heading "Control Deck / 控制台" [level=3] [ref=e129]
+            - paragraph [ref=e130]: 进入资料、牌组和设置，维持本地实验环境整洁、快速、可控。 / Open profile, decks, and settings to keep the local lab environment clean, fast, and manageable.
+            - generic [ref=e131]:
+              - button "本地资料 / Local Profile" [ref=e132]:
+                - img [ref=e133]
+                - generic [ref=e136]: 本地资料 / Local Profile
+              - button "本地牌组 / Local Decks" [ref=e137]:
+                - img [ref=e138]
+                - generic [ref=e142]: 本地牌组 / Local Decks
+              - button "外观偏好 / Appearance" [ref=e143]:
+                - img [ref=e144]
+                - generic [ref=e147]: 外观偏好 / Appearance
+              - button "重设本地资料 / Reset Local Profile" [ref=e148]:
+                - img [ref=e149]
+                - generic [ref=e152]: 重设本地资料 / Reset Local Profile
+    - contentinfo [ref=e153]:
+      - generic [ref=e154]:
+        - generic [ref=e156]: Chemistry UNO / 化学 UNO · Mendeleef Protocol vChemistry UNO Offline Local Build
+        - generic [ref=e157]: © 2026 MENDELEEF PROTOCOL. LOCAL EDITION. / 2026 MENDELEEF 协议，本地版本。
+  - generic [ref=e160]:
+    - generic [ref=e161]:
+      - generic [ref=e162]:
+        - img [ref=e164]
+        - generic [ref=e167]:
+          - paragraph [ref=e168]: Guide
+          - heading "欢迎来到单机模式 / Welcome to Local Mode" [level=3] [ref=e169]
+      - button "关闭引导" [ref=e170]:
         - img [ref=e171]
-  - generic [ref=e175]:
-    - generic [ref=e176]: "[plugin:vite:vue] Attribute name cannot contain U+0022 (\"), U+0027 ('), and U+003C (<)."
-    - generic [ref=e177]: D:/SystemFolders/Desktop/projects/cu-client/frontend/src/pages/GameRoom.vue:2503:144
-    - generic [ref=e178]: 2501| 2502| <div class="flex items-center gap-2"> 2503| <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="鍊嶉€? en="Speed" /></span> | ^ 2504| <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5"> 2505| <button
-    - generic [ref=e179]: at createCompilerError (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1378:17) at Object.emitError [as onerr] (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:3014:5) at Tokenizer.stateInAttrName (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:868:16) at Tokenizer.parse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1117:16) at Object.baseParse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:3053:13) at Object.parse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-dom@3.5.27\node_modules\@vue\compiler-dom\dist\compiler-dom.cjs.js:910:23) at Object.parse$1 [as parse] (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-sfc@3.5.27\node_modules\@vue\compiler-sfc\dist\compiler-sfc.cjs.js:1824:24) at createDescriptor (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:71:43) at transformMain (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:2421:34) at TransformPluginContext.transform (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:3053:16
-    - generic [ref=e180]:
+    - generic [ref=e175]:
+      - generic [ref=e176]: STEP 1 / 5
+      - generic [ref=e177]: 20%
+    - paragraph [ref=e180]: 这里是本地单机版的化学 UNO。你可以直接挑战 AI，或先进入教学关卡熟悉出牌和反应规则。 / This is the local single-player edition of Chemistry UNO. You can challenge AI directly or start with the tutorial.
+    - generic [ref=e181]:
+      - generic [ref=e182]: 键盘：← / → 切换
+      - generic [ref=e183]: Esc 跳过引导
+    - generic [ref=e184]:
+      - button "跳过引导" [ref=e185]
+      - button "下一步" [ref=e186]:
+        - generic [ref=e187]: 下一步
+        - img [ref=e188]
+  - generic [ref=e192]:
+    - generic [ref=e193]: "[plugin:vite:vue] Attribute name cannot contain U+0022 (\"), U+0027 ('), and U+003C (<)."
+    - generic [ref=e194]: D:/SystemFolders/Desktop/projects/cu-client/frontend/src/pages/GameRoom.vue:2503:144
+    - generic [ref=e195]: 2501| 2502| <div class="flex items-center gap-2"> 2503| <span class="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300"><BilingualText zh="鍊嶉€? en="Speed" /></span> | ^ 2504| <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-amber-500/20 bg-white/60 dark:bg-white/5"> 2505| <button
+    - generic [ref=e196]: at createCompilerError (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1378:17) at Object.emitError [as onerr] (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:3014:5) at Tokenizer.stateInAttrName (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:868:16) at Tokenizer.parse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:1117:16) at Object.baseParse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-core@3.5.27\node_modules\@vue\compiler-core\dist\compiler-core.cjs.js:3053:13) at Object.parse (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-dom@3.5.27\node_modules\@vue\compiler-dom\dist\compiler-dom.cjs.js:910:23) at Object.parse$1 [as parse] (D:\SystemFolders\Desktop\projects\cu-client\frontend\node_modules\.pnpm\@vue+compiler-sfc@3.5.27\node_modules\@vue\compiler-sfc\dist\compiler-sfc.cjs.js:1824:24) at createDescriptor (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:71:43) at transformMain (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:2421:34) at TransformPluginContext.transform (file:///D:/SystemFolders/Desktop/projects/cu-client/frontend/node_modules/.pnpm/@vitejs+plugin-vue@5.2.4_vi_b63e7d7be5344b893cf40fe93a459103/node_modules/@vitejs/plugin-vue/dist/index.mjs:3053:16
+    - generic [ref=e197]:
       - text: Click outside, press Esc key, or fix the code to dismiss.
       - text: You can also disable this overlay by setting
-      - code [ref=e181]: server.hmr.overlay
+      - code [ref=e198]: server.hmr.overlay
       - text: to
-      - code [ref=e182]: "false"
+      - code [ref=e199]: "false"
       - text: in
-      - code [ref=e183]: vite.config.ts
+      - code [ref=e200]: vite.config.ts
       - text: .
 ```
 

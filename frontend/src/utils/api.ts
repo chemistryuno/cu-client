@@ -277,15 +277,6 @@ export const substanceAPI = {
   rejectSubstance: (id: number) => api.delete(`/data/substances/${id}/reject`)
 }
 
-export const friendAPI = {
-  sendRequest: (friendUID: number, message = '') => api.post('/friends/request', { friend_uid: friendUID, message }),
-  getPendingRequests: () => api.get('/friends/pending'),
-  handleRequest: (requestId: number, action: 'accept' | 'decline') => api.post('/friends/handle', { request_id: requestId, action }),
-  getFriends: () => api.get('/friends'),
-  deleteFriend: (friendUID: number) => api.delete(`/friends/${friendUID}`),
-  setRemark: (friendUID: number, remark: string) => api.post('/friends/remark', { friend_uid: friendUID, remark })
-}
-
 export const pluginAPI = {
   getPluginCards: () => api.get('/plugin-cards'),
   getPluginsWithCards: () => api.get('/plugins'),
