@@ -1,6 +1,7 @@
 import initSqlJs, { type Database } from 'sql.js'
 import sqliteWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import { CLIENT_RUNTIME_STORAGE_KEYS, clientRuntimeStorage } from './clientRuntimeStorage'
+import { CHEMICAL_EQUATIONS } from './chemicalEquations'
 
 type RuntimeRecord = Record<string, any>
 type TableName = 'announcements' | 'reactions' | 'substances' | 'configs' | 'leaderboard'
@@ -235,12 +236,34 @@ const seedFromStorage = (db: Database) => {
   })
 }
 
+const seedHardcodedEquations = (db: Database) => {
+  if (tableCount(db, 'reactions') > 0) return
+
+  CHEMICAL_EQUATIONS.forEach((equation, index) => {
+    const parts = equation.split('=')
+    if (parts.length !== 2) return
+
+    const reactants = parts[0].trim().split('+').map(s => s.trim())
+    if (reactants.length < 2) return
+
+    const record = {
+      id: index + 1,
+      r1: reactants[0],
+      r2: reactants[1],
+      status: 'approved',
+      display: equation,
+    }
+    insertReaction(db, record, index)
+  })
+}
+
 const createDatabase = async () => {
   const SQL = await initSqlJs({ locateFile: getWasmPath })
   const persisted = loadPersistedDatabase()
   const db = persisted ? new SQL.Database(persisted) : new SQL.Database()
   runMigrations(db)
   seedFromStorage(db)
+  seedHardcodedEquations(db)
   dbInstance = db
   persistDatabase(db)
   return db
