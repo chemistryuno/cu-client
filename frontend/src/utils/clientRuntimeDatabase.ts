@@ -236,6 +236,35 @@ const seedFromStorage = (db: Database) => {
   })
 }
 
+const extractChemicalFormula = (substance: string): string => {
+  const trimmed = substance.trim()
+  let result = ''
+  let i = 0
+  let foundLetterOrParen = false
+
+  while (i < trimmed.length) {
+    const char = trimmed[i]
+
+    if (char === '↑' || char === '↓') {
+      break
+    }
+
+    if (/[A-Za-z([\]]/.test(char)) {
+      foundLetterOrParen = true
+      result += char
+    } else if (foundLetterOrParen && /[\d()[\]]/.test(char)) {
+      result += char
+    } else if (!foundLetterOrParen && /\d/.test(char)) {
+      i++
+      continue
+    }
+
+    i++
+  }
+
+  return result
+}
+
 const seedHardcodedEquations = (db: Database) => {
   if (tableCount(db, 'reactions') > 0) return
 
@@ -246,10 +275,14 @@ const seedHardcodedEquations = (db: Database) => {
     const reactants = parts[0].trim().split('+').map(s => s.trim())
     if (reactants.length < 2) return
 
+    const r1 = extractChemicalFormula(reactants[0])
+    const r2 = extractChemicalFormula(reactants[1])
+    if (!r1 || !r2) return
+
     const record = {
       id: index + 1,
-      r1: reactants[0],
-      r2: reactants[1],
+      r1,
+      r2,
       status: 'approved',
       display: equation,
     }
