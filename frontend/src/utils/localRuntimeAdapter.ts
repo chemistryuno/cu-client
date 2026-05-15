@@ -903,7 +903,13 @@ const parseBooleanQueryValue = (value: string | undefined) => {
   return null
 }
 
-const readRuntimeReactions = () => reactionRepository.read(buildDefaultReactions())
+const readRuntimeReactions = () => {
+  // First try to load from database (which should have hardcoded equations)
+  const dbReactions = reactionRepository.read([])
+  if (dbReactions.length > 0) return dbReactions
+  // Only fallback to buildDefaultReactions if database is truly empty
+  return reactionRepository.read(buildDefaultReactions())
+}
 const writeRuntimeReactions = (records: Array<Record<string, any>>) => {
   const next = reactionRepository.write(records)
   runtimeIndexesReady = false

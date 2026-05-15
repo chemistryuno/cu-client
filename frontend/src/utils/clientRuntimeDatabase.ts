@@ -385,6 +385,9 @@ export const runtimeSqlite = {
     const result = rows('SELECT display FROM reactions WHERE pair_key = ? AND status = ? ORDER BY id ASC LIMIT 1', [pairKey(left, right), 'approved'])
     return result[0]?.display ? String(result[0].display) : null
   },
+  countReactions() {
+    return tableCount(getClientRuntimeDatabase(), 'reactions')
+  },
   listReactionPairs() {
     return rows('SELECT r1, r2, display FROM reactions WHERE status = ? ORDER BY id ASC', ['approved'])
       .map((row) => ({ r1: String(row.r1 || ''), r2: String(row.r2 || ''), display: String(row.display || '') }))
