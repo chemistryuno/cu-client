@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { OFFLINE_MODE } from '../utils/runtimeConfig'
 import { useRoute, useRouter } from 'vue-router'
 import PhlogistonIcon from '../components/icons/PhlogistonIcon.vue'
 import BilingualText from '../components/BilingualText.vue'
 import { useI18n } from '../utils/i18n'
-import { gameAPI, authAPI, commonAPI, substanceAPI } from '../utils/api'
+import { gameAPI, commonAPI, substanceAPI } from '../utils/api'
 import { useDialog, setToastRef } from '../utils/dialog'
 import websocket from '../utils/websocket'
 import feedback from '../utils/feedback'
-import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Copy, Sparkles, ShieldAlert, Ban, X, MessageCircle, Flag, Send, Binary, Radar, Orbit, Users, QrCode, UserPlus } from 'lucide-vue-next'
+import { ArrowLeft, Play, RefreshCw, Zap, Activity, FlaskConical, Trophy, ChevronRight, Loader2, Timer, Plus, Sparkles, Ban, X, MessageCircle, Binary, Radar, Orbit, Users, QrCode } from 'lucide-vue-next'
 import { cn } from '../utils/cn'
 import { consoleButton } from '../utils/ui'
 import ChatBox from '../components/ChatBox.vue'
@@ -24,7 +23,7 @@ import '../styles/mobile-game.css'
 const route = useRoute()
 const router = useRouter()
 const { td } = useI18n()
-const { showAlert, showConfirm, showPrompt, showToast } = useDialog()
+const { showAlert, showConfirm, showToast } = useDialog()
 const gameToastRef = ref()
 const id = route.params.id as string
 const replayHistoryQueryID = computed(() => Number(route.query.replay_history_id || 0))
@@ -252,7 +251,6 @@ const getPlayerDisplayName = (player: any) => {
 const showPlayers = ref(false)
 const showChat = ref(false)
 const hasNewMessage = ref(false)
-const showQrModal = ref(false)
 
 // 动画状态管理
 const drawAnimatingUIDs = ref<Set<number>>(new Set())
@@ -264,7 +262,7 @@ const playersCardState = computed(() => {
 })
 
 // 改为监听简化版本而不是deep watch
-watch(playersCardState, (newState) => {
+watch(playersCardState, () => {
   if (!gameState.value?.players) return
   gameState.value.players.forEach((p: any) => {
     const oldVal = playerCardCounts.value[p.uid]
@@ -506,11 +504,6 @@ const winner = computed(() => {
      return gameState.value.players.find((p: any) => p.uid === winnerUid)
   }
   return gameState.value.players?.find((p: any) => p.card_count === 0)
-})
-const specialCards = new Set(['+2', '+4', 'Au', 'He', 'Ne', 'Ar', 'Kr'])
-const isFunctionalLastCard = computed(() => {
-  if (!gameState.value?.last_card) return false
-  return specialCards.has(gameState.value.last_card.substance)
 })
 const isAnyPlayWindow = computed(() => gameState.value?.status === 'playing' && Number(gameState.value?.allowed_any_player) >= 0)
 const centerCard = computed(() => gameState.value?.last_card || null)
@@ -2095,35 +2088,6 @@ const handleLeaveRoom = async () => {
   } catch (error) {
     console.error('离开房间失败:', error)
     router.push('/')
-  }
-}
-
-// 生成分享链接（私密房间自动带密钥）
-const shareLink = computed(() => {
-  const currentUrl = window.location.href
-  // 如果是私密房间且有访问密钥，自动添加key参数
-  if (roomInfo.value?.is_private && roomInfo.value?.access_key) {
-    // 检查URL中是否已经包含key参数
-    if (!currentUrl.includes('?key=')) {
-      const separator = currentUrl.includes('?') ? '&' : '?'
-      return `${currentUrl}${separator}key=${roomInfo.value.access_key}`
-    }
-  }
-  return currentUrl
-})
-
-const handleCopyLink = async () => {
-  try {
-    await navigator.clipboard.writeText(shareLink.value)
-    feedback.success()
-    if (roomInfo.value?.is_private) {
-      showToast('私密房间邀请链接已复制（含访问密钥），快发送给你的科研伙伴吧！', '任务下达', 'success')
-    } else {
-      showToast('实验邀请链接已复制到剪贴板，快发送给你的科研伙伴吧！', '任务下达', 'success')
-    }
-  } catch (err) {
-    feedback.error()
-    showToast('链接复制失败，请手动复制浏览器地址栏', '设备故障', 'error')
   }
 }
 
